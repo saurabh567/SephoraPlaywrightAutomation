@@ -1,0 +1,50 @@
+name: Sephora Playwright Cucumber Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Cucumber tests
+        env:
+          ENV: dev
+          BROWSER: chromium
+          HEADLESS: true
+          PARALLEL: 2
+          RETRIES: 1
+        run: npm test
+
+      - name: Generate report
+        if: always()
+        run: npm run report
+
+      - name: Upload automation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sephora-automation-artifacts
+          path: |
+            reports/**
+            logs/**

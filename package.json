@@ -1,0 +1,28 @@
+{
+  "name": "sephora-playwright-automation",
+  "version": "1.0.0",
+  "description": "Industry-standard Playwright JavaScript Cucumber BDD automation framework for Sephora India UI.",
+  "main": "index.js",
+  "scripts": {
+    "pretest": "node utils/cleanReports.js",
+    "test": "cucumber-js --config cucumber.js",
+    "test:smoke": "cucumber-js --config cucumber.js --tags @smoke",
+    "test:regression": "cucumber-js --config cucumber.js --tags @regression",
+    "test:login": "cucumber-js --config cucumber.js --tags @login",
+    "test:headed": "HEADLESS=false cucumber-js --config cucumber.js",
+    "test:firefox": "BROWSER=firefox cucumber-js --config cucumber.js",
+    "test:webkit": "BROWSER=webkit cucumber-js --config cucumber.js",
+    "report": "node utils/generateReport.js"
+  },
+  "keywords": ["playwright", "cucumber", "bdd", "javascript", "pom", "sephora", "automation"],
+  "author": "Kumar Saurabh",
+  "license": "ISC",
+  "devDependencies": {
+    "@cucumber/cucumber": "^11.2.0",
+    "@playwright/test": "^1.56.1",
+    "cucumber-html-reporter": "^7.2.0",
+    "dotenv": "^17.2.3",
+    "fs-extra": "^11.3.2",
+    "winston": "^3.18.3"
+  }
+}

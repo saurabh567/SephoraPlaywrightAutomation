@@ -1,0 +1,29 @@
+# Node dependencies
+node_modules/
+
+# Reports
+reports/
+playwright-report/
+test-results/
+
+# Screenshots and videos
+screenshots/
+videos/
+traces/
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Mac files
+.DS_Store
+
+# VS Code local settings
+.vscode/
+
+# Playwright browser binaries/cache
+.cache/
