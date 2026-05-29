@@ -10,7 +10,6 @@ module.exports = {
       'json:reports/json/cucumber-report.json',
       'html:reports/html/cucumber-report.html'
     ],
-    publishQuiet: true,
     retry: Number(process.env.RETRIES || 0),
     parallel: Number(process.env.PARALLEL || 1),
     timeout: 60 * 1000

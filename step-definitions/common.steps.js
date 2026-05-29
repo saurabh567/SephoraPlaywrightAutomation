@@ -2,41 +2,54 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 const ConfigReader = require('../utils/configReader');
 const products = require('../test-data/products.json');
+const HomePage = require('../pages/HomePage');
+const MakeupFacePage = require('../pages/MakeupFacePage');
+const ProductDetailsPage = require('../pages/ProductDetailsPage');
+const CartPage = require('../pages/CartPage');
 
 Given('I launch the Sephora application', async function () {
-  await this.pages.homePage.openHomePage();
+  const homePage = new HomePage(this.page);
+  await homePage.openHomePage();
 });
 
 Given('I am on the Sephora home page', async function () {
-  await this.pages.homePage.openHomePage();
+  const homePage = new HomePage(this.page);
+  await homePage.openHomePage();
 });
 
 Given('I am on the Makeup Face listing page', async function () {
-  await this.pages.makeupFacePage.openMakeupFacePage();
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.openMakeupFacePage();
 });
 
 Given('I am on the Rare Beauty product details page', async function () {
-  await this.pages.productDetailsPage.openProductPage();
+  const productDetailsPage = new ProductDetailsPage(this.page);
+  await productDetailsPage.openProductPage();
 });
 
 Given('I am on the shopping bag page', async function () {
-  await this.pages.cartPage.openCartPage();
+  const cartPage = new CartPage(this.page);
+  await cartPage.openCartPage();
 });
 
 When('I search for product from test data', async function () {
-  await this.pages.homePage.searchProduct(products.searchTerm);
+  const homePage = new HomePage(this.page);
+  await homePage.searchProduct(products.searchTerm);
 });
 
 When('I enter pincode from test data', async function () {
-  await this.pages.productDetailsPage.checkDelivery(products.pincode);
+  const productDetailsPage = new ProductDetailsPage(this.page);
+  await productDetailsPage.checkDelivery(products.pincode);
 });
 
 When('I click Add To Bag button', async function () {
-  await this.pages.productDetailsPage.addToBag();
+  const productDetailsPage = new ProductDetailsPage(this.page);
+  await productDetailsPage.addToBag();
 });
 
 When('I open the bag from header', async function () {
-  await this.pages.homePage.openBag();
+  const homePage = new HomePage(this.page);
+  await homePage.openBag();
 });
 
 Then('the page URL should contain {string}', async function (urlPart) {
@@ -48,7 +61,8 @@ Then('the page title should contain {string}', async function (titlePart) {
 });
 
 Then('I should see text {string}', async function (text) {
-  await this.pages.homePage.verifyTextVisible(text);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyTextVisible(text);
 });
 
 Then('the current environment base URL should be loaded', async function () {

@@ -1,39 +1,45 @@
 const { When, Then } = require('@cucumber/cucumber');
+const MakeupFacePage = require('../pages/MakeupFacePage');
 
 When('I open the first visible product from listing page', async function () {
-  await this.pages.makeupFacePage.openFirstProduct();
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.openFirstProduct();
 });
 
 Then('the Makeup Face page banner should be visible', async function () {
-  await this.pages.makeupFacePage.verifyVisible(this.pages.makeupFacePage.heading);
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyVisible(makeupFacePage.heading);
 });
 
 Then('the face category tab should be selected or visible', async function () {
-  await this.pages.makeupFacePage.verifyVisible(this.pages.makeupFacePage.faceTab);
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyVisible(makeupFacePage.faceTab);
 });
 
 Then('all makeup category tabs should be visible', async function () {
-  const page = this.pages.makeupFacePage;
-  await page.verifyVisible(page.allTab);
-  await page.verifyVisible(page.faceTab);
-  await page.verifyVisible(page.eyesTab);
-  await page.verifyVisible(page.lipsTab);
-  await page.verifyVisible(page.nailsTab);
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyVisible(makeupFacePage.allTab);
+  await makeupFacePage.verifyVisible(makeupFacePage.faceTab);
+  await makeupFacePage.verifyVisible(makeupFacePage.eyesTab);
+  await makeupFacePage.verifyVisible(makeupFacePage.lipsTab);
+  await makeupFacePage.verifyVisible(makeupFacePage.nailsTab);
 });
 
 Then('the product listing sort dropdown should be visible', async function () {
-  await this.pages.makeupFacePage.verifyVisible(this.pages.makeupFacePage.sortDropdown);
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyVisible(makeupFacePage.sortDropdown);
 });
 
 Then('the product filters should be visible', async function () {
-  const page = this.pages.makeupFacePage;
-  await page.verifyVisible(page.productTypesFilter);
-  await page.verifyVisible(page.productsFilter);
-  await page.verifyVisible(page.brandsFilter);
-  await page.verifyVisible(page.ratingFilter);
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyVisible(makeupFacePage.productTypesFilter);
+  await makeupFacePage.verifyVisible(makeupFacePage.productsFilter);
+  await makeupFacePage.verifyVisible(makeupFacePage.brandsFilter);
+  await makeupFacePage.verifyVisible(makeupFacePage.ratingFilter);
 });
 
 Then('the Rare Beauty product should be visible in listing', async function () {
-  await this.pages.makeupFacePage.verifyTextVisible('RARE BEAUTY');
-  await this.pages.makeupFacePage.verifyTextVisible('Soft Pinch Liquid Blush');
+  const makeupFacePage = new MakeupFacePage(this.page);
+  await makeupFacePage.verifyTextVisible('RARE BEAUTY');
+  await makeupFacePage.verifyTextVisible('Soft Pinch Liquid Blush');
 });

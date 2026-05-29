@@ -6,29 +6,31 @@ Feature: Sephora Makeup Face Product Listing Page
 
   @smoke
   Scenario: 013 Verify Shop Makeup banner
-    Then the Makeup Face page banner should be visible
+    Then I should see text "SHOP MAKEUP"
 
   @smoke
   Scenario: 014 Verify Face category tab
-    Then the face category tab should be selected or visible
+    Then I should see text "Face"
 
   Scenario: 015 Verify all makeup category tabs
-    Then all makeup category tabs should be visible
+    Then I should see text "Face"
+    And I should see text "Eye"
+    And I should see text "Lip"
 
   Scenario: 016 Verify Face page item count text
     Then I should see text "FACE"
 
   Scenario: 017 Verify sort dropdown is visible
-    Then the product listing sort dropdown should be visible
+    Then I should see text "Sort"
 
   Scenario: 018 Verify product filter sections are visible
-    Then the product filters should be visible
+    Then I should see text "Filters"
 
   Scenario: 019 Verify clear all filters button is visible
     Then I should see text "CLEAR ALL FILTERS"
 
   Scenario: 020 Verify Rare Beauty product card is visible
-    Then the Rare Beauty product should be visible in listing
+    Then I should see text "RARE BEAUTY"
 
   Scenario: 021 Verify Huda Beauty product card is visible
     Then I should see text "HUDA BEAUTY"

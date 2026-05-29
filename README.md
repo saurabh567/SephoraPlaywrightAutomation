@@ -19,7 +19,7 @@ features/              Gherkin feature files
 step-definitions/      Reusable Cucumber step definitions
 pages/                 Page Object Model classes
 utils/                 Config reader, logger, reports cleaner, report generator
-hooks/                 Global Before/After hooks and custom world
+hooks/                 Global Before/After hooks for browser, context, page, screenshots, videos, and traces
 config/                Environment configuration
 test-data/             JSON based test data
 reports/               JSON, HTML, screenshots, videos, traces
@@ -117,4 +117,4 @@ logs/execution.log
 
 ## Interview Explanation
 
-This is a Cucumber BDD Playwright framework using Page Object Model. Feature files contain business-readable Gherkin scenarios, step definitions contain reusable automation glue code, and page classes contain locators and page actions. Configuration is managed through `.env`, test data is maintained separately in JSON files, and global hooks manage browser, context, page, screenshot, video, and trace lifecycle. The framework is CI/CD ready through Jenkinsfile and GitHub Actions.
+This is a Cucumber BDD Playwright framework using Page Object Model. Feature files contain business-readable Gherkin scenarios. Step definitions directly create the required page class, for example `const homePage = new HomePage(this.page)`, and then call page action methods like `homePage.searchProduct()`. Page classes contain locators and page-specific actions, while `BasePage` contains reusable methods like `open`, `click`, `fill`, and `verifyVisible`. Configuration is managed through `.env`, test data is maintained separately in JSON files, and global hooks manage browser, context, page, screenshot, video, and trace lifecycle. The framework is CI/CD ready through Jenkinsfile and GitHub Actions.

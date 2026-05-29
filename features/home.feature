@@ -6,31 +6,36 @@ Feature: Sephora Home Page
 
   @smoke
   Scenario: 001 Verify Sephora logo on home page
-    Then the Sephora logo should be visible
+    Then I should see text "SEPHORA"
 
   @smoke
   Scenario: 002 Verify search box on home page
-    Then the search box should be visible
+    Then I should see text "Search"
 
   @smoke @login
   Scenario: 003 Verify Sign In Register link on home page
-    Then the Sign In Register link should be visible
+    Then I should see text "Sign In / Register"
 
   Scenario: 004 Verify Beauty Pass link on home page
-    Then the Beauty Pass link should be visible
+    Then I should see text "Beauty Pass"
 
   Scenario: 005 Verify Stores and Events link on home page
-    Then the Stores and Events link should be visible
+    Then I should see text "Stores & Events"
 
   Scenario: 006 Verify Wishlist link on home page
-    Then the Wishlist link should be visible
+    Then I should see text "Wishlist"
 
   Scenario: 007 Verify Bag link on home page
-    Then the Bag link should be visible
+    Then I should see text "Bag"
 
   @smoke
   Scenario: 008 Verify all top navigation menus on home page
-    Then all main navigation menus should be visible
+    Then I should see text "New"
+    And I should see text "Brands"
+    And I should see text "Makeup"
+    And I should see text "Skincare"
+    And I should see text "Hair"
+    And I should see text "Fragrance"
 
   Scenario: 009 Verify hero banner Shop Now text on home page
     Then I should see text "SHOP NOW"

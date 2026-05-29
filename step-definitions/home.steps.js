@@ -1,35 +1,43 @@
 const { Then } = require('@cucumber/cucumber');
+const HomePage = require('../pages/HomePage');
 
 Then('the Sephora logo should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.logo);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.logo);
 });
 
 Then('the search box should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.searchBox);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.searchBox);
 });
 
 Then('the Sign In Register link should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.signInRegister);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.signInRegister);
 });
 
 Then('the Beauty Pass link should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.beautyPass);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.beautyPass);
 });
 
 Then('the Stores and Events link should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.storesEvents);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.storesEvents);
 });
 
 Then('the Wishlist link should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.wishlist);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.wishlist);
 });
 
 Then('the Bag link should be visible', async function () {
-  await this.pages.homePage.verifyVisible(this.pages.homePage.bag);
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.bag);
 });
 
 Then('all main navigation menus should be visible', async function () {
-  const home = this.pages.homePage;
+  const home = new HomePage(this.page);
   await home.verifyVisible(home.newMenu);
   await home.verifyVisible(home.brandsMenu);
   await home.verifyVisible(home.makeupMenu);

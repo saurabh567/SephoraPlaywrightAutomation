@@ -4,12 +4,6 @@ const fs = require('fs-extra');
 const path = require('path');
 const config = require('../config/env.config');
 const logger = require('../utils/logger');
-const HomePage = require('../pages/HomePage');
-const LoginPage = require('../pages/LoginPage');
-const MakeupFacePage = require('../pages/MakeupFacePage');
-const ProductDetailsPage = require('../pages/ProductDetailsPage');
-const CartPage = require('../pages/CartPage');
-require('./world');
 
 let browser;
 
@@ -35,12 +29,6 @@ Before(async function (scenario) {
   await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   this.page = await this.context.newPage();
   this.page.setDefaultTimeout(config.timeout);
-
-  this.pages.homePage = new HomePage(this.page);
-  this.pages.loginPage = new LoginPage(this.page);
-  this.pages.makeupFacePage = new MakeupFacePage(this.page);
-  this.pages.productDetailsPage = new ProductDetailsPage(this.page);
-  this.pages.cartPage = new CartPage(this.page);
 });
 
 After(async function (scenario) {

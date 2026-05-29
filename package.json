@@ -6,19 +6,31 @@
   "scripts": {
     "pretest": "node utils/cleanReports.js",
     "test": "cucumber-js --config cucumber.js",
+    "test:home": "cucumber-js --config cucumber.js features/home.feature",
     "test:smoke": "cucumber-js --config cucumber.js --tags @smoke",
     "test:regression": "cucumber-js --config cucumber.js --tags @regression",
     "test:login": "cucumber-js --config cucumber.js --tags @login",
+    "test:makeup": "cucumber-js --config cucumber.js features/makeup_face.feature",
+    "test:cart": "cucumber-js --config cucumber.js features/cart.feature",
+    "test:product": "cucumber-js --config cucumber.js features/product_details.feature",
     "test:headed": "HEADLESS=false cucumber-js --config cucumber.js",
     "test:firefox": "BROWSER=firefox cucumber-js --config cucumber.js",
     "test:webkit": "BROWSER=webkit cucumber-js --config cucumber.js",
     "report": "node utils/generateReport.js"
   },
-  "keywords": ["playwright", "cucumber", "bdd", "javascript", "pom", "sephora", "automation"],
+  "keywords": [
+    "playwright",
+    "cucumber",
+    "bdd",
+    "javascript",
+    "pom",
+    "sephora",
+    "automation"
+  ],
   "author": "Kumar Saurabh",
   "license": "ISC",
   "devDependencies": {
-    "@cucumber/cucumber": "^11.2.0",
+    "@cucumber/cucumber": "^11.3.0",
     "@playwright/test": "^1.56.1",
     "cucumber-html-reporter": "^7.2.0",
     "dotenv": "^17.2.3",
