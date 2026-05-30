@@ -50,3 +50,18 @@ Then('all main navigation menus should be visible', async function () {
   await home.verifyVisible(home.giftsMenu);
   await home.verifyVisible(home.saleMenu);
 });
+
+Then('the hero banner Shop Now button should be visible', async function () {
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.shopNowButton);
+});
+
+Then('the Rare Beauty promotional text should be visible', async function () {
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.rareBeautyPromotion);
+});
+
+Then('the Free Samples message should be visible', async function () {
+  const homePage = new HomePage(this.page);
+  await homePage.verifyVisible(homePage.freeSamplesMessage);
+});

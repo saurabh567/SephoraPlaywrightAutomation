@@ -28,7 +28,7 @@ class BasePage {
   }
 
   async verifyTextVisible(text) {
-    await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible({
+    await expect(this.page.getByText(text, { exact: false }).filter({ visible: true }).first()).toBeVisible({
       timeout: ConfigReader.get('timeout')
     });
   }

@@ -3,26 +3,28 @@ const BasePage = require('./BasePage');
 class HomePage extends BasePage {
   constructor(page) {
     super(page);
-    this.logo = page.locator('#image-wrap').first();
-    this.searchBox = page.getByPlaceholder('Search for brands and products');
-    this.searchIcon = page.locator('button, [role="button"]').filter({ hasText: /^$/ }).last();
-    this.signInRegister = page.getByText('Sign In / Register');
-    this.beautyPass = page.getByText('Beauty Pass');
-    this.storesEvents = page.getByText('Stores & Events');
-    this.wishlist = page.getByText('Wishlist');
-    this.bag = page.getByText('Bag').first();
-    this.newMenu = page.getByText('NEW', { exact: true });
-    this.brandsMenu = page.getByText('BRANDS', { exact: true });
-    this.makeupMenu = page.getByText('MAKEUP', { exact: true });
-    this.skincareMenu = page.getByText('SKINCARE', { exact: true });
-    this.hairMenu = page.getByText('HAIR', { exact: true });
-    this.toolsBrushesMenu = page.getByText('TOOLS & BRUSHES', { exact: true });
-    this.bathBodyMenu = page.getByText('BATH & BODY', { exact: true });
-    this.fragranceMenu = page.getByText('FRAGRANCE', { exact: true });
-    this.cleanMenu = page.getByText('CLEAN', { exact: true });
-    this.giftsMenu = page.getByText('GIFTS', { exact: true });
-    this.saleMenu = page.getByText('SALE', { exact: true });
-    this.shopNowButton = page.getByText('SHOP NOW');
+    this.logo = page.locator("xpath=(//div[@id='image-wrap'] | //img[contains(@alt,'Sephora')])[1]");
+    this.searchBox = page.locator("xpath=//input[@id='search']");
+    this.searchIcon = page.locator("xpath=(//button[.//span[contains(@class,'search')] or @type='submit'] | //*[@role='button'][.//*[name()='svg']])[last()]");
+    this.signInRegister = page.locator("xpath=(//*[contains(normalize-space(.),'Sign In') and contains(normalize-space(.),'Register')])[1]");
+    this.beautyPass = page.locator("xpath=(//*[normalize-space(.)='Beauty Pass'])[1]");
+    this.storesEvents = page.locator("xpath=(//*[normalize-space(.)='Stores & Events'])[1]");
+    this.wishlist = page.locator("xpath=(//*[normalize-space(.)='Wishlist'])[1]");
+    this.bag = page.locator("xpath=(//*[normalize-space(.)='Bag'])[1]");
+    this.newMenu = page.locator("xpath=(//*[normalize-space(.)='NEW'])[1]");
+    this.brandsMenu = page.locator("xpath=(//*[normalize-space(.)='BRANDS'])[1]");
+    this.makeupMenu = page.locator("xpath=(//*[normalize-space(.)='MAKEUP'])[1]");
+    this.skincareMenu = page.locator("xpath=(//*[normalize-space(.)='SKINCARE'])[1]");
+    this.hairMenu = page.locator("xpath=(//*[normalize-space(.)='HAIR'])[1]");
+    this.toolsBrushesMenu = page.locator("xpath=(//*[normalize-space(.)='TOOLS & BRUSHES'])[1]");
+    this.bathBodyMenu = page.locator("xpath=(//*[normalize-space(.)='BATH & BODY'])[1]");
+    this.fragranceMenu = page.locator("xpath=(//*[normalize-space(.)='FRAGRANCE'])[1]");
+    this.cleanMenu = page.locator("xpath=(//*[normalize-space(.)='CLEAN'])[1]");
+    this.giftsMenu = page.locator("xpath=(//*[normalize-space(.)='GIFTS'])[1]");
+    this.saleMenu = page.locator("xpath=(//*[normalize-space(.)='SALE'])[1]");
+    this.shopNowButton = page.locator("xpath=(//img[contains(@src,'theme-image')])[1]");
+    this.rareBeautyPromotion = page.locator("xpath=(//*[contains(translate(normalize-space(.),'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ'),'RARE BEAUTY')])[1]");
+    this.freeSamplesMessage = page.locator("xpath=//img[contains(@src,'free_samples_banner')]");
   }
 
   async openHomePage() {
