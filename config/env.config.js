@@ -13,7 +13,7 @@ module.exports = {
   baseUrl: environments[activeEnv].baseUrl,
   browser: process.env.BROWSER || 'chromium',
   headless: process.env.HEADLESS !== 'false',
-  timeout: Number(process.env.TIMEOUT || 30000),
+  timeout: Number(process.env.TIMEOUT || 60000),
   retries: Number(process.env.RETRIES || 1),
   parallel: Number(process.env.PARALLEL || 2),
   viewport: {

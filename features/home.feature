@@ -4,9 +4,9 @@ Feature: Sephora Home Page
   Background:
     Given I am on the Sephora home page
 
-  @smoke
+  @smoke @single
   Scenario: 001 Verify Sephora logo on home page
-    Then I should see text "SEPHORA"
+    Then the Sephora logo should be visible
 
   @smoke
   Scenario: 002 Verify search box on home page

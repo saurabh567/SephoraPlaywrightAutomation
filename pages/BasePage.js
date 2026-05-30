@@ -7,17 +7,20 @@ class BasePage {
   }
 
   async open(path = '/') {
-    await this.page.goto(`${ConfigReader.getBaseUrl()}${path}`, { waitUntil: 'domcontentloaded' });
+    await this.page.goto(`${ConfigReader.getBaseUrl()}${path}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: ConfigReader.get('timeout')
+    });
   }
 
   async click(locator) {
-    await locator.waitFor({ state: 'visible' });
-    await locator.click();
+    await locator.waitFor({ state: 'visible', timeout: ConfigReader.get('timeout') });
+    await locator.click({ timeout: ConfigReader.get('timeout') });
   }
 
   async fill(locator, value) {
-    await locator.waitFor({ state: 'visible' });
-    await locator.fill(value);
+    await locator.waitFor({ state: 'visible', timeout: ConfigReader.get('timeout') });
+    await locator.fill(value, { timeout: ConfigReader.get('timeout') });
   }
 
   async verifyVisible(locator) {

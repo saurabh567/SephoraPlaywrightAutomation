@@ -3,7 +3,7 @@ const BasePage = require('./BasePage');
 class HomePage extends BasePage {
   constructor(page) {
     super(page);
-    this.logo = page.getByText('SEPHORA').first();
+    this.logo = page.locator('#image-wrap').first();
     this.searchBox = page.getByPlaceholder('Search for brands and products');
     this.searchIcon = page.locator('button, [role="button"]').filter({ hasText: /^$/ }).last();
     this.signInRegister = page.getByText('Sign In / Register');

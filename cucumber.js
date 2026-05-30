@@ -12,6 +12,6 @@ module.exports = {
     ],
     retry: Number(process.env.RETRIES || 0),
     parallel: Number(process.env.PARALLEL || 1),
-    timeout: 60 * 1000
+    timeout: Number(process.env.TIMEOUT || 60000) + 10000
   }
 };

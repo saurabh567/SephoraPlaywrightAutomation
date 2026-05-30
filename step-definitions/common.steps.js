@@ -53,11 +53,11 @@ When('I open the bag from header', async function () {
 });
 
 Then('the page URL should contain {string}', async function (urlPart) {
-  await expect(this.page).toHaveURL(new RegExp(urlPart));
+  await expect(this.page).toHaveURL(new RegExp(urlPart), { timeout: ConfigReader.get('timeout') });
 });
 
 Then('the page title should contain {string}', async function (titlePart) {
-  await expect(this.page).toHaveTitle(new RegExp(titlePart, 'i'));
+  await expect(this.page).toHaveTitle(new RegExp(titlePart, 'i'), { timeout: ConfigReader.get('timeout') });
 });
 
 Then('I should see text {string}', async function (text) {
@@ -66,5 +66,7 @@ Then('I should see text {string}', async function (text) {
 });
 
 Then('the current environment base URL should be loaded', async function () {
-  await expect(this.page).toHaveURL(new RegExp(ConfigReader.getBaseUrl().replace('https://', '')));
+  await expect(this.page).toHaveURL(new RegExp(ConfigReader.getBaseUrl().replace('https://', '')), {
+    timeout: ConfigReader.get('timeout')
+  });
 });

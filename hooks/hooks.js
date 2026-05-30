@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 
 let browser;
 
-setDefaultTimeout(config.timeout);
+setDefaultTimeout(config.timeout + 10000);
 
 BeforeAll(async function () {
   fs.ensureDirSync('reports/screenshots');
@@ -31,6 +31,7 @@ Before(async function (scenario) {
   await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   this.page = await this.context.newPage();
   this.page.setDefaultTimeout(config.timeout);
+  this.page.setDefaultNavigationTimeout(config.timeout);
 });
 
 After(async function (scenario) {

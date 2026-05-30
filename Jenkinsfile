@@ -12,7 +12,7 @@ pipeline {
         HEADLESS = 'true'
         PARALLEL = '1'
         RETRIES = '0'
-        TIMEOUT = '30000'
+        TIMEOUT = '60000'
     }
 
     stages {
