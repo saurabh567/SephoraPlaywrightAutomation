@@ -1,4 +1,4 @@
-const { Before, After, BeforeAll, AfterAll, Status } = require('@cucumber/cucumber');
+const { Before, After, BeforeAll, AfterAll, Status, setDefaultTimeout } = require('@cucumber/cucumber');
 const { chromium, firefox, webkit } = require('playwright');
 const fs = require('fs-extra');
 const path = require('path');
@@ -6,6 +6,8 @@ const config = require('../config/env.config');
 const logger = require('../utils/logger');
 
 let browser;
+
+setDefaultTimeout(config.timeout);
 
 BeforeAll(async function () {
   fs.ensureDirSync('reports/screenshots');

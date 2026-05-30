@@ -21,11 +21,13 @@ class BasePage {
   }
 
   async verifyVisible(locator) {
-    await expect(locator).toBeVisible();
+    await expect(locator).toBeVisible({ timeout: ConfigReader.get('timeout') });
   }
 
   async verifyTextVisible(text) {
-    await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible();
+    await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible({
+      timeout: ConfigReader.get('timeout')
+    });
   }
 
   async getPageTitle() {
