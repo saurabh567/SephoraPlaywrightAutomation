@@ -7,10 +7,12 @@ pipeline {
 
     environment {
         ENV = 'dev'
+        BASE_URL = 'https://sephora.in'
         BROWSER = 'chromium'
         HEADLESS = 'true'
-        PARALLEL = '2'
-        RETRIES = '1'
+        PARALLEL = '1'
+        RETRIES = '0'
+        TIMEOUT = '30000'
     }
 
     stages {
