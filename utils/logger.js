@@ -1,3 +1,4 @@
+// Winston logger used to print execution logs to console and logs/execution.log.
 const { createLogger, format, transports } = require('winston');
 const fs = require('fs-extra');
 

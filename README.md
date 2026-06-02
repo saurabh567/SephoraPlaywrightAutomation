@@ -14,6 +14,8 @@ Industry-standard JavaScript automation framework built using Playwright, Cucumb
 
 ## Folder Structure
 
+For a file-by-file explanation, see [`FRAMEWORK_GUIDE.md`](FRAMEWORK_GUIDE.md).
+
 ```text
 features/              Gherkin feature files
 step-definitions/      Reusable Cucumber step definitions
@@ -44,10 +46,28 @@ npm test
 npm run test:smoke
 npm run test:regression
 npm run test:login
+npm run test:parallel
+npm run test:parallel:2
+npm run test:cross-browser
+npm run test:cross-browser:smoke
 npm run test:headed
 npm run test:firefox
 npm run test:webkit
 npm run report
+```
+
+Run with a custom worker count:
+
+```bash
+PARALLEL=3 npm test
+```
+
+Run cross-browser tests:
+
+```bash
+npm run test:cross-browser
+BROWSERS=chromium,firefox npm run test:cross-browser
+TAGS=@smoke npm run test:cross-browser
 ```
 
 ## Environment Configuration
@@ -100,8 +120,11 @@ reports/json/cucumber-report.json
 reports/html/cucumber-report.html
 reports/html/cucumber-html-report.html
 reports/screenshots/
-reports/videos/
+reports/videos/worker-<id>/
 reports/traces/
+reports/cross-browser/chromium/
+reports/cross-browser/firefox/
+reports/cross-browser/webkit/
 logs/execution.log
 ```
 
@@ -117,4 +140,4 @@ logs/execution.log
 
 ## Interview Explanation
 
-This is a Cucumber BDD Playwright framework using Page Object Model. Feature files contain business-readable Gherkin scenarios. Step definitions directly create the required page class, for example `const homePage = new HomePage(this.page)`, and then call page action methods like `homePage.searchProduct()`. Page classes contain locators and page-specific actions, while `BasePage` contains reusable methods like `open`, `click`, `fill`, and `verifyVisible`. Configuration is managed through `.env`, test data is maintained separately in JSON files, and global hooks manage browser, context, page, screenshot, video, and trace lifecycle. The framework is CI/CD ready through Jenkinsfile and GitHub Actions.
+This is a Cucumber BDD Playwright framework using Page Object Model. Feature files contain business-readable Gherkin scenarios. Step definitions directly create the required page class, for example `const homePage = new HomePage(this.page)`, and then call page action methods like `homePage.searchProduct()`. Page classes contain locators and page-specific actions, while `BasePage` contains reusable methods like `open`, `click`, `fill`, and `verifyVisible`. Configuration is managed through `.env`, test data is maintained separately in JSON files, and global hooks manage browser, context, page, screenshot, video, and trace lifecycle. Parallel execution is controlled by the `PARALLEL` environment variable, and worker-specific artifacts are saved with the worker id to avoid collisions. The framework is CI/CD ready through Jenkinsfile and GitHub Actions.

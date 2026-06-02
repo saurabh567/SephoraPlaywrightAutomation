@@ -1,3 +1,4 @@
+// Page object for Sephora home page locators and home page-specific actions.
 const BasePage = require('./BasePage');
 
 class HomePage extends BasePage {

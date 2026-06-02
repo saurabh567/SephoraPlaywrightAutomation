@@ -6,6 +6,12 @@
   "scripts": {
     "pretest": "node utils/cleanReports.js",
     "test": "cucumber-js --config cucumber.js",
+    "pretest:parallel": "node utils/cleanReports.js",
+    "test:parallel": "PARALLEL=4 cucumber-js --config cucumber.js",
+    "pretest:parallel:2": "node utils/cleanReports.js",
+    "test:parallel:2": "PARALLEL=2 cucumber-js --config cucumber.js",
+    "test:cross-browser": "node utils/runCrossBrowser.js",
+    "test:cross-browser:smoke": "BROWSERS=chromium,firefox,webkit TAGS=@smoke node utils/runCrossBrowser.js",
     "test:home": "cucumber-js --config cucumber.js features/home.feature",
     "test:smoke": "cucumber-js --config cucumber.js --tags @smoke",
     "test:regression": "cucumber-js --config cucumber.js --tags @regression",
@@ -32,6 +38,8 @@
   "devDependencies": {
     "@cucumber/cucumber": "^11.3.0",
     "@playwright/test": "^1.56.1",
+    "allure-commandline": "^2.42.0",
+    "allure-cucumberjs": "^3.9.0",
     "cucumber-html-reporter": "^7.2.0",
     "dotenv": "^17.2.3",
     "fs-extra": "^11.3.2",

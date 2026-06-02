@@ -1,3 +1,4 @@
+// Page object for the Makeup Face product listing page.
 const BasePage = require('./BasePage');
 
 class MakeupFacePage extends BasePage {

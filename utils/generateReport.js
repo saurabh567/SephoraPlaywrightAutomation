@@ -1,8 +1,10 @@
+// Generates a readable Cucumber HTML report from the JSON report output.
 const reporter = require('cucumber-html-reporter');
 const fs = require('fs-extra');
 
-const jsonReport = 'reports/json/cucumber-report.json';
-const htmlReport = 'reports/html/cucumber-html-report.html';
+const reportDir = process.env.REPORT_DIR || 'reports';
+const jsonReport = `${reportDir}/json/cucumber-report.json`;
+const htmlReport = `${reportDir}/html/cucumber-html-report.html`;
 
 if (!fs.existsSync(jsonReport)) {
   console.error('JSON report not found. Run npm test first.');

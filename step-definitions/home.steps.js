@@ -1,3 +1,4 @@
+// Home page-specific Cucumber steps that call the HomePage page object.
 const { Then } = require('@cucumber/cucumber');
 const HomePage = require('../pages/HomePage');
 

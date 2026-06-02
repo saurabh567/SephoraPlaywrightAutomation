@@ -1,11 +1,14 @@
+// Deletes old generated artifacts before a new test execution starts.
 const fs = require('fs-extra');
 
+const reportDir = process.env.REPORT_DIR || 'reports';
+
 const folders = [
-  'reports/html',
-  'reports/json',
-  'reports/screenshots',
-  'reports/videos',
-  'reports/traces',
+  `${reportDir}/html`,
+  `${reportDir}/json`,
+  `${reportDir}/screenshots`,
+  `${reportDir}/videos`,
+  `${reportDir}/traces`,
   'screenshots',
   'videos',
   'logs'

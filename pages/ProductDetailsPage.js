@@ -1,3 +1,4 @@
+// Page object for Rare Beauty product details page locators and actions.
 const BasePage = require('./BasePage');
 
 class ProductDetailsPage extends BasePage {

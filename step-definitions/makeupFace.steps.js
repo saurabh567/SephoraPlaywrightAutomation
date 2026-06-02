@@ -1,3 +1,4 @@
+// Makeup Face listing page-specific Cucumber steps.
 const { When, Then } = require('@cucumber/cucumber');
 const MakeupFacePage = require('../pages/MakeupFacePage');
 

@@ -1,3 +1,4 @@
+# Product details page scenarios for product information, shade, delivery, quantity, and add-to-bag validations.
 @productDetails @regression
 Feature: Sephora Product Details Page
 
@@ -8,16 +9,16 @@ Feature: Sephora Product Details Page
   Scenario: 028 Verify product title on product details page
     Then the product title should be visible
 
-  @smoke
+  @smoke @failed
   Scenario: 029 Verify product brand on product details page
     Then the product brand should be visible
-
+  @failed
   Scenario: 030 Verify product price on product details page
     Then the product price should be visible
-
+  @failed
   Scenario: 031 Verify product rating on product details page
     Then the product rating should be visible
-
+  @failed
   Scenario: 032 Verify selected shade Believe on product details page
     Then the shade Believe should be visible
 
@@ -37,7 +38,7 @@ Feature: Sephora Product Details Page
   @smoke
   Scenario: 037 Verify Add To Bag button on product details page
     Then the Add To Bag button should be visible
-
+  @failed
   Scenario: 038 Verify coupon banner on product details page
     Then I should see text "APP10"
 

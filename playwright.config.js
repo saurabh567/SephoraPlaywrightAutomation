@@ -1,3 +1,4 @@
+// Playwright configuration for browser defaults, artifacts, viewport, and Playwright HTML reporting.
 require('dotenv').config();
 
 module.exports = {

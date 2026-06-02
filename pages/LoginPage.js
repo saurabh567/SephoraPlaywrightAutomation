@@ -1,3 +1,4 @@
+// Page object for login popup locators and login-related actions.
 const BasePage = require('./BasePage');
 
 class LoginPage extends BasePage {

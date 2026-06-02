@@ -1,3 +1,6 @@
+// Cucumber runtime configuration for features, step definitions, hooks, reports, retries, parallel runs, and timeouts.
+const reportDir = process.env.REPORT_DIR || 'reports';
+
 module.exports = {
   default: {
     require: [
@@ -7,8 +10,8 @@ module.exports = {
     paths: ['features/**/*.feature'],
     format: [
       'progress',
-      'json:reports/json/cucumber-report.json',
-      'html:reports/html/cucumber-report.html'
+      `json:${reportDir}/json/cucumber-report.json`,
+      `html:${reportDir}/html/cucumber-report.html`
     ],
     retry: Number(process.env.RETRIES || 0),
     parallel: Number(process.env.PARALLEL || 1),

@@ -1,3 +1,4 @@
+# Makeup Face listing page scenarios for categories, filters, products, and sorting validations.
 @makeupFace @regression
 Feature: Sephora Makeup Face Product Listing Page
 
@@ -35,12 +36,14 @@ Feature: Sephora Makeup Face Product Listing Page
   Scenario: 021 Verify Huda Beauty product card is visible
     Then I should see text "HUDA BEAUTY"
 
+  @failed
   Scenario: 022 Verify product rating stars area is visible
     Then I should see text "★"
 
   Scenario: 023 Verify Recommended sort option is visible
     Then I should see text "Recommended"
 
+  @failed
   Scenario: 024 Verify Face breadcrumb is visible
     Then I should see text "Home / Makeup / Face"
 

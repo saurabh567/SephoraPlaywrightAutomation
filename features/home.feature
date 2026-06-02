@@ -1,3 +1,4 @@
+# Home page scenarios for header, navigation, banner, promotional, and search validations.
 @home @regression
 Feature: Sephora Home Page
 

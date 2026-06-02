@@ -1,3 +1,4 @@
+// Central environment configuration read by hooks, page objects, and utility helpers.
 require('dotenv').config();
 
 const environments = {
@@ -14,6 +15,7 @@ module.exports = {
   browser: process.env.BROWSER || 'chromium',
   headless: process.env.HEADLESS !== 'false',
   timeout: Number(process.env.TIMEOUT || 60000),
+  reportDir: process.env.REPORT_DIR || 'reports',
   retries: Number(process.env.RETRIES || 1),
   parallel: Number(process.env.PARALLEL || 2),
   viewport: {

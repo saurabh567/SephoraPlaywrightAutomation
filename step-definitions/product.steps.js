@@ -1,3 +1,4 @@
+// Product details page-specific Cucumber steps.
 const { Then } = require('@cucumber/cucumber');
 const ProductDetailsPage = require('../pages/ProductDetailsPage');
 

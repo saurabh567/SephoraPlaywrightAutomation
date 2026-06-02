@@ -1,22 +1,18 @@
+// Page object for shopping bag page locators and cart-related actions.
 const BasePage = require('./BasePage');
 
 class CartPage extends BasePage {
   constructor(page) {
     super(page);
-    this.shoppingBagTitle = page.getByText('SHOPPING BAG');
-    this.itemCount = page.getByText('1 Item');
-    this.productName = page.getByText('Soft Pinch Liquid Blush');
-    this.productBrand = page.getByText('Rare Beauty');
-    this.quantityMinus = page.getByText('−').first();
-    this.quantityPlus = page.getByText('+').first();
-    this.priceSummary = page.getByText('PRICE SUMMARY');
-    this.totalMrp = page.getByText('Total MRP');
-    this.subtotal = page.getByText('Subtotal');
-    this.total = page.getByText('Total').last();
-    this.checkoutButton = page.getByText('CHECKOUT');
-    this.applyCoupons = page.getByText('Apply Coupons');
-    this.changePincode = page.getByText('CHANGE PINCODE');
-    this.deleteIcon = page.locator('svg, button').filter({ hasText: /^$/ }).last();
+    this.shoppingBagTitle = page.getByText(/shopping bag|bag/i).first();
+    this.noItemsAlert = page.getByText('No items in cart');
+    this.emptyCartTitle = page.getByText('SORRY!');
+    this.emptyCartMessage = page.getByText('Your Shopping Bag is empty.');
+    this.freeSamplesBanner = page.locator("xpath=//img[contains(@src,'free_samples_banner')]");
+    this.app10CouponBanner = page.locator("xpath=//img[contains(@src,'23ee3f70bb09') or contains(@src,'theme-image-1698835351634')]");
+    this.beautyPassRewards = page.getByText('BEAUTY PASS REWARDS').first();
+    this.customerCareSection = page.getByText('CUSTOMER CARE').first();
+    this.paymentOptions = page.getByText('PAYMENT OPTIONS').first();
   }
 
   async openCartPage() {

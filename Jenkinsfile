@@ -1,3 +1,4 @@
+// Jenkins pipeline for running the Playwright Cucumber framework locally or in CI.
 pipeline {
     agent any
 
@@ -9,8 +10,9 @@ pipeline {
         ENV = 'dev'
         BASE_URL = 'https://sephora.in'
         BROWSER = 'chromium'
+        BROWSERS = 'chromium,firefox,webkit'
         HEADLESS = 'true'
-        PARALLEL = '1'
+        PARALLEL = '2'
         RETRIES = '0'
         TIMEOUT = '60000'
     }

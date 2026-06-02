@@ -1,3 +1,4 @@
+// Shared Cucumber steps used across multiple feature files.
 const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 const ConfigReader = require('../utils/configReader');

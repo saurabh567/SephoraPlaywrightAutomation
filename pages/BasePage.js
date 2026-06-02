@@ -1,3 +1,4 @@
+// Base page class containing reusable Playwright actions shared by all page objects.
 const { expect } = require('@playwright/test');
 const ConfigReader = require('../utils/configReader');
 
