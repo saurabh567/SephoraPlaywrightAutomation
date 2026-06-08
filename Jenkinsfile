@@ -12,7 +12,7 @@ pipeline {
         BROWSER = 'chromium'
         BROWSERS = 'chromium,firefox,webkit'
         HEADLESS = 'true'
-        PARALLEL = '2'
+        PARALLEL = '1'
         RETRIES = '0'
         TIMEOUT = '60000'
     }

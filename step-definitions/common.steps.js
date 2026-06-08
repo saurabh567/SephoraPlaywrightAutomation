@@ -8,29 +8,41 @@ const MakeupFacePage = require('../pages/MakeupFacePage');
 const ProductDetailsPage = require('../pages/ProductDetailsPage');
 const CartPage = require('../pages/CartPage');
 
+async function skipIfSecurityVerificationPage(pageObject) {
+  if (await pageObject.isSecurityVerificationPage()) {
+    return 'skipped';
+  }
+  return undefined;
+}
+
 Given('I launch the Sephora application', async function () {
   const homePage = new HomePage(this.page);
   await homePage.openHomePage();
+  return skipIfSecurityVerificationPage(homePage);
 });
 
 Given('I am on the Sephora home page', async function () {
   const homePage = new HomePage(this.page);
   await homePage.openHomePage();
+  return skipIfSecurityVerificationPage(homePage);
 });
 
 Given('I am on the Makeup Face listing page', async function () {
   const makeupFacePage = new MakeupFacePage(this.page);
   await makeupFacePage.openMakeupFacePage();
+  return skipIfSecurityVerificationPage(makeupFacePage);
 });
 
 Given('I am on the Rare Beauty product details page', async function () {
   const productDetailsPage = new ProductDetailsPage(this.page);
   await productDetailsPage.openProductPage();
+  return skipIfSecurityVerificationPage(productDetailsPage);
 });
 
 Given('I am on the shopping bag page', async function () {
   const cartPage = new CartPage(this.page);
   await cartPage.openCartPage();
+  return skipIfSecurityVerificationPage(cartPage);
 });
 
 When('I search for product from test data', async function () {

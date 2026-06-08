@@ -34,6 +34,14 @@ class BasePage {
     });
   }
 
+  async isSecurityVerificationPage() {
+    return this.page
+      .getByText(/performing security verification|verify you are human|protect against malicious bots|cloudflare/i)
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+  }
+
   async getPageTitle() {
     return this.page.title();
   }
