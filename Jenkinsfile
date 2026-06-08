@@ -33,7 +33,7 @@ pipeline {
 
         stage('Run Cucumber Tests') {
             steps {
-                sh 'npm test'
+                sh 'npm run test:ai'
             }
         }
 
@@ -46,7 +46,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'reports/**/*, logs/**/*', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'reports/**, ai/output/**, ai/memory/**', allowEmptyArchive: true
             publishHTML(target: [
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,

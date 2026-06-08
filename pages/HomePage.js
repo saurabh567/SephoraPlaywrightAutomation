@@ -26,6 +26,7 @@ class HomePage extends BasePage {
     this.shopNowButton = page.locator("xpath=(//img[contains(@src,'theme-image')])[1]");
     this.rareBeautyPromotion = page.locator("xpath=(//*[contains(translate(normalize-space(.),'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ'),'RARE BEAUTY')])[1]");
     this.freeSamplesMessage = page.locator("xpath=//img[contains(@src,'free_samples_banner')]");
+    this.footerLinks = page.locator("xpath=//footer//a[@href] | //*[contains(translate(@class,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'footer')]//a[@href]");
   }
 
   async openHomePage() {
@@ -43,6 +44,53 @@ class HomePage extends BasePage {
 
   async openBag() {
     await this.bag.click();
+  }
+
+  async getFooterLinks() {
+    await this.scrollToBottom();
+    await this.footerLinks.first().waitFor({ state: 'attached' });
+
+    return this.footerLinks.evaluateAll((links) =>
+      links
+        .filter((link) => {
+          const style = window.getComputedStyle(link);
+          const isVisible =
+            style.visibility !== 'hidden' &&
+            style.display !== 'none' &&
+            link.getClientRects().length > 0 &&
+            link.offsetParent !== null;
+          return isVisible;
+        })
+        .map((link) => ({
+          text: link.innerText.trim() || link.getAttribute('aria-label') || link.getAttribute('title') || 'footer link',
+          href: link.href || link.getAttribute('href') || ''
+        }))
+        .filter((link) => link.href)
+    );
+  }
+
+  async verifyFooterLinksHaveValidUrls(footerLinks) {
+    if (!footerLinks || footerLinks.length === 0) {
+      throw new Error('No footer links were found on the home page.');
+    }
+
+    const invalidLinks = footerLinks.filter(
+      (link) => !link.href || link.href === '#' || link.href.toLowerCase().startsWith('javascript:')
+    );
+
+    if (invalidLinks.length > 0) {
+      throw new Error(`Invalid footer links found: ${JSON.stringify(invalidLinks, null, 2)}`);
+    }
+  }
+
+  async verifyFooterLinksHaveUniqueUrls(footerLinks) {
+    await this.verifyFooterLinksHaveValidUrls(footerLinks);
+    const urls = footerLinks.map((link) => link.href);
+    const duplicateUrls = urls.filter((url, index) => urls.indexOf(url) !== index);
+
+    if (duplicateUrls.length > 0) {
+      throw new Error(`Duplicate footer URLs found: ${[...new Set(duplicateUrls)].join(', ')}`);
+    }
   }
 }
 

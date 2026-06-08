@@ -7,6 +7,8 @@ allure-results/
 allure-report/
 playwright-report/
 test-results/
+ai/output/
+ai/memory/*.json
 
 # Screenshots and videos
 screenshots/
@@ -16,10 +18,12 @@ traces/
 # Logs
 logs/
 *.log
+!ai/input/jenkins-console.log
 
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Mac files
 .DS_Store

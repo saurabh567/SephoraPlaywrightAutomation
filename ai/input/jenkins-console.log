@@ -1,0 +1,9 @@
+[Pipeline] stage
+[Pipeline] { (Run Tests)
++ npm run test:ai
+Scenario: Verify product search
+Error: expect(locator).toBeVisible() failed
+Timeout: 30000ms
+Locator: getByText('Search')
+[Pipeline] }
+ERROR: script returned exit code 1

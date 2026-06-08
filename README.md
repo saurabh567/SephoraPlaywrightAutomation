@@ -11,6 +11,7 @@ Industry-standard JavaScript automation framework built using Playwright, Cucumb
 - Page Object Model
 - Jenkins CI/CD
 - GitHub Actions
+- AI-assisted automation agents
 
 ## Folder Structure
 
@@ -127,6 +128,128 @@ reports/cross-browser/firefox/
 reports/cross-browser/webkit/
 logs/execution.log
 ```
+
+## AI-Assisted Automation
+
+The AI layer lives under [`ai/`](ai/) and is intentionally simple for interview demos. It works in two modes:
+
+```text
+MOCK_MODE=true   Local rule-based output, no API key required.
+MOCK_MODE=false  Uses OPENAI_API_KEY from .env with an OpenAI-compatible API.
+```
+
+### AI Concepts
+
+An LLM, or Large Language Model, is the AI model that understands requirements, code, logs, reports, and failures. In this framework, it can generate test cases, feature files, step definitions, page objects, reviews, and failure analysis.
+
+An AI Agent is a focused automation helper with one responsibility. For example, `TestCaseGenerationAgent` creates test cases, while `SelfHealingAutomationAgent` suggests better locators.
+
+Agentic AI means multiple agents run in a controlled workflow. Here, `ai/core/AgentRunner.js` can run one agent, all agents, or post-test AI analysis after Cucumber execution.
+
+MCP servers are used to safely provide external context to AI agents, such as file system data, GitHub pull requests, Jenkins logs, browser state, Playwright traces, or documentation. This beginner layer does not require real paid MCP setup, but the architecture can later connect to MCP servers when the framework becomes more advanced.
+
+### Agents In This Framework
+
+```text
+TestCaseGenerationAgent
+FeatureFileGenerationAgent
+StepDefinitionGenerationAgent
+PageObjectGenerationAgent
+JenkinsBuildFailureAnalysisAgent
+PlaywrightCodeReviewAgent
+SelfHealingAutomationAgent
+```
+
+Every agent prints clear execution logs:
+
+```text
+[AI] Starting AgentName
+[AI] Reading input from ...
+[AI] Generating output ...
+[AI] Completed AgentName
+```
+
+### Run AI Agents
+
+```bash
+npm run ai:testcases
+npm run ai:feature
+npm run ai:steps
+npm run ai:page
+npm run ai:jenkins
+npm run ai:review
+npm run ai:heal
+npm run ai:all
+```
+
+Run AI-integrated tests:
+
+```bash
+npm test
+npm run test:ai
+```
+
+`npm test` runs normal Cucumber tests only. `npm run test:ai` runs Cucumber first and then runs post-test AI analysis. Even if tests fail, AI analysis still runs and the original Cucumber exit code is preserved.
+
+Generated AI proof files:
+
+```text
+ai/output/generated-test-cases.md
+ai/output/generated-feature.feature
+ai/output/generated-step-definitions.js
+ai/output/generated-page-object.js
+ai/output/jenkins-failure-analysis.md
+ai/output/code-review-report.md
+ai/output/self-healing-suggestions.md
+ai/output/ai-post-test-summary.md
+ai/memory/agent-run-history.json
+```
+
+Main AI implementation files:
+
+```text
+ai/core/BaseAgent.js
+ai/core/AgentRunner.js
+ai/core/LLMClient.js
+ai/index.js
+```
+
+### Multi-Page Requirement Generation
+
+You can put multiple page requirements in one file:
+
+```text
+ai/input/requirement.txt
+```
+
+Example:
+
+```text
+1. Home page: Verify all footer links have unique URLs.
+2. Cart page: Verify cart item quantity can be increased.
+3. Product details page: Verify product price and Add To Bag button.
+4. Checkout page: Verify user can see payment options.
+```
+
+Then run:
+
+```bash
+npm run ai:testcases
+npm run ai:feature
+npm run ai:steps
+```
+
+The AI layer classifies requirements by page area and creates draft feature files:
+
+```text
+ai/output/generated-feature.feature
+ai/output/generated-features/home.feature
+ai/output/generated-features/cart.feature
+ai/output/generated-features/product_details.feature
+ai/output/generated-features/checkout.feature
+```
+
+These files are draft AI output. Review them first, then copy approved scenarios into the real executable files under `features/`.
 
 ## Jenkins Steps
 

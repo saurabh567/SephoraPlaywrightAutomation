@@ -11,6 +11,7 @@ This document explains the purpose of each folder and important file in the Seph
 - `cucumber.js`: Cucumber runtime configuration. It loads hooks, step definitions, feature paths, reports, retries, parallel execution, and timeout.
 - `playwright.config.js`: Playwright-level configuration for browser defaults, screenshots, traces, videos, viewport, and report output.
 - `Jenkinsfile`: Jenkins declarative pipeline for checkout, dependency installation, browser installation, test execution, report generation, and artifact archiving.
+- `ai/`: AI-assisted automation layer containing agents, prompts, workflows, tools, memory, MCP design, and architecture documentation.
 - `.gitignore`: Excludes generated files such as `node_modules`, reports, screenshots, videos, logs, and environment files from Git.
 - `.env`: Local environment values such as `BASE_URL`, `BROWSER`, `HEADLESS`, and `TIMEOUT`. This file is intentionally ignored by Git.
 
@@ -64,6 +65,7 @@ Contains helper utilities used by the framework.
 - `logger.js`: Creates framework logging for execution messages.
 - `cleanReports.js`: Cleans old reports, screenshots, videos, traces, and logs before a new test run.
 - `generateReport.js`: Generates the final Cucumber HTML report from JSON report output.
+- `runCucumberWithAi.js`: Runs Cucumber and then triggers post-execution AI analysis while preserving the original Cucumber exit code.
 
 ## `test-data/`
 
@@ -81,6 +83,7 @@ These folders are created during execution and are normally ignored by Git.
 - `screenshots/`: Optional screenshot output folder.
 - `videos/`: Optional video output folder.
 - `node_modules/`: Installed npm dependencies.
+- `ai/output/`: Generated AI artifacts such as feature drafts, code drafts, summaries, and patch plans.
 
 ## Execution Flow
 

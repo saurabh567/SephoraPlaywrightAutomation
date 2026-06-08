@@ -1,5 +1,5 @@
 // Home page-specific Cucumber steps that call the HomePage page object.
-const { Then } = require('@cucumber/cucumber');
+const { When, Then } = require('@cucumber/cucumber');
 const HomePage = require('../pages/HomePage');
 
 Then('the Sephora logo should be visible', async function () {
@@ -65,4 +65,14 @@ Then('the Rare Beauty promotional text should be visible', async function () {
 Then('the Free Samples message should be visible', async function () {
   const homePage = new HomePage(this.page);
   await homePage.verifyVisible(homePage.freeSamplesMessage);
+});
+
+When('I collect all footer links', async function () {
+  const homePage = new HomePage(this.page);
+  this.footerLinks = await homePage.getFooterLinks();
+});
+
+Then('each footer link should have a different valid URL', async function () {
+  const homePage = new HomePage(this.page);
+  await homePage.verifyFooterLinksHaveUniqueUrls(this.footerLinks);
 });

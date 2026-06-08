@@ -6,6 +6,8 @@
   "scripts": {
     "pretest": "node utils/cleanReports.js",
     "test": "cucumber-js --config cucumber.js",
+    "pretest:ai": "node utils/cleanReports.js",
+    "test:ai": "node utils/runCucumberWithAi.js",
     "pretest:parallel": "node utils/cleanReports.js",
     "test:parallel": "PARALLEL=4 cucumber-js --config cucumber.js",
     "pretest:parallel:2": "node utils/cleanReports.js",
@@ -22,7 +24,15 @@
     "test:headed": "HEADLESS=false cucumber-js --config cucumber.js",
     "test:firefox": "BROWSER=firefox cucumber-js --config cucumber.js",
     "test:webkit": "BROWSER=webkit cucumber-js --config cucumber.js",
-    "report": "node utils/generateReport.js"
+    "report": "node utils/generateReport.js",
+    "ai:testcases": "node ai/index.js --agent TestCaseGenerationAgent",
+    "ai:feature": "node ai/index.js --agent FeatureFileGenerationAgent",
+    "ai:steps": "node ai/index.js --agent StepDefinitionGenerationAgent",
+    "ai:page": "node ai/index.js --agent PageObjectGenerationAgent",
+    "ai:jenkins": "node ai/index.js --agent JenkinsBuildFailureAnalysisAgent",
+    "ai:review": "node ai/index.js --agent PlaywrightCodeReviewAgent",
+    "ai:heal": "node ai/index.js --agent SelfHealingAutomationAgent",
+    "ai:all": "node ai/index.js --all"
   },
   "keywords": [
     "playwright",

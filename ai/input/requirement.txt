@@ -1,0 +1,1 @@
+User should be able to click on each of the footer links on the Sephora home page and each footer link must have a different URL.

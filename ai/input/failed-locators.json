@@ -1,0 +1,8 @@
+[
+  {
+    "scenario": "Verify search box on home page",
+    "failedLocator": "getByText('Search')",
+    "error": "element(s) not found",
+    "suggestionNeeded": "Suggest a more stable locator for the search input"
+  }
+]

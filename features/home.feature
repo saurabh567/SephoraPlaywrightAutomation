@@ -49,3 +49,8 @@ Feature: Sephora Home Page
   Scenario: 012 Verify user can search product from home page
     When I search for product from test data
     Then the page title should contain "Sephora"
+
+  @footer @testcasegeneratedbyAI
+  Scenario: 013 Verify all footer links have different URLs
+    When I collect all footer links
+    Then each footer link should have a different valid URL
