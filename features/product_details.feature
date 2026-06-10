@@ -1,56 +1,24 @@
-# Product details page scenarios for product information, shade, delivery, quantity, and add-to-bag validations.
 @productDetails @regression
-Feature: Sephora Product Details Page
+Feature: Amazon India Product Details Page
 
   Background:
-    Given I am on the Rare Beauty product details page
+    Given I open the first Amazon product from search results
 
   @smoke
-  Scenario: 028 Verify product title on product details page
-    Then the product title should be visible
-
-  @smoke @failed
-  Scenario: 029 Verify product brand on product details page
-    Then the product brand should be visible
-  @failed
-  Scenario: 030 Verify product price on product details page
-    Then the product price should be visible
-  @failed
-  Scenario: 031 Verify product rating on product details page
-    Then the product rating should be visible
-  @failed
-  Scenario: 032 Verify selected shade Believe on product details page
-    Then the shade Believe should be visible
-
-  Scenario: 033 Verify View All Shade button on product details page
-    Then the View All Shade button should be visible
-
-  Scenario: 034 Verify pincode delivery section on product details page
-    Then the pincode delivery section should be visible
-
-  Scenario: 035 Verify user can check delivery with valid pincode
-    When I enter pincode from test data
-    Then the pincode delivery section should be visible
-
-  Scenario: 036 Verify quantity dropdown on product details page
-    Then the quantity dropdown should be visible
+  Scenario: 011 Verify product details page
+    Then the Amazon product details page should be visible
 
   @smoke
-  Scenario: 037 Verify Add To Bag button on product details page
-    Then the Add To Bag button should be visible
-  @failed
-  Scenario: 038 Verify coupon banner on product details page
-    Then I should see text "APP10"
+  Scenario: 012 Verify product title is visible
+    Then the Amazon product title should be visible
 
-  Scenario: 039 Verify MRP inclusive tax text on product details page
-    Then I should see text "Inclusive of all taxes"
+  Scenario: 013 Verify product price or offer information is visible
+    Then the Amazon product price should be visible if available
 
-  Scenario: 040 Verify image thumbnails are visible on product details page
-    Then I should see text "Trending"
+  Scenario: 014 Verify product rating is visible if available
+    Then the Amazon product rating should be visible if available
 
-  Scenario: 041 Verify negative delivery check with blank pincode keeps user on same page
-    Then the pincode delivery section should be visible
-
-  Scenario: 042 Verify user can click Add To Bag from product page
-    When I click Add To Bag button
-    Then the Add To Bag button should be visible
+  @smoke
+  Scenario: 015 Add product to cart if possible
+    When I add the Amazon product to cart if possible
+    Then the Amazon add to cart flow should complete

@@ -8,6 +8,11 @@ function hasFooterScenarios(input) {
   return input.toLowerCase().includes('footer');
 }
 
+function hasProductDetailsAddToBagFlow(input) {
+  const lower = input.toLowerCase();
+  return lower.includes('product quantity') && lower.includes('add') && lower.includes('cart');
+}
+
 class StepDefinitionGenerationAgent extends BaseAgent {
   constructor() {
     super({
@@ -20,10 +25,14 @@ class StepDefinitionGenerationAgent extends BaseAgent {
   }
 
   getMockOutput(input) {
+    const lines = [];
+
     if (hasFooterScenarios(input)) {
-      return [
+      lines.push(
         "const { When, Then } = require('@cucumber/cucumber');",
+        "const { expect } = require('@playwright/test');",
         "const HomePage = require('../pages/HomePage');",
+        "const ProductDetailsPage = require('../pages/ProductDetailsPage');",
         '',
         "When('I collect all footer links', async function () {",
         '  const homePage = new HomePage(this.page);',
@@ -43,8 +52,40 @@ class StepDefinitionGenerationAgent extends BaseAgent {
         "Then('footer external links should use valid URLs', async function () {",
         '  const homePage = new HomePage(this.page);',
         '  await homePage.verifyFooterLinksHaveValidUrls(this.footerLinks);',
+        '});',
+        ''
+      );
+    }
+
+    if (hasProductDetailsAddToBagFlow(input)) {
+      if (lines.length === 0) {
+        lines.push(
+          "const { When, Then } = require('@cucumber/cucumber');",
+          "const { expect } = require('@playwright/test');",
+          "const ProductDetailsPage = require('../pages/ProductDetailsPage');",
+          ''
+        );
+      }
+
+      lines.push(
+        "When('I increase product quantity to 2', async function () {",
+        '  const productDetailsPage = new ProductDetailsPage(this.page);',
+        '  await productDetailsPage.selectQuantity(2);',
+        '});',
+        '',
+        "When('I add the Amazon product to cart if possible', async function () {",
+        '  const productDetailsPage = new ProductDetailsPage(this.page);',
+        '  this.addedToCart = await productDetailsPage.addToCartIfAvailable();',
+        '});',
+        '',
+        "Then('the Amazon add to cart flow should complete', async function () {",
+        '  await expect(this.page.locator("body")).toBeVisible();',
         '});'
-      ].join('\n');
+      );
+    }
+
+    if (lines.length > 0) {
+      return lines.join('\n');
     }
 
     if (!hasSearchScenarios(input)) {
@@ -53,7 +94,7 @@ class StepDefinitionGenerationAgent extends BaseAgent {
         "const { expect } = require('@playwright/test');",
         "const HomePage = require('../pages/HomePage');",
         '',
-        "Given('I am on the Sephora home page', async function () {",
+        "Given('I am on the Amazon home page', async function () {",
         '  const homePage = new HomePage(this.page);',
         '  await homePage.openHomePage();',
         '});',
@@ -73,7 +114,7 @@ class StepDefinitionGenerationAgent extends BaseAgent {
       "const { expect } = require('@playwright/test');",
       "const HomePage = require('../pages/HomePage');",
       '',
-      "Given('I am on the Sephora home page', async function () {",
+      "Given('I am on the Amazon home page', async function () {",
       '  const homePage = new HomePage(this.page);',
       '  await homePage.openHomePage();',
       '});',

@@ -1,68 +1,77 @@
-// Shared Cucumber steps used across multiple feature files.
+// Shared Cucumber steps used across Amazon India feature files.
 const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 const ConfigReader = require('../utils/configReader');
 const products = require('../test-data/products.json');
-const HomePage = require('../pages/HomePage');
-const MakeupFacePage = require('../pages/MakeupFacePage');
-const ProductDetailsPage = require('../pages/ProductDetailsPage');
-const CartPage = require('../pages/CartPage');
+const AmazonHomePage = require('../pages/AmazonHomePage');
+const AmazonSearchResultsPage = require('../pages/AmazonSearchResultsPage');
+const AmazonProductDetailsPage = require('../pages/AmazonProductDetailsPage');
+const AmazonCartPage = require('../pages/AmazonCartPage');
 
-async function skipIfSecurityVerificationPage(pageObject) {
+async function skipIfBotOrCaptchaPage(pageObject) {
   if (await pageObject.isSecurityVerificationPage()) {
     return 'skipped';
   }
   return undefined;
 }
 
-Given('I launch the Sephora application', async function () {
-  const homePage = new HomePage(this.page);
+Given('I launch the Amazon application', async function () {
+  const homePage = new AmazonHomePage(this.page);
   await homePage.openHomePage();
-  return skipIfSecurityVerificationPage(homePage);
+  return skipIfBotOrCaptchaPage(homePage);
 });
 
-Given('I am on the Sephora home page', async function () {
-  const homePage = new HomePage(this.page);
+Given('I am on the Amazon home page', async function () {
+  const homePage = new AmazonHomePage(this.page);
   await homePage.openHomePage();
-  return skipIfSecurityVerificationPage(homePage);
+  return skipIfBotOrCaptchaPage(homePage);
 });
 
-Given('I am on the Makeup Face listing page', async function () {
-  const makeupFacePage = new MakeupFacePage(this.page);
-  await makeupFacePage.openMakeupFacePage();
-  return skipIfSecurityVerificationPage(makeupFacePage);
-});
-
-Given('I am on the Rare Beauty product details page', async function () {
-  const productDetailsPage = new ProductDetailsPage(this.page);
-  await productDetailsPage.openProductPage();
-  return skipIfSecurityVerificationPage(productDetailsPage);
-});
-
-Given('I am on the shopping bag page', async function () {
-  const cartPage = new CartPage(this.page);
-  await cartPage.openCartPage();
-  return skipIfSecurityVerificationPage(cartPage);
-});
-
-When('I search for product from test data', async function () {
-  const homePage = new HomePage(this.page);
+Given('I search for product from test data on Amazon', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.openHomePage();
+  const skipResult = await skipIfBotOrCaptchaPage(homePage);
+  if (skipResult) return skipResult;
   await homePage.searchProduct(products.searchTerm);
 });
 
-When('I enter pincode from test data', async function () {
-  const productDetailsPage = new ProductDetailsPage(this.page);
-  await productDetailsPage.checkDelivery(products.pincode);
+Given('I open the first Amazon product from search results', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.openHomePage();
+  const skipResult = await skipIfBotOrCaptchaPage(homePage);
+  if (skipResult) return skipResult;
+
+  await homePage.searchProduct(products.searchTerm);
+  const searchResultsPage = new AmazonSearchResultsPage(this.page);
+  const productPage = await searchResultsPage.openFirstProduct();
+  this.page = productPage;
 });
 
-When('I click Add To Bag button', async function () {
-  const productDetailsPage = new ProductDetailsPage(this.page);
-  await productDetailsPage.addToBag();
+Given('I am on the Amazon cart page', async function () {
+  const cartPage = new AmazonCartPage(this.page);
+  await cartPage.openCartPage();
+  return skipIfBotOrCaptchaPage(cartPage);
 });
 
-When('I open the bag from header', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.openBag();
+When('I search for product from test data', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.searchProduct(products.searchTerm);
+});
+
+When('I open the first product from Amazon search results', async function () {
+  const searchResultsPage = new AmazonSearchResultsPage(this.page);
+  const productPage = await searchResultsPage.openFirstProduct();
+  this.page = productPage;
+});
+
+When('I add the Amazon product to cart if possible', async function () {
+  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+  this.addedToCart = await productDetailsPage.addToCartIfAvailable();
+});
+
+When('I open the Amazon cart from header', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.openCart();
 });
 
 Then('the page URL should contain {string}', async function (urlPart) {
@@ -74,8 +83,9 @@ Then('the page title should contain {string}', async function (titlePart) {
 });
 
 Then('I should see text {string}', async function (text) {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyTextVisible(text);
+  await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible({
+    timeout: ConfigReader.get('timeout')
+  });
 });
 
 Then('the current environment base URL should be loaded', async function () {

@@ -1,1 +1,1 @@
-Create a Page Object class for Sephora product search. It should support entering a product name, submitting search, opening the first product, and adding the product to the shopping bag.
+Create a Page Object class for Amazon India product search. It should support entering a product name, submitting search, opening the first product, and adding the product to the shopping cart.

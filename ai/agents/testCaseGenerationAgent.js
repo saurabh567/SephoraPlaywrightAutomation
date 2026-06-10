@@ -1,8 +1,11 @@
 const BaseAgent = require('../core/BaseAgent');
+const fs = require('fs-extra');
+const path = require('path');
+const RetrievalService = require('../vector-db/retrievalService');
 
 function splitRequirements(input) {
   const cleanedInput = input.trim();
-  if (!cleanedInput) return ['User should be able to search products on Sephora.'];
+  if (!cleanedInput) return ['User should be able to search products on Amazon India.'];
 
   return cleanedInput
     .split(/\n+/)
@@ -12,6 +15,20 @@ function splitRequirements(input) {
 
 function getRequirementContext(requirement) {
   const lower = requirement.toLowerCase();
+
+  if (
+    lower.includes('product detail') &&
+    lower.includes('quantity') &&
+    lower.includes('add to cart') &&
+    lower.includes('cart')
+  ) {
+    return {
+      featureName: 'product details add to cart flow',
+      validAction: 'product quantity can be selected and added to cart from product details page',
+      result: 'cart page can be opened after adding the product',
+      singleScenario: true
+    };
+  }
 
   if (lower.includes('footer') && lower.includes('link')) {
     return {
@@ -51,11 +68,11 @@ function getRequirementContext(requirement) {
 
   if (lower.includes('cart') || lower.includes('bag')) {
     return {
-      featureName: 'shopping bag',
-      validAction: 'adding a product to the shopping bag',
-      result: 'product is visible in the shopping bag',
-      invalidAction: 'opening shopping bag with no product added',
-      emptyAction: 'removing all items from shopping bag',
+      featureName: 'shopping cart',
+      validAction: 'adding a product to the shopping cart',
+      result: 'product is visible in the shopping cart',
+      invalidAction: 'opening shopping cart with no product added',
+      emptyAction: 'removing all items from shopping cart',
       edgeOne: 'maximum allowed product quantity',
       edgeTwo: 'quantity update repeated multiple times'
     };
@@ -79,7 +96,7 @@ function classifyFeature(requirement) {
     return { key: 'checkout', title: 'Checkout Page', fileName: 'checkout.feature' };
   }
 
-  if (lower.includes('product detail') || lower.includes('product details') || lower.includes('pincode') || lower.includes('add to bag')) {
+  if (lower.includes('product detail') || lower.includes('product details') || lower.includes('add to cart')) {
     return { key: 'product-details', title: 'Product Details Page', fileName: 'product_details.feature' };
   }
 
@@ -92,6 +109,16 @@ function classifyFeature(requirement) {
 
 function buildTestCasesForRequirement(requirement) {
   const context = getRequirementContext(requirement);
+
+  if (context.singleScenario) {
+    return [
+      `### Requirement: ${requirement}`,
+      '',
+      '#### Positive',
+      `- Verify ${context.validAction} and ${context.result}`,
+      ''
+    ];
+  }
 
   return [
     `### Requirement: ${requirement}`,
@@ -151,6 +178,78 @@ class TestCaseGenerationAgent extends BaseAgent {
       lines.push(`## ${group.title}`, '', `Target Feature File: ${group.fileName}`, '');
       for (const requirement of group.requirements) {
         lines.push(...buildTestCasesForRequirement(requirement));
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  async generateFeatureWithVectorDb(requirementText) {
+    console.log('[AI] Running TestCaseGenerationAgent with Vector DB context');
+    const requirement = requirementText && requirementText.trim()
+      ? requirementText.trim()
+      : this.readInput();
+    const retrieval = new RetrievalService();
+    const similarFeatures = await retrieval.searchFeatureFiles(requirement, 3);
+    const feature = classifyFeature(requirement);
+    const gherkin = this.buildVectorBackedFeature(requirement, feature, similarFeatures);
+    const outputPath = path.join(process.cwd(), 'ai/generated-features', feature.fileName);
+
+    fs.ensureDirSync(path.dirname(outputPath));
+    fs.writeFileSync(outputPath, gherkin);
+
+    return {
+      outputPath: path.relative(process.cwd(), outputPath),
+      similarFeatureCount: similarFeatures.length
+    };
+  }
+
+  buildVectorBackedFeature(requirement, feature, similarFeatures) {
+    const context = getRequirementContext(requirement);
+    const scenarioTitle = context.singleScenario
+      ? `Verify ${context.validAction} and ${context.result}`
+      : `Verify ${context.validAction}`;
+
+    const lines = [
+      `Feature: ${feature.title} AI Generated Scenarios`,
+      '',
+      '  # Generated from ai/input/requirement.txt using Vector DB retrieval.',
+      `  # Target existing feature file: features/${feature.fileName}`,
+      `  # Similar feature examples found: ${similarFeatures.length}`,
+      '',
+      '  @ai-generated @vector-db',
+      `  Scenario: ${scenarioTitle}`,
+      '    Given I am on the Amazon home page'
+    ];
+
+    if (feature.key === 'product-details') {
+      lines.push(
+        '    When I open the first product from Amazon search results',
+        '    And I increase the product quantity to 2',
+        '    And I add the Amazon product to cart if possible',
+        '    Then the Amazon add to cart flow should complete'
+      );
+    } else if (feature.key === 'cart') {
+      lines.push(
+        '    When I open the Amazon cart from header',
+        '    Then the Amazon cart page should be visible'
+      );
+    } else if (feature.key === 'checkout') {
+      lines.push(
+        '    When I proceed to checkout',
+        '    Then checkout page should be displayed'
+      );
+    } else {
+      lines.push(
+        `    When I perform the requirement action "${requirement.replace(/"/g, '\\"')}"`,
+        '    Then the expected requirement result should be visible'
+      );
+    }
+
+    if (similarFeatures.length > 0) {
+      lines.push('', '  # Similar Vector DB context:');
+      for (const match of similarFeatures) {
+        lines.push(`  # - ${match.metadata?.sourcePath || 'unknown source'} score=${match.score ?? ''}`);
       }
     }
 

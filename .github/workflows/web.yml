@@ -1,0 +1,57 @@
+name: Web Automation
+
+on:
+  push:
+    branches: [main, master, selfpracticeforplaywright]
+  pull_request:
+    branches: [main, master, selfpracticeforplaywright]
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+
+    env:
+      TEST_PLATFORM: WEB
+      ENV: qa
+      BROWSER: chromium
+      HEADLESS: true
+      PARALLEL: 1
+      RETRIES: 0
+      MOCK_MODE: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run web tests
+        run: npm run test:web
+
+      - name: Generate reports
+        if: always()
+        run: |
+          npm run report || true
+          npm run allure:generate || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-automation-artifacts
+          path: |
+            reports/**
+            allure-results/**
+            allure-report/**
+            logs/**

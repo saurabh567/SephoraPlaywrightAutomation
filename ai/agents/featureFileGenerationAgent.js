@@ -53,6 +53,7 @@ function toScenarioName(testCase) {
 
 function buildWhenStep(testCase) {
   const lower = testCase.toLowerCase();
+  if (isProductDetailsAddToBagFlow(testCase)) return 'When I add the Amazon product to cart if possible';
   if (lower.includes('footer')) return 'When I collect all footer links';
   if (lower.includes('duplicate footer')) return 'When I collect all footer links';
   if (lower.includes('external footer')) return 'When I collect all footer links';
@@ -65,8 +66,14 @@ function buildWhenStep(testCase) {
   return `When I perform "${testCase}"`;
 }
 
+function isProductDetailsAddToBagFlow(testCase) {
+  const lower = testCase.toLowerCase();
+  return lower.includes('quantity') && lower.includes('add') && lower.includes('cart');
+}
+
 function buildThenStep(testCase) {
   const lower = testCase.toLowerCase();
+  if (isProductDetailsAddToBagFlow(testCase)) return 'Then the Amazon add to cart flow should complete';
   if (lower.includes('different valid url') || lower.includes('duplicate footer')) {
     return 'Then each footer link should have a different valid URL';
   }
@@ -82,6 +89,24 @@ function buildThenStep(testCase) {
   if (lower.includes('special characters') || lower.includes('very long')) return 'Then I should see search handled without application error';
   if (lower.includes('valid product search') || lower.includes('results')) return 'Then I should see relevant search results';
   return 'Then I should see the expected result';
+}
+
+function buildBackgroundStep(title) {
+  if (title === 'Product Details Page') return '    Given I open the first Amazon product from search results';
+  if (title === 'Cart Page') return '    Given I am on the Amazon cart page';
+  return '    Given I am on the Amazon home page';
+}
+
+function buildScenarioSteps(testCase) {
+  if (isProductDetailsAddToBagFlow(testCase)) {
+    return [
+      '    When I increase product quantity to 2',
+      '    And I add the Amazon product to cart if possible',
+      '    Then the Amazon add to cart flow should complete'
+    ];
+  }
+
+  return [`    ${buildWhenStep(testCase)}`, `    ${buildThenStep(testCase)}`];
 }
 
 class FeatureFileGenerationAgent extends BaseAgent {
@@ -115,13 +140,12 @@ class FeatureFileGenerationAgent extends BaseAgent {
       `Feature: ${title}`,
       '',
       '  Background:',
-      '    Given I am on the Sephora home page',
+      buildBackgroundStep(title),
       '',
       ...scenarios.flatMap(({ tag, testCase }) => [
         `  ${tag}`,
         `  Scenario: ${toScenarioName(testCase)}`,
-        `    ${buildWhenStep(testCase)}`,
-        `    ${buildThenStep(testCase)}`,
+        ...buildScenarioSteps(testCase),
         ''
       ])
     ].join('\n');
@@ -169,13 +193,12 @@ class FeatureFileGenerationAgent extends BaseAgent {
       `Feature: ${requirement}`,
       '',
       '  Background:',
-      '    Given I am on the Sephora home page',
+      '    Given I am on the Amazon home page',
       '',
       ...scenarios.flatMap(({ tag, testCase }) => [
         `  ${tag}`,
         `  Scenario: ${toScenarioName(testCase)}`,
-        `    ${buildWhenStep(testCase)}`,
-        `    ${buildThenStep(testCase)}`,
+        ...buildScenarioSteps(testCase),
         ''
       ])
     ].join('\n');

@@ -1,1 +1,4 @@
-User should be able to click on each of the footer links on the Sephora home page and each footer link must have a different URL.
+User should be able to search products on Amazon India.
+User should be able to open the first product from Amazon search results.
+User should be able to add an Amazon product to cart if the product is available.
+User should be able to open the Amazon cart page and verify cart content or empty cart message.

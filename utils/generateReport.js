@@ -18,8 +18,9 @@ reporter.generate({
   reportSuiteAsScenarios: true,
   launchReport: false,
   metadata: {
-    'App Name': 'Sephora India',
+    'App Name': process.env.APP_NAME || 'Amazon India',
     Browser: process.env.BROWSER || 'chromium',
+    'Test Platform': process.env.TEST_PLATFORM || 'WEB',
     Platform: process.platform,
     Environment: process.env.ENV || 'dev'
   }

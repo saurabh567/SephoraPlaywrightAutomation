@@ -1,0 +1,59 @@
+name: Android Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      deviceName:
+        description: Android device or emulator name
+        required: false
+        default: Android Emulator
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+
+    env:
+      TEST_PLATFORM: ANDROID
+      ENV: qa
+      DEVICE_NAME: ${{ inputs.deviceName }}
+      APPIUM_HOST: 127.0.0.1
+      APPIUM_PORT: 4723
+      MOCK_MODE: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Appium Android driver
+        run: npx appium driver install uiautomator2 || true
+
+      - name: Start Appium server
+        run: npx appium --base-path / > appium.log 2>&1 &
+
+      - name: Run Android tests
+        run: npm run test:android
+
+      - name: Generate reports
+        if: always()
+        run: npm run allure:generate || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-automation-artifacts
+          path: |
+            reports/**
+            allure-results/**
+            allure-report/**
+            logs/**
+            appium.log

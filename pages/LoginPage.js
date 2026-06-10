@@ -1,22 +1,24 @@
-// Page object for login popup locators and login-related actions.
+// Amazon sign-in page locators and login-related actions.
 const BasePage = require('./BasePage');
 
 class LoginPage extends BasePage {
   constructor(page) {
     super(page);
-    this.signInRegister = page.getByText('Sign In / Register');
-    this.emailInput = page.locator('input[type="email"], input[name*="email" i], input[placeholder*="email" i]').first();
-    this.passwordInput = page.locator('input[type="password"], input[name*="password" i], input[placeholder*="password" i]').first();
-    this.loginButton = page.getByRole('button', { name: /login|sign in|continue/i }).first();
+    this.signInLink = page.locator('#nav-link-accountList').first();
+    this.emailInput = page.locator('input[type="email"], #ap_email, input[name="email"]').first();
+    this.continueButton = page.locator('#continue').or(page.getByRole('button', { name: /continue/i })).first();
+    this.passwordInput = page.locator('input[type="password"], #ap_password').first();
+    this.loginButton = page.locator('#signInSubmit').or(page.getByRole('button', { name: /sign in/i })).first();
   }
 
   async openLoginPopup() {
-    await this.signInRegister.click();
+    await this.signInLink.click();
   }
 
   async login(email, password) {
     await this.openLoginPopup();
     await this.fill(this.emailInput, email);
+    await this.continueButton.click();
     await this.fill(this.passwordInput, password);
     await this.loginButton.click();
   }

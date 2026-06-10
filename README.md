@@ -1,36 +1,40 @@
-# Sephora Playwright Automation Framework
+# AMAZONWEBMOBILEPLAYWRIGHTFRAMEWORK
 
-Industry-standard JavaScript automation framework built using Playwright, Cucumber BDD, Page Object Model, environment-based configuration, reporting, logging, Jenkins, and GitHub Actions.
+Unified enterprise automation framework for Amazon India using Playwright, JavaScript, Cucumber BDD, Page Object Model, Jenkins, GitHub Actions, Allure reporting, AI agents, and Vector DB support.
 
-## Tech Stack
-
-- Playwright
-- JavaScript
-- Cucumber BDD
-- Node.js
-- Page Object Model
-- Jenkins CI/CD
-- GitHub Actions
-- AI-assisted automation agents
-
-## Folder Structure
-
-For a file-by-file explanation, see [`FRAMEWORK_GUIDE.md`](FRAMEWORK_GUIDE.md).
+Application under test:
 
 ```text
-features/              Gherkin feature files
-step-definitions/      Reusable Cucumber step definitions
-pages/                 Page Object Model classes
-utils/                 Config reader, logger, reports cleaner, report generator
-hooks/                 Global Before/After hooks for browser, context, page, screenshots, videos, and traces
-config/                Environment configuration
-test-data/             JSON based test data
-reports/               JSON, HTML, screenshots, videos, traces
-screenshots/           Optional screenshot output folder
-videos/                Optional video output folder
-logs/                  Execution logs
-.github/workflows/     GitHub Actions workflow
-Jenkinsfile            Jenkins pipeline
+https://www.amazon.in/
+```
+
+## Framework Stack
+
+- JavaScript
+- Playwright
+- Cucumber BDD
+- Page Object Model
+- Appium mobile scaffold for Android and iOS
+- Cucumber HTML and Allure reporting
+- Jenkins pipeline
+- GitHub Actions
+- AI agent architecture
+- ChromaDB/local Vector DB support
+
+## Project Structure
+
+```text
+features/              Cucumber feature files
+step-definitions/      Cucumber step definitions
+pages/                 Amazon page objects
+hooks/                 Browser, context, screenshot, video, and trace lifecycle
+config/                Runtime configuration
+utils/                 Reporting, validation, and execution utilities
+test-data/             Amazon-specific test data
+reports/               Generated reports and artifacts
+framework/             Web/mobile/common abstraction layer
+mobile/                Appium mobile scaffolding
+ai/                    AI agents, prompts, workflows, MCP, memory, Vector DB
 ```
 
 ## Setup
@@ -40,136 +44,137 @@ npm install
 npx playwright install
 ```
 
-## Execution Commands
+Use `.env.example` as the reference environment file.
+
+Important values:
+
+```text
+APP_NAME=Amazon India
+BASE_URL=https://www.amazon.in
+TEST_PLATFORM=WEB
+BROWSER=chromium
+HEADLESS=false
+```
+
+## Test Execution
+
+Default Cucumber execution:
 
 ```bash
 npm test
+```
+
+Smoke tests:
+
+```bash
 npm run test:smoke
+```
+
+Regression tests:
+
+```bash
 npm run test:regression
-npm run test:login
-npm run test:parallel
-npm run test:parallel:2
-npm run test:cross-browser
-npm run test:cross-browser:smoke
-npm run test:headed
-npm run test:firefox
-npm run test:webkit
+```
+
+Amazon web execution:
+
+```bash
+npm run test:web
+```
+
+Search results feature:
+
+```bash
+npm run test:search-results
+```
+
+Product details feature:
+
+```bash
+npm run test:product
+```
+
+Cart feature:
+
+```bash
+npm run test:cart
+```
+
+## Reports
+
+Generate Cucumber HTML report:
+
+```bash
 npm run report
 ```
 
-Run with a custom worker count:
+Generate and open Allure report:
 
 ```bash
-PARALLEL=3 npm test
+npm run allure:generate
+npm run allure:open
 ```
 
-Run cross-browser tests:
+Generated artifacts are stored under:
+
+```text
+reports/
+allure-results/
+allure-report/
+```
+
+## Amazon Test Coverage
+
+Current Amazon India scenarios cover:
+
+- Home page load
+- Amazon logo visibility
+- Search box visibility
+- Product search
+- Search results page
+- Search result product cards
+- Opening first product from search result
+- Product details page
+- Product title, price, and rating checks
+- Add product to cart if available
+- Cart page and empty-cart validation
+- Proceed-to-buy button if cart has items
+
+Amazon can show captcha, location prompts, sign-in prompts, or availability changes. Those conditions may require headed debugging or test data adjustment.
+
+## Unified Web And Mobile Execution
+
+Web:
 
 ```bash
-npm run test:cross-browser
-BROWSERS=chromium,firefox npm run test:cross-browser
-TAGS=@smoke npm run test:cross-browser
+npm run test:web
 ```
 
-## Environment Configuration
+Android:
 
-Update `.env`:
-
-```env
-ENV=dev
-BASE_URL=https://sephora.in
-BROWSER=chromium
-HEADLESS=false
-TIMEOUT=30000
-RETRIES=1
-PARALLEL=2
+```bash
+npm run test:android
 ```
 
-Supported browsers:
+iOS:
 
-```text
-chromium
-firefox
-webkit
+```bash
+npm run test:ios
 ```
 
-Supported environments:
+All platforms:
 
-```text
-dev
-qa
-stage
+```bash
+npm run test:all
 ```
 
-## Test Coverage Added
+Mobile execution requires Appium 2, the relevant Appium driver, and valid device/app capability values in the environment files.
 
-This framework includes 50 BDD scenarios based on the provided Sephora screenshots:
+## AI Agents
 
-1. Home page
-2. Makeup Face listing page
-3. Product details page
-4. Shopping bag page
+The AI layer is kept under `ai/` and remains independent from normal `npm test` execution unless you run AI-specific scripts.
 
-Coverage includes positive and negative checks, smoke tags, regression tags, product listing, product details, cart summary, header navigation, filters, and delivery section validation.
-
-## Reporting
-
-After execution, reports are available under:
-
-```text
-reports/json/cucumber-report.json
-reports/html/cucumber-report.html
-reports/html/cucumber-html-report.html
-reports/screenshots/
-reports/videos/worker-<id>/
-reports/traces/
-reports/cross-browser/chromium/
-reports/cross-browser/firefox/
-reports/cross-browser/webkit/
-logs/execution.log
-```
-
-## AI-Assisted Automation
-
-The AI layer lives under [`ai/`](ai/) and is intentionally simple for interview demos. It works in two modes:
-
-```text
-MOCK_MODE=true   Local rule-based output, no API key required.
-MOCK_MODE=false  Uses OPENAI_API_KEY from .env with an OpenAI-compatible API.
-```
-
-### AI Concepts
-
-An LLM, or Large Language Model, is the AI model that understands requirements, code, logs, reports, and failures. In this framework, it can generate test cases, feature files, step definitions, page objects, reviews, and failure analysis.
-
-An AI Agent is a focused automation helper with one responsibility. For example, `TestCaseGenerationAgent` creates test cases, while `SelfHealingAutomationAgent` suggests better locators.
-
-Agentic AI means multiple agents run in a controlled workflow. Here, `ai/core/AgentRunner.js` can run one agent, all agents, or post-test AI analysis after Cucumber execution.
-
-MCP servers are used to safely provide external context to AI agents, such as file system data, GitHub pull requests, Jenkins logs, browser state, Playwright traces, or documentation. This beginner layer does not require real paid MCP setup, but the architecture can later connect to MCP servers when the framework becomes more advanced.
-
-### Agents In This Framework
-
-```text
-TestCaseGenerationAgent
-FeatureFileGenerationAgent
-StepDefinitionGenerationAgent
-PageObjectGenerationAgent
-JenkinsBuildFailureAnalysisAgent
-PlaywrightCodeReviewAgent
-SelfHealingAutomationAgent
-```
-
-Every agent prints clear execution logs:
-
-```text
-[AI] Starting AgentName
-[AI] Reading input from ...
-[AI] Generating output ...
-[AI] Completed AgentName
-```
-
-### Run AI Agents
+Common commands:
 
 ```bash
 npm run ai:testcases
@@ -180,87 +185,97 @@ npm run ai:jenkins
 npm run ai:review
 npm run ai:heal
 npm run ai:all
-```
-
-Run AI-integrated tests:
-
-```bash
-npm test
 npm run test:ai
 ```
 
-`npm test` runs normal Cucumber tests only. `npm run test:ai` runs Cucumber first and then runs post-test AI analysis. Even if tests fail, AI analysis still runs and the original Cucumber exit code is preserved.
-
-Generated AI proof files:
+AI output files are generated under:
 
 ```text
-ai/output/generated-test-cases.md
-ai/output/generated-feature.feature
-ai/output/generated-step-definitions.js
-ai/output/generated-page-object.js
-ai/output/jenkins-failure-analysis.md
-ai/output/code-review-report.md
-ai/output/self-healing-suggestions.md
-ai/output/ai-post-test-summary.md
-ai/memory/agent-run-history.json
+ai/output/
+ai/memory/
+reports/ai/
 ```
 
-Main AI implementation files:
+## Vector DB Support
 
-```text
-ai/core/BaseAgent.js
-ai/core/AgentRunner.js
-ai/core/LLMClient.js
-ai/index.js
-```
+The framework supports ChromaDB locally first, with a local JSON fallback for demos when ChromaDB is not running.
 
-### Multi-Page Requirement Generation
-
-You can put multiple page requirements in one file:
-
-```text
-ai/input/requirement.txt
-```
-
-Example:
-
-```text
-1. Home page: Verify all footer links have unique URLs.
-2. Cart page: Verify cart item quantity can be increased.
-3. Product details page: Verify product price and Add To Bag button.
-4. Checkout page: Verify user can see payment options.
-```
-
-Then run:
+Start ChromaDB:
 
 ```bash
-npm run ai:testcases
-npm run ai:feature
-npm run ai:steps
+npm run vector:start
 ```
 
-The AI layer classifies requirements by page area and creates draft feature files:
+Ingest framework knowledge:
+
+```bash
+npm run vector:ingest
+```
+
+Search similar failures:
+
+```bash
+npm run vector:search -- --type failures --query "locator timeout element not visible"
+```
+
+Analyze failures with Vector DB context:
+
+```bash
+npm test
+npm run ai:analyze-failures
+```
+
+Generate feature scenarios from `ai/input/requirement.txt`:
+
+```bash
+npm run ai:generate-tests
+```
+
+## Jenkins
+
+The included `Jenkinsfile` supports:
+
+- Web execution
+- Android execution
+- iOS execution
+- Parallel platform execution
+- Report artifact publishing
+- Allure report publishing
+- AI report artifact publishing
+
+Typical flow:
 
 ```text
-ai/output/generated-feature.feature
-ai/output/generated-features/home.feature
-ai/output/generated-features/cart.feature
-ai/output/generated-features/product_details.feature
-ai/output/generated-features/checkout.feature
+Checkout
+Install dependencies
+Install Playwright browsers
+Run selected test platform
+Generate reports
+Archive reports, screenshots, traces, and AI artifacts
 ```
 
-These files are draft AI output. Review them first, then copy approved scenarios into the real executable files under `features/`.
+## GitHub Actions
 
-## Jenkins Steps
+Workflow files are under `.github/workflows/`:
 
-1. Install NodeJS plugin in Jenkins.
-2. Configure NodeJS tool name as `NodeJS`.
-3. Create a pipeline job.
-4. Connect your GitHub repository.
-5. Use the included `Jenkinsfile`.
-6. Run the build.
-7. Check archived artifacts and Cucumber HTML report.
+```text
+web.yml
+android.yml
+ios.yml
+```
+
+Each workflow installs dependencies, runs the relevant platform tests, and uploads report artifacts.
+
+## Migration Validation
+
+Run this command after migration changes:
+
+```bash
+npm run validate:migration
+```
+
+It scans for old application references and fails if any are found.
 
 ## Interview Explanation
 
-This is a Cucumber BDD Playwright framework using Page Object Model. Feature files contain business-readable Gherkin scenarios. Step definitions directly create the required page class, for example `const homePage = new HomePage(this.page)`, and then call page action methods like `homePage.searchProduct()`. Page classes contain locators and page-specific actions, while `BasePage` contains reusable methods like `open`, `click`, `fill`, and `verifyVisible`. Configuration is managed through `.env`, test data is maintained separately in JSON files, and global hooks manage browser, context, page, screenshot, video, and trace lifecycle. Parallel execution is controlled by the `PARALLEL` environment variable, and worker-specific artifacts are saved with the worker id to avoid collisions. The framework is CI/CD ready through Jenkinsfile and GitHub Actions.
+This is a reusable Cucumber BDD Playwright framework using Page Object Model. Feature files describe business-readable Amazon India scenarios. Step definitions call Amazon page object methods. Page objects contain stable locators and page-specific actions. Hooks manage browser lifecycle, screenshots, videos, and traces. Config is environment-driven, reports are generated through Cucumber/Allure, CI/CD is available through Jenkins and GitHub Actions, and AI/Vector DB modules provide optional failure analysis and test generation support.

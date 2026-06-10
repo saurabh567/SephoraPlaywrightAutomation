@@ -5,7 +5,7 @@ module.exports = {
   timeout: Number(process.env.TIMEOUT || 30000),
   retries: Number(process.env.RETRIES || 0),
   use: {
-    baseURL: process.env.BASE_URL || 'https://sephora.in',
+    baseURL: process.env.BASE_URL || 'https://www.amazon.in',
     headless: process.env.HEADLESS !== 'false',
     trace: process.env.TRACE || 'on',
     video: process.env.VIDEO || 'retain-on-failure',

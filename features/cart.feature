@@ -1,33 +1,16 @@
-# Shopping bag page scenarios for empty bag, promotional banner, footer, and recovery-state validations.
 @cart @regression
-Feature: Sephora Shopping Bag Page
+Feature: Amazon India Cart Page
 
   Background:
-    Given I am on the shopping bag page
+    Given I am on the Amazon cart page
 
   @smoke
-  Scenario: 043 Verify shopping bag title
-    Then the shopping bag title should be visible
+  Scenario: 016 Verify cart page
+    Then the Amazon cart page should be visible
 
   @smoke
-  Scenario: 044 Verify empty cart details
-    Then the cart item details should be visible
+  Scenario: 017 Verify cart title or empty cart message
+    Then the Amazon cart title or empty cart message should be visible
 
-  Scenario: 045 Verify cart promotional banners
-    Then the cart quantity controls should be visible
-
-  Scenario: 046 Verify cart footer support sections
-    Then the price summary should be visible
-
-  @smoke
-  Scenario: 047 Verify Beauty Pass rewards section
-    Then the checkout button should be visible
-
-  Scenario: 048 Verify APP10 coupon banner
-    Then the apply coupon section should be visible
-
-  Scenario: 049 Verify no items alert
-    Then the change pincode button should be visible
-
-  Scenario: 050 Verify cart coupon APP10 banner is visible
-    Then the apply coupon section should be visible
+  Scenario: 018 Verify proceed to buy button if cart has items
+    Then the Amazon proceed to buy button should be visible if cart has items

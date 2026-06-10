@@ -32,7 +32,7 @@ If `OPENAI_API_KEY` is missing, agents run in dry-run mode and return prompt pre
 ## Agent Usage
 
 ```bash
-npm run ai:agent -- --agent testCaseGeneration --requirement "Validate Sephora search for valid and invalid products"
+npm run ai:agent -- --agent testCaseGeneration --requirement "Validate Amazon India search for valid and invalid products"
 npm run ai:agent -- --agent playwrightCodeReview
 npm run ai:agent -- --agent jenkinsBuildFailureAnalysis --file jenkins-console.txt
 ```

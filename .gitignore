@@ -24,6 +24,9 @@ logs/
 .env
 .env.*
 !.env.example
+!.env.qa
+!.env.stage
+!.env.prod
 
 # Mac files
 .DS_Store

@@ -1,56 +1,30 @@
-# Home page scenarios for header, navigation, banner, promotional, and search validations.
 @home @regression
-Feature: Sephora Home Page
+Feature: Amazon India Home Page
 
   Background:
-    Given I am on the Sephora home page
+    Given I am on the Amazon home page
 
-  @smoke  @passed 
-  Scenario: 001 Verify Sephora logo on home page
-    Then the Sephora logo should be visible
+  @smoke
+  Scenario: 001 Verify Amazon home page loads successfully
+    Then the Amazon home page should be loaded
 
-  @smoke @passed
-  Scenario: 002 Verify search box on home page
-    Then the search box should be visible
+  @smoke
+  Scenario: 002 Verify Amazon logo is visible
+    Then the Amazon logo should be visible
 
-  @smoke @login @passed
-  Scenario: 003 Verify Sign In Register link on home page
-    Then the Sign In Register link should be visible
-   
-   @passed
-  Scenario: 004 Verify Beauty Pass link on home page
-    Then the Beauty Pass link should be visible
-   @passed
-  Scenario: 005 Verify Stores and Events link on home page
-    Then the Stores and Events link should be visible
+  @smoke
+  Scenario: 003 Verify search box is visible
+    Then the Amazon search box should be visible
 
-  @passed
-  Scenario: 006 Verify Wishlist link on home page
-    Then the Wishlist link should be visible
-   @passed
-  Scenario: 007 Verify Bag link on home page
-    Then the Bag link should be visible
-
-  @smoke @passed
-  Scenario: 008 Verify all top navigation menus on home page
-    Then all main navigation menus should be visible
-  
-  @passed
-  Scenario: 009 Verify hero banner Shop Now text on home page
-    Then the hero banner Shop Now button should be visible
-
-  @passed
-  Scenario: 010 Verify Rare Beauty promotional text on home page
-    Then the Rare Beauty promotional text should be visible
-  @passed
-  Scenario: 011 Verify Free Samples message on home page
-    Then the Free Samples message should be visible
-  @passed
-  Scenario: 012 Verify user can search product from home page
+  @smoke
+  Scenario: 004 Search for a product
     When I search for product from test data
-    Then the page title should contain "Sephora"
+    Then the Amazon search results page should be visible
 
-  @footer @testcasegeneratedbyAI
-  Scenario: 013 Verify all footer links have different URLs
+  Scenario: 005 Verify Amazon cart link is visible
+    Then the Amazon cart link should be visible
+
+  @footer
+  Scenario: 006 Verify Amazon footer links have valid URLs
     When I collect all footer links
-    Then each footer link should have a different valid URL
+    Then each footer link should have a valid URL

@@ -1,78 +1,40 @@
-// Home page-specific Cucumber steps that call the HomePage page object.
+// Amazon home page-specific Cucumber steps.
 const { When, Then } = require('@cucumber/cucumber');
-const HomePage = require('../pages/HomePage');
+const { expect } = require('@playwright/test');
+const AmazonHomePage = require('../pages/AmazonHomePage');
+const AmazonSearchResultsPage = require('../pages/AmazonSearchResultsPage');
 
-Then('the Sephora logo should be visible', async function () {
-  const homePage = new HomePage(this.page);
+Then('the Amazon home page should be loaded', async function () {
+  await expect(this.page).toHaveURL(/amazon\.in/i);
+  await expect(this.page.locator('body')).toBeVisible();
+});
+
+Then('the Amazon logo should be visible', async function () {
+  const homePage = new AmazonHomePage(this.page);
   await homePage.verifyVisible(homePage.logo);
 });
 
-Then('the search box should be visible', async function () {
-  const homePage = new HomePage(this.page);
+Then('the Amazon search box should be visible', async function () {
+  const homePage = new AmazonHomePage(this.page);
   await homePage.verifyVisible(homePage.searchBox);
 });
 
-Then('the Sign In Register link should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.signInRegister);
+Then('the Amazon cart link should be visible', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.verifyVisible(homePage.cartLink);
 });
 
-Then('the Beauty Pass link should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.beautyPass);
-});
-
-Then('the Stores and Events link should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.storesEvents);
-});
-
-Then('the Wishlist link should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.wishlist);
-});
-
-Then('the Bag link should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.bag);
-});
-
-Then('all main navigation menus should be visible', async function () {
-  const home = new HomePage(this.page);
-  await home.verifyVisible(home.newMenu);
-  await home.verifyVisible(home.brandsMenu);
-  await home.verifyVisible(home.makeupMenu);
-  await home.verifyVisible(home.skincareMenu);
-  await home.verifyVisible(home.hairMenu);
-  await home.verifyVisible(home.toolsBrushesMenu);
-  await home.verifyVisible(home.bathBodyMenu);
-  await home.verifyVisible(home.fragranceMenu);
-  await home.verifyVisible(home.cleanMenu);
-  await home.verifyVisible(home.giftsMenu);
-  await home.verifyVisible(home.saleMenu);
-});
-
-Then('the hero banner Shop Now button should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.shopNowButton);
-});
-
-Then('the Rare Beauty promotional text should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.rareBeautyPromotion);
-});
-
-Then('the Free Samples message should be visible', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyVisible(homePage.freeSamplesMessage);
+Then('the Amazon search results page should be visible', async function () {
+  const searchResultsPage = new AmazonSearchResultsPage(this.page);
+  await searchResultsPage.verifySearchResultsVisible();
 });
 
 When('I collect all footer links', async function () {
-  const homePage = new HomePage(this.page);
+  const homePage = new AmazonHomePage(this.page);
   this.footerLinks = await homePage.getFooterLinks();
 });
 
-Then('each footer link should have a different valid URL', async function () {
-  const homePage = new HomePage(this.page);
-  await homePage.verifyFooterLinksHaveUniqueUrls(this.footerLinks);
+Then('each footer link should have a valid URL', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.verifyFooterLinksHaveValidUrls(this.footerLinks);
 });

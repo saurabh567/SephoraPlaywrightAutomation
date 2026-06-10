@@ -9,6 +9,10 @@ const folders = [
   `${reportDir}/screenshots`,
   `${reportDir}/videos`,
   `${reportDir}/traces`,
+  `${reportDir}/ai`,
+  `${reportDir}/cross-browser`,
+  'allure-results',
+  'allure-report',
   'screenshots',
   'videos',
   'logs'

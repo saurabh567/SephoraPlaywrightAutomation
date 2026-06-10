@@ -1,0 +1,59 @@
+name: iOS Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      deviceName:
+        description: iOS simulator or device name
+        required: false
+        default: iPhone 15
+
+jobs:
+  ios:
+    runs-on: macos-latest
+
+    env:
+      TEST_PLATFORM: IOS
+      ENV: qa
+      DEVICE_NAME: ${{ inputs.deviceName }}
+      APPIUM_HOST: 127.0.0.1
+      APPIUM_PORT: 4723
+      MOCK_MODE: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Appium iOS driver
+        run: npx appium driver install xcuitest || true
+
+      - name: Start Appium server
+        run: npx appium --base-path / > appium.log 2>&1 &
+
+      - name: Run iOS tests
+        run: npm run test:ios
+
+      - name: Generate reports
+        if: always()
+        run: npm run allure:generate || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-automation-artifacts
+          path: |
+            reports/**
+            allure-results/**
+            allure-report/**
+            logs/**
+            appium.log
