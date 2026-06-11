@@ -26,6 +26,8 @@ class MobileDriverFactory {
       port: config.appium.port,
       path: config.appium.path,
       logLevel: config.appium.logLevel,
+      connectionRetryTimeout: config.appium.connectionRetryTimeout,
+      connectionRetryCount: config.appium.connectionRetryCount,
       capabilities: this.getCapabilities(config.testPlatform)
     });
   }

@@ -1,6 +1,6 @@
-# AMAZONWEBMOBILEPLAYWRIGHTFRAMEWORK Guide
+# AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION Guide
 
-This document explains the purpose of each folder and important file in the AMAZONWEBMOBILEPLAYWRIGHTFRAMEWORK project.
+This document explains the purpose of each folder and important file in the AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION project.
 
 ## Core Flow
 
@@ -50,7 +50,7 @@ Reports, logs, screenshots, AI analysis, Vector DB knowledge
 
 - `reports/`: Cucumber JSON/HTML, screenshots, videos, and traces.
 - `ai/`: AI agents, prompts, workflows, MCP config, memory, and Vector DB services.
-- `ai/vector-db/`: ChromaDB/local fallback ingestion and retrieval services.
+- `ai/vector-db/`: strict ChromaDB ingestion and retrieval services using real embeddings.
 
 ## Common Commands
 

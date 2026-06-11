@@ -1,248 +1,153 @@
-const fs = require('fs-extra');
-const path = require('path');
 const config = require('./vectorConfig');
-
-function cosineSimilarity(left = [], right = []) {
-  const length = Math.min(left.length, right.length);
-  if (length === 0) return 0;
-
-  let dot = 0;
-  let leftMagnitude = 0;
-  let rightMagnitude = 0;
-
-  for (let index = 0; index < length; index += 1) {
-    dot += left[index] * right[index];
-    leftMagnitude += left[index] * left[index];
-    rightMagnitude += right[index] * right[index];
-  }
-
-  const denominator = Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude);
-  return denominator === 0 ? 0 : dot / denominator;
-}
 
 class ChromaClient {
   constructor(options = {}) {
     this.chromaUrl = options.chromaUrl || config.chromaUrl;
-    this.localStorePath = options.localStorePath || config.localStorePath;
-    this.useLocalFallback = options.useLocalFallback ?? config.useLocalFallback;
+    this.tenant = options.tenant || config.chromaTenant;
+    this.database = options.database || config.chromaDatabase;
+    this.timeoutMs = options.timeoutMs || config.requestTimeoutMs;
+    this.authToken = options.authToken || process.env.CHROMA_AUTH_TOKEN || '';
+  }
+
+  get collectionsUrl() {
+    return `${this.chromaUrl}/api/v2/tenants/${encodeURIComponent(this.tenant)}/databases/${encodeURIComponent(this.database)}/collections`;
+  }
+
+  async request(url, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let response;
+
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          Accept: 'application/json',
+          ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+          ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}),
+          ...options.headers
+        },
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`ChromaDB request timed out after ${this.timeoutMs}ms: ${url}`);
+      }
+      throw new Error(`ChromaDB is not reachable at ${this.chromaUrl}: ${error.message}`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`ChromaDB request failed: ${response.status} ${response.statusText} ${body}`.trim());
+    }
+
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
   }
 
   async healthCheck() {
     const endpoints = ['/api/v2/heartbeat', '/api/v1/heartbeat'];
+    let lastError;
+
     for (const endpoint of endpoints) {
       try {
-        const response = await fetch(`${this.chromaUrl}${endpoint}`);
-        if (response.ok) {
-          return {
-            status: 'connected',
-            mode: 'chroma',
-            url: this.chromaUrl,
-            endpoint
-          };
-        }
+        const heartbeat = await this.request(`${this.chromaUrl}${endpoint}`);
+        return {
+          status: 'connected',
+          mode: 'chroma',
+          url: this.chromaUrl,
+          tenant: this.tenant,
+          database: this.database,
+          heartbeat
+        };
       } catch (error) {
-        // Try the next endpoint before falling back.
+        lastError = error;
       }
     }
 
-    return {
-      status: this.useLocalFallback ? 'fallback' : 'unavailable',
-      mode: this.useLocalFallback ? 'local-json' : 'chroma',
-      url: this.chromaUrl,
-      message: this.useLocalFallback
-        ? 'ChromaDB is not reachable. Using ai/memory/local-vector-store.json for local demo retrieval.'
-        : 'ChromaDB is not reachable.'
-    };
+    throw new Error(`ChromaDB health check failed at ${this.chromaUrl}: ${lastError?.message || 'unknown error'}`);
+  }
+
+  async listCollections() {
+    const payload = await this.request(this.collectionsUrl);
+    return Array.isArray(payload) ? payload : payload?.collections || [];
   }
 
   async ensureCollections(collectionNames) {
+    const results = [];
     for (const collectionName of collectionNames) {
-      await this.ensureCollection(collectionName);
+      results.push(await this.ensureCollection(collectionName));
     }
+    return results;
   }
 
   async ensureCollection(collectionName) {
-    const health = await this.healthCheck();
-    if (health.mode !== 'chroma') {
-      this.ensureLocalCollection(collectionName);
-      return { name: collectionName, mode: health.mode };
-    }
+    const collections = await this.listCollections();
+    const existing = collections.find((collection) => collection.name === collectionName);
+    if (existing) return existing;
 
-    try {
-      return await this.ensureChromaCollection(collectionName);
-    } catch (error) {
-      if (!this.useLocalFallback) throw error;
-      console.warn(`[VectorDB] Chroma collection setup failed for ${collectionName}. Using local fallback.`);
-      this.ensureLocalCollection(collectionName);
-      return { name: collectionName, mode: 'local-json', warning: error.message };
-    }
-  }
-
-  async addDocuments(collectionName, records) {
-    if (!records.length) return { collectionName, count: 0 };
-
-    const health = await this.healthCheck();
-    if (health.mode === 'chroma') {
-      try {
-        const collection = await this.ensureChromaCollection(collectionName);
-        await this.addToChroma(collection.id, records);
-        return { collectionName, count: records.length, mode: 'chroma' };
-      } catch (error) {
-        if (!this.useLocalFallback) throw error;
-        console.warn(`[VectorDB] Chroma add failed for ${collectionName}. Using local fallback.`);
-      }
-    }
-
-    this.addToLocalStore(collectionName, records);
-    return { collectionName, count: records.length, mode: 'local-json' };
-  }
-
-  async query(collectionName, queryEmbedding, topK = 5) {
-    const health = await this.healthCheck();
-    if (health.mode === 'chroma') {
-      try {
-        const collection = await this.ensureChromaCollection(collectionName);
-        return await this.queryChroma(collection.id, queryEmbedding, topK);
-      } catch (error) {
-        if (!this.useLocalFallback) throw error;
-        console.warn(`[VectorDB] Chroma query failed for ${collectionName}. Using local fallback.`);
-      }
-    }
-
-    return this.queryLocalStore(collectionName, queryEmbedding, topK);
-  }
-
-  async ensureChromaCollection(collectionName) {
-    const base = `${this.chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections`;
-    const listResponse = await fetch(base);
-    if (!listResponse.ok) {
-      throw new Error(`Unable to list Chroma collections: ${listResponse.status}`);
-    }
-
-    const existing = await listResponse.json();
-    const collections = Array.isArray(existing) ? existing : existing.collections || [];
-    const match = collections.find((collection) => collection.name === collectionName);
-    if (match) return match;
-
-    const createResponse = await fetch(base, {
+    return this.request(this.collectionsUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: collectionName })
+      body: JSON.stringify({
+        name: collectionName,
+        metadata: { 'hnsw:space': 'cosine' }
+      })
     });
-
-    if (!createResponse.ok) {
-      const body = await createResponse.text();
-      throw new Error(`Unable to create Chroma collection ${collectionName}: ${createResponse.status} ${body}`);
-    }
-
-    return createResponse.json();
   }
 
-  async addToChroma(collectionId, records) {
-    const response = await fetch(
-      `${this.chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections/${collectionId}/add`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ids: records.map((record) => record.id),
-          documents: records.map((record) => record.document),
-          metadatas: records.map((record) => record.metadata),
-          embeddings: records.map((record) => record.embedding)
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Unable to add records to Chroma: ${response.status} ${body}`);
-    }
+  async upsertDocuments(collectionName, records) {
+    if (!records.length) return { collectionName, count: 0 };
+    const collection = await this.ensureCollection(collectionName);
+    await this.request(`${this.collectionsUrl}/${collection.id}/upsert`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: records.map((record) => record.id),
+        documents: records.map((record) => record.document),
+        metadatas: records.map((record) => record.metadata),
+        embeddings: records.map((record) => record.embedding)
+      })
+    });
+    return { collectionName, collectionId: collection.id, count: records.length, mode: 'chroma' };
   }
 
-  async queryChroma(collectionId, queryEmbedding, topK) {
-    const response = await fetch(
-      `${this.chromaUrl}/api/v2/tenants/default_tenant/databases/default_database/collections/${collectionId}/query`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query_embeddings: [queryEmbedding],
-          n_results: topK,
-          include: ['documents', 'metadatas', 'distances']
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Unable to query Chroma: ${response.status} ${body}`);
-    }
-
-    const data = await response.json();
-    return this.normalizeChromaResults(data);
+  async query(collectionName, queryEmbedding, topK = 5, where) {
+    const collection = await this.ensureCollection(collectionName);
+    const payload = await this.request(`${this.collectionsUrl}/${collection.id}/query`, {
+      method: 'POST',
+      body: JSON.stringify({
+        query_embeddings: [queryEmbedding],
+        n_results: topK,
+        include: ['documents', 'metadatas', 'distances'],
+        ...(where ? { where } : {})
+      })
+    });
+    return this.normalizeQueryResults(payload);
   }
 
-  normalizeChromaResults(data) {
-    const documents = data.documents?.[0] || [];
-    const metadatas = data.metadatas?.[0] || [];
-    const distances = data.distances?.[0] || [];
+  async count(collectionName) {
+    const collection = await this.ensureCollection(collectionName);
+    const payload = await this.request(`${this.collectionsUrl}/${collection.id}/count`);
+    return typeof payload === 'number' ? payload : payload?.count || 0;
+  }
+
+  normalizeQueryResults(payload) {
+    const ids = payload.ids?.[0] || [];
+    const documents = payload.documents?.[0] || [];
+    const metadatas = payload.metadatas?.[0] || [];
+    const distances = payload.distances?.[0] || [];
 
     return documents.map((document, index) => ({
+      id: ids[index],
       document,
       metadata: metadatas[index] || {},
-      score: typeof distances[index] === 'number' ? Number((1 - distances[index]).toFixed(4)) : null
+      distance: typeof distances[index] === 'number' ? distances[index] : null,
+      similarityScore: typeof distances[index] === 'number'
+        ? Number(Math.max(-1, Math.min(1, 1 - distances[index])).toFixed(6))
+        : null
     }));
-  }
-
-  ensureLocalCollection(collectionName) {
-    const store = this.readLocalStore();
-    store.collections[collectionName] = store.collections[collectionName] || [];
-    this.writeLocalStore(store);
-  }
-
-  addToLocalStore(collectionName, records) {
-    const store = this.readLocalStore();
-    const existing = store.collections[collectionName] || [];
-    const byId = new Map(existing.map((record) => [record.id, record]));
-
-    for (const record of records) {
-      byId.set(record.id, {
-        id: record.id,
-        document: record.document,
-        metadata: record.metadata,
-        embedding: record.embedding,
-        updatedAt: new Date().toISOString()
-      });
-    }
-
-    store.collections[collectionName] = Array.from(byId.values());
-    this.writeLocalStore(store);
-  }
-
-  queryLocalStore(collectionName, queryEmbedding, topK) {
-    const store = this.readLocalStore();
-    const records = store.collections[collectionName] || [];
-
-    return records
-      .map((record) => ({
-        document: record.document,
-        metadata: record.metadata,
-        score: Number(cosineSimilarity(queryEmbedding, record.embedding).toFixed(4))
-      }))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, topK);
-  }
-
-  readLocalStore() {
-    if (!fs.existsSync(this.localStorePath)) {
-      return { createdAt: new Date().toISOString(), collections: {} };
-    }
-    return fs.readJsonSync(this.localStorePath);
-  }
-
-  writeLocalStore(store) {
-    fs.ensureDirSync(path.dirname(this.localStorePath));
-    fs.writeJsonSync(this.localStorePath, store, { spaces: 2 });
   }
 }
 

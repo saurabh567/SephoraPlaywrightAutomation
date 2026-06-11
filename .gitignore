@@ -9,6 +9,7 @@ playwright-report/
 test-results/
 ai/output/
 ai/memory/*.json
+ai/memory/chroma-data/
 
 # Screenshots and videos
 screenshots/
@@ -19,6 +20,8 @@ traces/
 logs/
 *.log
 !ai/input/jenkins-console.log
+!mobile/logs/
+!mobile/logs/.gitkeep
 
 # Environment files
 .env
@@ -27,6 +30,10 @@ logs/
 !.env.qa
 !.env.stage
 !.env.prod
+!.env.android
+!.env.ios
+!.env.ios.app.example
+!.env.ios.real.example
 
 # Mac files
 .DS_Store

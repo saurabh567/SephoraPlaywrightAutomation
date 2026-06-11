@@ -1,4 +1,4 @@
-# AMAZONWEBMOBILEPLAYWRIGHTFRAMEWORK
+# AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION
 
 Unified enterprise automation framework for Amazon India using Playwright, JavaScript, Cucumber BDD, Page Object Model, Jenkins, GitHub Actions, Allure reporting, AI agents, and Vector DB support.
 
@@ -19,7 +19,7 @@ https://www.amazon.in/
 - Jenkins pipeline
 - GitHub Actions
 - AI agent architecture
-- ChromaDB/local Vector DB support
+- ChromaDB-backed retrieval and RAG agents
 
 ## Project Structure
 
@@ -58,10 +58,16 @@ HEADLESS=false
 
 ## Test Execution
 
-Default Cucumber execution:
+Default AI-enriched Cucumber execution:
 
 ```bash
 npm test
+```
+
+Plain Cucumber execution without AI service validation or post-test agents:
+
+```bash
+npm run test:core
 ```
 
 Smoke tests:
@@ -172,7 +178,9 @@ Mobile execution requires Appium 2, the relevant Appium driver, and valid device
 
 ## AI Agents
 
-The AI layer is kept under `ai/` and remains independent from normal `npm test` execution unless you run AI-specific scripts.
+The AI layer is kept under `ai/`. `npm test` and `npm run test:ai` validate ChromaDB
+and embeddings, run Cucumber, ingest artifacts, and perform failure RAG when failures exist.
+Use `npm run test:core` when intentionally running without AI services.
 
 Common commands:
 
@@ -196,14 +204,22 @@ ai/memory/
 reports/ai/
 ```
 
-## Vector DB Support
+## ChromaDB And RAG
 
-The framework supports ChromaDB locally first, with a local JSON fallback for demos when ChromaDB is not running.
+The AI path requires a healthy ChromaDB service, a real embedding API, and a real
+OpenAI-compatible chat completion API. It does not use local hash vectors or mock responses.
+
+Prerequisites:
+
+- Docker with the Compose plugin, or an externally managed ChromaDB endpoint
+- `OPENAI_API_KEY`, or separate `EMBEDDING_API_KEY` plus the LLM credential
+- Jenkins credential ID `openai-api-key` for the supplied pipeline
 
 Start ChromaDB:
 
 ```bash
 npm run vector:start
+npm run vector:health
 ```
 
 Ingest framework knowledge:
@@ -217,6 +233,16 @@ Search similar failures:
 ```bash
 npm run vector:search -- --type failures --query "locator timeout element not visible"
 ```
+
+Production validation:
+
+```bash
+npm run vector:test
+npm run rag:test
+npm run ai:test
+```
+
+See `docs/AI_RAG_MIGRATION.md` for architecture, impacted files, and rollout details.
 
 Analyze failures with Vector DB context:
 
@@ -253,6 +279,56 @@ Run selected test platform
 Generate reports
 Archive reports, screenshots, traces, and AI artifacts
 ```
+
+## AppiumAgent
+
+`AppiumAgent` automatically manages the local Appium server for Android and iOS execution. Web Playwright execution does not use it.
+
+Why it is used:
+
+- Avoids manually starting Appium before every mobile run.
+- Reuses an already-running Appium server when one exists.
+- Starts Appium only when the configured `/status` endpoint is unavailable.
+- Stops Appium only when this framework started it.
+- Captures Appium server logs at `mobile/logs/appium-server.log`.
+
+Local commands:
+
+```bash
+npm run appium:status
+npm run appium:start
+npm run appium:stop
+npm run test:android
+npm run test:ios
+```
+
+Mobile test flow:
+
+```text
+Cucumber BeforeAll
+AppiumAgent checks http://127.0.0.1:4723/status
+If Appium is running, reuse it
+If Appium is not running and APPIUM_AUTO_START=true, start it
+Run Android/iOS scenarios
+Cucumber AfterAll stops Appium only if this framework started it
+```
+
+Jenkins flow:
+
+```text
+Install dependencies
+Run web tests without AppiumAgent
+Run Android/iOS tests with AppiumAgent preflight
+Archive reports and mobile/logs/appium-server.log
+```
+
+Troubleshooting:
+
+- If port `4723` is already used by Appium, the framework reuses it.
+- If port `4723` is used by something that is not healthy Appium, the run fails clearly instead of killing that process.
+- If startup times out, check `APPIUM_START_TIMEOUT` and `mobile/logs/appium-server.log`.
+- Set `APPIUM_AUTO_START=false` if you want to manage Appium manually.
+- Set `APPIUM_AUTO_STOP=false` if you want the framework-started Appium server to remain running after tests.
 
 ## GitHub Actions
 

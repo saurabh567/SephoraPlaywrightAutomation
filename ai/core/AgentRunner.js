@@ -49,25 +49,10 @@ class AgentRunner {
   }
 
   async runPostTestAnalysis() {
-    const order = [
-      'JenkinsBuildFailureAnalysisAgent',
-      'PlaywrightCodeReviewAgent',
-      'SelfHealingAutomationAgent'
-    ];
-
-    const results = [];
-    for (const agentName of order) {
-      try {
-        results.push(await this.runAgent(agentName));
-      } catch (error) {
-        console.error(`[AI] ${agentName} failed: ${error.message}`);
-        results.push({ agent: agentName, error: error.message });
-      }
-    }
-
-    this.writePostTestSummary(results);
-    this.writeMemory('post-test-analysis', results);
-    return results;
+    const workflow = require('../workflows/runPostExecutionAgents');
+    const result = await workflow.run();
+    this.writeMemory('post-test-rag-analysis', [result]);
+    return result;
   }
 
   writePostTestSummary(results) {

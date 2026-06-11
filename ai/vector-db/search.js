@@ -17,9 +17,11 @@ function resolveCollection(type) {
   const map = {
     requirements: config.collections.requirements,
     features: config.collections.featureFiles,
+    pageObjects: config.collections.pageObjects,
     failures: config.collections.failures,
     locators: config.collections.locators,
-    reports: config.collections.reports
+    reports: config.collections.failures,
+    jenkins: config.collections.jenkinsLogs
   };
   return map[type] || config.collections.failures;
 }

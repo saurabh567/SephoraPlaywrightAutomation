@@ -2,18 +2,37 @@
 const { Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 const AmazonCartPage = require('../pages/AmazonCartPage');
+const getAmazonMobilePage = require('../mobile/AmazonMobilePageFactory');
 
 Then('the Amazon cart page should be visible', async function () {
+  const mobilePage = getAmazonMobilePage(this);
+  if (mobilePage) {
+    await mobilePage.verifyCartPageVisible();
+    return;
+  }
+
   const cartPage = new AmazonCartPage(this.page);
   await cartPage.verifyCartPageVisible();
 });
 
 Then('the Amazon cart title or empty cart message should be visible', async function () {
+  const mobilePage = getAmazonMobilePage(this);
+  if (mobilePage) {
+    await mobilePage.verifyCartTitleOrEmptyMessage();
+    return;
+  }
+
   const cartPage = new AmazonCartPage(this.page);
   await expect(cartPage.cartTitle.or(cartPage.emptyCartMessage).first()).toBeVisible({ timeout: 60000 });
 });
 
 Then('the Amazon proceed to buy button should be visible if cart has items', async function () {
+  const mobilePage = getAmazonMobilePage(this);
+  if (mobilePage) {
+    await mobilePage.verifyProceedToBuyButtonIfCartHasItems();
+    return;
+  }
+
   const cartPage = new AmazonCartPage(this.page);
   const hasItems = await cartPage.cartItems.first().isVisible({ timeout: 5000 }).catch(() => false);
   if (hasItems) {

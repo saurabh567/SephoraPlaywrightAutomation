@@ -27,7 +27,8 @@ AI_TEMPERATURE=0.2
 AI_MAX_TOKENS=4000
 ```
 
-If `OPENAI_API_KEY` is missing, agents run in dry-run mode and return prompt previews.
+`OPENAI_API_KEY` is required. AI execution fails explicitly when the LLM or embedding
+provider is not configured.
 
 ## Agent Usage
 
@@ -55,22 +56,24 @@ ai/output/
 
 ## Runtime Integration
 
-`npm test` now runs:
+`npm run test:ai` runs:
 
 ```text
 utils/runCucumberWithAi.js
   -> npx cucumber-js --config cucumber.js
   -> ai/workflows/runPostExecutionAgents.js
-  -> FailureAnalysisAgent
-  -> ReportSummaryAgent
+  -> real embedding generation and ChromaDB ingestion
+  -> FailureAnalysisAgent RAG
+  -> LocatorHealingAgent RAG
   -> ExecutionMemoryAgent
 ```
 
 Generated post-execution artifacts:
 
 ```text
-ai/output/failure-summary.md
-ai/output/execution-summary.md
+reports/ai/failure-analysis.md
+reports/ai/locator-healing.md
+reports/ai/ai-execution-evidence.json
 ai/memory/execution-history.json
 ```
 

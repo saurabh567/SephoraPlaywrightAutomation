@@ -1,141 +1,26 @@
-const BaseAgent = require('../core/BaseAgent');
 const fs = require('fs-extra');
 const path = require('path');
-const RetrievalService = require('../vector-db/retrievalService');
+const BaseAgent = require('../core/BaseAgent');
+const RagService = require('../rag/ragService');
 
-function splitRequirements(input) {
-  const cleanedInput = input.trim();
-  if (!cleanedInput) return ['User should be able to search products on Amazon India.'];
-
-  return cleanedInput
-    .split(/\n+/)
-    .map((line) => line.trim().replace(/^[-*]\s*/, '').replace(/^\d+[.)]\s*/, ''))
-    .filter(Boolean);
+function slugify(value) {
+  return String(value || 'generated-feature')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) || 'generated-feature';
 }
 
-function getRequirementContext(requirement) {
-  const lower = requirement.toLowerCase();
-
-  if (
-    lower.includes('product detail') &&
-    lower.includes('quantity') &&
-    lower.includes('add to cart') &&
-    lower.includes('cart')
-  ) {
-    return {
-      featureName: 'product details add to cart flow',
-      validAction: 'product quantity can be selected and added to cart from product details page',
-      result: 'cart page can be opened after adding the product',
-      singleScenario: true
-    };
-  }
-
-  if (lower.includes('footer') && lower.includes('link')) {
-    return {
-      featureName: 'footer links',
-      validAction: 'all footer links are visible and clickable',
-      result: 'each footer link has a different valid URL',
-      invalidAction: 'footer link with missing or empty URL',
-      emptyAction: 'footer section with no available links',
-      edgeOne: 'duplicate footer URLs',
-      edgeTwo: 'external footer URLs opening safely'
-    };
-  }
-
-  if (lower.includes('search')) {
-    return {
-      featureName: 'product search',
-      validAction: 'valid product search',
-      result: 'search results displayed',
-      invalidAction: 'invalid product search',
-      emptyAction: 'empty search',
-      edgeOne: 'special characters in search text',
-      edgeTwo: 'very long search text'
-    };
-  }
-
-  if (lower.includes('login') || lower.includes('sign in')) {
-    return {
-      featureName: 'sign in',
-      validAction: 'valid user sign in',
-      result: 'user is signed in successfully',
-      invalidAction: 'invalid credentials',
-      emptyAction: 'empty username or password',
-      edgeOne: 'special characters in email field',
-      edgeTwo: 'very long email and password values'
-    };
-  }
-
-  if (lower.includes('cart') || lower.includes('bag')) {
-    return {
-      featureName: 'shopping cart',
-      validAction: 'adding a product to the shopping cart',
-      result: 'product is visible in the shopping cart',
-      invalidAction: 'opening shopping cart with no product added',
-      emptyAction: 'removing all items from shopping cart',
-      edgeOne: 'maximum allowed product quantity',
-      edgeTwo: 'quantity update repeated multiple times'
-    };
-  }
-
-  return {
-    featureName: requirement.replace(/^user should be able to\s+/i, '').replace(/\.$/, ''),
-    validAction: 'valid user action from the requirement',
-    result: 'expected result from the requirement is displayed',
-    invalidAction: 'invalid input or invalid action',
-    emptyAction: 'empty input or missing required data',
-    edgeOne: 'special characters or unusual input',
-    edgeTwo: 'very long input value'
-  };
+function extractFeatureName(content) {
+  const match = String(content).match(/^\s*Feature:\s*(.+)$/mi);
+  return match ? slugify(match[1]) : `generated-feature-${Date.now()}`;
 }
 
-function classifyFeature(requirement) {
-  const lower = requirement.toLowerCase();
-
-  if (lower.includes('checkout') || lower.includes('payment') || lower.includes('place order')) {
-    return { key: 'checkout', title: 'Checkout Page', fileName: 'checkout.feature' };
-  }
-
-  if (lower.includes('product detail') || lower.includes('product details') || lower.includes('add to cart')) {
-    return { key: 'product-details', title: 'Product Details Page', fileName: 'product_details.feature' };
-  }
-
-  if (lower.includes('cart') || lower.includes('bag')) {
-    return { key: 'cart', title: 'Cart Page', fileName: 'cart.feature' };
-  }
-
-  return { key: 'home', title: 'Home Page', fileName: 'home.feature' };
-}
-
-function buildTestCasesForRequirement(requirement) {
-  const context = getRequirementContext(requirement);
-
-  if (context.singleScenario) {
-    return [
-      `### Requirement: ${requirement}`,
-      '',
-      '#### Positive',
-      `- Verify ${context.validAction} and ${context.result}`,
-      ''
-    ];
-  }
-
-  return [
-    `### Requirement: ${requirement}`,
-    '',
-    '#### Positive',
-    `- Verify ${context.validAction}`,
-    `- Verify ${context.result}`,
-    '',
-    '#### Negative',
-    `- Verify ${context.invalidAction}`,
-    `- Verify ${context.emptyAction}`,
-    '',
-    '#### Edge',
-    `- Verify ${context.edgeOne}`,
-    `- Verify ${context.edgeTwo}`,
-    ''
-  ];
+function stripMarkdownFence(content) {
+  return String(content).trim()
+    .replace(/^```(?:gherkin|feature)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
 }
 
 class TestCaseGenerationAgent extends BaseAgent {
@@ -145,115 +30,61 @@ class TestCaseGenerationAgent extends BaseAgent {
       inputPath: 'ai/input/requirement.txt',
       outputPath: 'ai/output/generated-test-cases.md',
       promptPath: 'ai/prompts/test-case-generation.prompt.md',
-      purpose: 'Convert requirement into positive, negative, and edge test cases.'
+      purpose: 'Generate executable Gherkin scenarios from requirements and retrieved framework examples.'
     });
   }
 
-  getMockOutput(input) {
-    const groupedRequirements = splitRequirements(input).reduce((groups, requirement) => {
-      const feature = classifyFeature(requirement);
-      groups[feature.key] = groups[feature.key] || { ...feature, requirements: [] };
-      groups[feature.key].requirements.push(requirement);
-      return groups;
-    }, {});
+  async generateFeatureWithRag(requirementText) {
+    const requirement = String(requirementText || this.readInput()).trim();
+    if (!requirement) throw new Error('A requirement is required for RAG test generation.');
 
-    const lines = [
-      '# Generated Test Cases',
-      '',
-      'Source: ai/input/requirement.txt',
-      '',
-      '## Feature Mapping',
-      '',
-      '| Page Area | Target Feature File | Requirement Count |',
-      '|---|---|---|'
-    ];
-
-    for (const group of Object.values(groupedRequirements)) {
-      lines.push(`| ${group.title} | ${group.fileName} | ${group.requirements.length} |`);
-    }
-
-    lines.push('');
-
-    for (const group of Object.values(groupedRequirements)) {
-      lines.push(`## ${group.title}`, '', `Target Feature File: ${group.fileName}`, '');
-      for (const requirement of group.requirements) {
-        lines.push(...buildTestCasesForRequirement(requirement));
+    const rag = new RagService();
+    const result = await rag.generate({
+      task: 'Generate a new Cucumber Gherkin feature for the supplied requirement using the project conventions in retrieved examples.',
+      input: requirement,
+      topK: Number(process.env.TEST_GENERATION_RAG_TOP_K || 5),
+      systemPrompt: this.readPrompt(),
+      instructions: [
+        '- Return valid Gherkin only, without Markdown fences or explanatory prose.',
+        '- Reuse existing step wording when retrieved evidence supports it.',
+        '- Include positive, negative, and edge scenarios relevant to the requirement.',
+        '- Do not invent unsupported application capabilities.'
+      ].join('\n'),
+      retrieve: async (retrieval, topK) => {
+        const [features, requirements] = await Promise.all([
+          retrieval.searchFeatureFiles(requirement, topK),
+          retrieval.searchRequirements(requirement, Math.max(2, Math.ceil(topK / 2)))
+        ]);
+        return [...features, ...requirements]
+          .sort((left, right) => (right.similarityScore || 0) - (left.similarityScore || 0))
+          .slice(0, topK);
       }
+    });
+
+    const gherkin = stripMarkdownFence(result.content);
+    if (!/^\s*Feature:/mi.test(gherkin)) {
+      throw new Error('LLM response is not valid Gherkin because it does not contain a Feature declaration.');
     }
-
-    return lines.join('\n');
-  }
-
-  async generateFeatureWithVectorDb(requirementText) {
-    console.log('[AI] Running TestCaseGenerationAgent with Vector DB context');
-    const requirement = requirementText && requirementText.trim()
-      ? requirementText.trim()
-      : this.readInput();
-    const retrieval = new RetrievalService();
-    const similarFeatures = await retrieval.searchFeatureFiles(requirement, 3);
-    const feature = classifyFeature(requirement);
-    const gherkin = this.buildVectorBackedFeature(requirement, feature, similarFeatures);
-    const outputPath = path.join(process.cwd(), 'ai/generated-features', feature.fileName);
-
+    const outputPath = path.join(process.cwd(), 'ai/generated-features', `${extractFeatureName(gherkin)}.feature`);
     fs.ensureDirSync(path.dirname(outputPath));
     fs.writeFileSync(outputPath, gherkin);
 
     return {
+      agent: this.name,
       outputPath: path.relative(process.cwd(), outputPath),
-      similarFeatureCount: similarFeatures.length
+      response: gherkin,
+      retrievalEvidence: result.promptEvidence,
+      model: result.model,
+      usage: result.usage
     };
   }
 
-  buildVectorBackedFeature(requirement, feature, similarFeatures) {
-    const context = getRequirementContext(requirement);
-    const scenarioTitle = context.singleScenario
-      ? `Verify ${context.validAction} and ${context.result}`
-      : `Verify ${context.validAction}`;
+  generateFeatureWithVectorDb(requirementText) {
+    return this.generateFeatureWithRag(requirementText);
+  }
 
-    const lines = [
-      `Feature: ${feature.title} AI Generated Scenarios`,
-      '',
-      '  # Generated from ai/input/requirement.txt using Vector DB retrieval.',
-      `  # Target existing feature file: features/${feature.fileName}`,
-      `  # Similar feature examples found: ${similarFeatures.length}`,
-      '',
-      '  @ai-generated @vector-db',
-      `  Scenario: ${scenarioTitle}`,
-      '    Given I am on the Amazon home page'
-    ];
-
-    if (feature.key === 'product-details') {
-      lines.push(
-        '    When I open the first product from Amazon search results',
-        '    And I increase the product quantity to 2',
-        '    And I add the Amazon product to cart if possible',
-        '    Then the Amazon add to cart flow should complete'
-      );
-    } else if (feature.key === 'cart') {
-      lines.push(
-        '    When I open the Amazon cart from header',
-        '    Then the Amazon cart page should be visible'
-      );
-    } else if (feature.key === 'checkout') {
-      lines.push(
-        '    When I proceed to checkout',
-        '    Then checkout page should be displayed'
-      );
-    } else {
-      lines.push(
-        `    When I perform the requirement action "${requirement.replace(/"/g, '\\"')}"`,
-        '    Then the expected requirement result should be visible'
-      );
-    }
-
-    if (similarFeatures.length > 0) {
-      lines.push('', '  # Similar Vector DB context:');
-      for (const match of similarFeatures) {
-        lines.push(`  # - ${match.metadata?.sourcePath || 'unknown source'} score=${match.score ?? ''}`);
-      }
-    }
-
-    return lines.join('\n');
+  async run() {
+    return this.generateFeatureWithRag(this.readInput());
   }
 }
 

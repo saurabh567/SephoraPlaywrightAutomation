@@ -1,73 +1,83 @@
-require('dotenv').config();
-const crypto = require('crypto');
 const config = require('./vectorConfig');
+const OllamaClient = require('../local/ollamaClient');
 
 class EmbeddingService {
-  constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY || '';
-    this.baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-    this.model = config.embeddingModel;
-    this.mockMode = config.mockMode;
+  constructor(options = {}) {
+    this.model = options.model || config.embeddingModel;
+    this.expectedDimensions = Number(options.dimensions || config.embeddingDimensions);
+    this.batchSize = Number(options.batchSize || config.embeddingBatchSize);
+    this.ollama = options.ollama || new OllamaClient({
+      baseUrl: options.baseUrl || config.ollamaBaseUrl,
+      timeoutMs: options.timeoutMs || config.requestTimeoutMs
+    });
+  }
+
+  validateConfiguration() {
+    if (!this.model) throw new Error('OLLAMA_EMBEDDING_MODEL is required.');
+    if (!Number.isInteger(this.expectedDimensions) || this.expectedDimensions <= 0) {
+      throw new Error('EMBEDDING_DIMENSIONS must be a positive integer.');
+    }
+  }
+
+  validateEmbedding(embedding, index = 0) {
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+      throw new Error(`Ollama returned an empty embedding at index ${index}.`);
+    }
+    if (embedding.length !== this.expectedDimensions) {
+      throw new Error(
+        `Embedding dimension mismatch for ${this.model}: expected ${this.expectedDimensions}, received ${embedding.length}.`
+      );
+    }
+    if (embedding.some((value) => typeof value !== 'number' || !Number.isFinite(value))) {
+      throw new Error(`Ollama returned non-numeric embedding values at index ${index}.`);
+    }
+  }
+
+  async requestEmbeddings(inputs) {
+    this.validateConfiguration();
+    const normalized = inputs.map((input) => String(input || '').trim());
+    if (normalized.some((input) => !input)) throw new Error('Cannot embed empty text.');
+
+    const payload = await this.ollama.request('/api/embed', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: this.model,
+        input: normalized,
+        truncate: true
+      })
+    });
+    const embeddings = payload.embeddings || [];
+    if (embeddings.length !== normalized.length) {
+      throw new Error(`Ollama returned ${embeddings.length} vectors for ${normalized.length} inputs.`);
+    }
+    embeddings.forEach((embedding, index) => this.validateEmbedding(embedding, index));
+    return embeddings;
   }
 
   async embedText(text) {
-    const normalizedText = String(text || '').trim();
-    if (!normalizedText) {
-      return this.createLocalEmbedding('empty');
-    }
-
-    if (this.mockMode) {
-      return this.createLocalEmbedding(normalizedText);
-    }
-
-    if (!this.apiKey) {
-      throw new Error('OPENAI_API_KEY is required when MOCK_MODE=false for OpenAI embeddings.');
-    }
-
-    const response = await fetch(`${this.baseUrl}/embeddings`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: this.model,
-        input: normalizedText
-      })
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`OpenAI embedding request failed: ${response.status} ${response.statusText}\n${body}`);
-    }
-
-    const data = await response.json();
-    return data.data?.[0]?.embedding || [];
+    const [embedding] = await this.requestEmbeddings([text]);
+    return embedding;
   }
 
   async embedMany(texts) {
+    const inputs = Array.from(texts || []);
     const embeddings = [];
-    for (const text of texts) {
-      embeddings.push(await this.embedText(text));
+    for (let index = 0; index < inputs.length; index += this.batchSize) {
+      embeddings.push(...await this.requestEmbeddings(inputs.slice(index, index + this.batchSize)));
     }
     return embeddings;
   }
 
-  createLocalEmbedding(text) {
-    const dimensions = 384;
-    const vector = new Array(dimensions).fill(0);
-    const tokens = String(text).toLowerCase().split(/[^a-z0-9_./-]+/).filter(Boolean);
-
-    for (const token of tokens) {
-      const hash = crypto.createHash('sha256').update(token).digest();
-      for (let index = 0; index < hash.length; index += 1) {
-        const position = hash[index] % dimensions;
-        vector[position] += index % 2 === 0 ? 1 : -1;
-      }
-    }
-
-    const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
-    return vector.map((value) => Number((value / magnitude).toFixed(8)));
+  async healthCheck() {
+    await this.ollama.ensureModel(this.model);
+    const embedding = await this.embedText('AI automation embedding health check');
+    return {
+      status: 'connected',
+      provider: 'ollama',
+      url: this.ollama.baseUrl,
+      model: this.model,
+      dimensions: embedding.length
+    };
   }
 }
 

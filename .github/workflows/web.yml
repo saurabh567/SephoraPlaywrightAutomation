@@ -18,7 +18,6 @@ jobs:
       HEADLESS: true
       PARALLEL: 1
       RETRIES: 0
-      MOCK_MODE: true
 
     steps:
       - name: Checkout code

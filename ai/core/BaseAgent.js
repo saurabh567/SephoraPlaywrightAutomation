@@ -39,22 +39,6 @@ class BaseAgent {
     return fullPath;
   }
 
-  getMockOutput(input) {
-    return [
-      `# ${this.name}`,
-      '',
-      `Purpose: ${this.purpose}`,
-      '',
-      'MOCK_MODE=true, so this is a local demo output.',
-      '',
-      '## Input Preview',
-      '',
-      '```text',
-      input.slice(0, 1200),
-      '```'
-    ].join('\n');
-  }
-
   buildUserPrompt(input) {
     return [
       `Agent: ${this.name}`,
@@ -73,8 +57,7 @@ class BaseAgent {
 
     const output = await this.llm.complete({
       systemPrompt: this.readPrompt(),
-      userPrompt: this.buildUserPrompt(input),
-      mockOutput: this.getMockOutput(input)
+      userPrompt: this.buildUserPrompt(input)
     });
 
     this.writeOutput(output);

@@ -1,5 +1,5 @@
 // Central environment configuration read by hooks, page objects, and utility helpers.
-require('dotenv').config();
+require('dotenv').config({ path: process.env.ENV_FILE || '.env' });
 const { normalizePlatform, TEST_PLATFORMS } = require('../framework/common/platforms');
 
 const environments = {
@@ -33,9 +33,15 @@ module.exports = {
     protocol: process.env.APPIUM_PROTOCOL || 'http',
     hostname: process.env.APPIUM_HOST || '127.0.0.1',
     port: Number(process.env.APPIUM_PORT || 4723),
-    path: process.env.APPIUM_PATH || '/',
+    path: process.env.APPIUM_BASE_PATH || process.env.APPIUM_PATH || '/',
     logLevel: process.env.APPIUM_LOG_LEVEL || 'info',
-    serverUrl: `${process.env.APPIUM_PROTOCOL || 'http'}://${process.env.APPIUM_HOST || '127.0.0.1'}:${process.env.APPIUM_PORT || 4723}${process.env.APPIUM_PATH || '/'}`
+    autoStart: process.env.APPIUM_AUTO_START !== 'false',
+    autoStop: process.env.APPIUM_AUTO_STOP !== 'false',
+    startTimeout: Number(process.env.APPIUM_START_TIMEOUT || 30000),
+    connectionRetryTimeout: Number(process.env.APPIUM_CONNECTION_RETRY_TIMEOUT || 180000),
+    connectionRetryCount: Number(process.env.APPIUM_CONNECTION_RETRY_COUNT || 3),
+    logPath: process.env.APPIUM_LOG_PATH || 'mobile/logs/appium-server.log',
+    serverUrl: `${process.env.APPIUM_PROTOCOL || 'http'}://${process.env.APPIUM_HOST || '127.0.0.1'}:${process.env.APPIUM_PORT || 4723}${process.env.APPIUM_BASE_PATH || process.env.APPIUM_PATH || '/'}`
   },
   mobile: {
     deviceName: process.env.DEVICE_NAME || '',
@@ -44,7 +50,10 @@ module.exports = {
     appPackage: process.env.APP_PACKAGE || '',
     appActivity: process.env.APP_ACTIVITY || '',
     bundleId: process.env.BUNDLE_ID || '',
+    browserName: process.env.BROWSER_NAME || '',
+    iosAutomationMode: process.env.IOS_AUTOMATION_MODE || '',
     udid: process.env.UDID || '',
-    noReset: process.env.NO_RESET === 'true'
+    noReset: process.env.NO_RESET === 'true',
+    fullReset: process.env.FULL_RESET === 'true'
   }
 };

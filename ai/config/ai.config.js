@@ -20,9 +20,5 @@ module.exports = {
     aiOutput: 'ai/output',
     memory: 'ai/memory/shared-memory.json',
     prompts: 'ai/prompts'
-  },
-  safety: {
-    dryRunWhenNoApiKey: true,
-    allowFileWrites: process.env.AI_ALLOW_FILE_WRITES === 'true'
   }
 };
