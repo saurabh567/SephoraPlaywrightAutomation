@@ -3,6 +3,7 @@ const fs = require('fs-extra');
 const path = require('path');
 
 const agents = {
+  TestExecutionAgent: require('../agents/TestExecutionAgent'),
   TestCaseGenerationAgent: require('../agents/testCaseGenerationAgent'),
   FeatureFileGenerationAgent: require('../agents/featureFileGenerationAgent'),
   StepDefinitionGenerationAgent: require('../agents/stepDefinitionGenerationAgent'),

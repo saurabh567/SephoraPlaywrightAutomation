@@ -178,11 +178,9 @@ Mobile execution requires Appium 2, the relevant Appium driver, and valid device
 
 ## AI Agents
 
-The AI layer is kept under `ai/`. `npm test` and `npm run test:ai` validate ChromaDB
-and embeddings, run Cucumber, ingest artifacts, and perform failure RAG when failures exist.
-Use `npm run test:core` when intentionally running without AI services.
+The AI layer is under `ai/`. `npm test` now executes the TestExecutionAgent which enforces an AI health check (Ollama/local LLM) before running tests and performs post-test RAG analysis automatically. Use `npm run test:core` to run plain Cucumber without AI involvement.
 
-Common commands:
+Common agent commands:
 
 ```bash
 npm run ai:testcases
@@ -193,7 +191,6 @@ npm run ai:jenkins
 npm run ai:review
 npm run ai:heal
 npm run ai:all
-npm run test:ai
 ```
 
 AI output files are generated under:
@@ -204,40 +201,43 @@ ai/memory/
 reports/ai/
 ```
 
-## ChromaDB And RAG
+## Local LLM (Ollama) and Vector Store (no OpenAI required)
 
-The AI path requires a healthy ChromaDB service, a real embedding API, and a real
-OpenAI-compatible chat completion API. It does not use local hash vectors or mock responses.
+This framework prefers Ollama for LLMs/embeddings and falls back to a local JSON vector store if ChromaDB is unavailable. Docker/Chroma is optional.
 
-Prerequisites:
+Prerequisites (local):
 
-- Docker with the Compose plugin, or an externally managed ChromaDB endpoint
-- `OPENAI_API_KEY`, or separate `EMBEDDING_API_KEY` plus the LLM credential
-- Jenkins credential ID `openai-api-key` for the supplied pipeline
-
-Start ChromaDB:
+- Ollama running locally: https://ollama.ai/docs
+- Pull models you plan to use, e.g.:
 
 ```bash
-npm run vector:start
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
+```
+
+Health check (Ollama + local vector store):
+
+```bash
 npm run vector:health
 ```
 
-Ingest framework knowledge:
+Ingest framework knowledge into the local JSON vector store:
 
 ```bash
 npm run vector:ingest
 ```
 
-Search similar failures:
+Run RAG test and failure analysis:
 
 ```bash
-npm run vector:search -- --type failures --query "locator timeout element not visible"
+npm run rag:test
+npm run ai:analyze-failures
 ```
 
-Production validation:
+Notes:
 
-```bash
-npm run vector:test
+- No OpenAI API key is required for local execution.
+- If ChromaDB is available and started, the framework will prefer it for retrieval; otherwise the local JSON store is used as a safe fallback.
 npm run rag:test
 npm run ai:test
 ```

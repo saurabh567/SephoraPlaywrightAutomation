@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const IngestionService = require('./ingestionService');
+const IngestionService = require('./unifiedIngestionService');
 
 async function main() {
   console.log('[VectorDB] Starting framework knowledge ingestion');
@@ -11,7 +11,8 @@ async function main() {
   fs.ensureDirSync(path.dirname(outputPath));
   fs.writeJsonSync(outputPath, result, { spaces: 2 });
 
-  console.log(`[VectorDB] Ingested ${result.totalDocuments} documents`);
+  const total = (result && (result.totalDocuments || (result.result && (result.result.totalDocuments || result.result.insertedOrUpdated)))) || 0;
+  console.log(`[VectorDB] Ingested ${total} documents`);
   console.log(`[VectorDB] Summary: ${path.relative(process.cwd(), outputPath)}`);
 }
 

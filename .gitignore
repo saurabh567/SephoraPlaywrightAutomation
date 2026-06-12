@@ -20,8 +20,9 @@ traces/
 logs/
 *.log
 !ai/input/jenkins-console.log
-!mobile/logs/
-!mobile/logs/.gitkeep
+
+# Mobile logs (ignore runtime appium/server logs)
+mobile/logs/
 
 # Environment files
 .env
@@ -30,10 +31,16 @@ logs/
 !.env.qa
 !.env.stage
 !.env.prod
-!.env.android
-!.env.ios
-!.env.ios.app.example
-!.env.ios.real.example
+# Ignore local platform env files
+.env.android
+.env.ios
+
+# Appium server state
+appium-server.pid
+mobile/logs/appium-server-state.json
+
+# Local vector store
+ai/local/vector-store.json
 
 # Mac files
 .DS_Store

@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const IngestionService = require('../vector-db/ingestionService');
+const IngestionService = require('../vector-db/unifiedIngestionService');
 const failureAnalysisAgent = require('../agents/failureAnalysisAgent');
 const locatorHealingAgent = require('../agents/locatorHealingAgent');
 const executionMemoryAgent = require('../agents/executionMemoryAgent');

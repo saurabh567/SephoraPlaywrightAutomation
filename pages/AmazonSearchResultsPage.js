@@ -7,9 +7,11 @@ class AmazonSearchResultsPage extends BasePage {
     super(page);
     this.resultsText = page.getByText(/results for|result for|results/i).first();
     this.searchResults = page.locator('[data-component-type="s-search-result"]');
-    this.firstProduct = this.searchResults
-      .locator('h2 a, a.a-link-normal.s-no-outline')
-      .filter({ hasText: /./ })
+    // Use a more specific and stable locator: choose search-result entries that contain an
+    // anchor with class containing "a-link-normal", then target the anchor for clicks.
+    this.firstProduct = this.page
+      .locator('[data-component-type="s-search-result"] > :has([class*="a-link-normal"])')
+      .locator('a[class*="a-link-normal"], h2 a')
       .first();
     this.sortDropdown = page.locator('#s-result-sort-select').first();
   }

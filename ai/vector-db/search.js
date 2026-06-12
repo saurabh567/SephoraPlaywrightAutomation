@@ -1,4 +1,4 @@
-const RetrievalService = require('./retrievalService');
+const RetrievalService = require('./unifiedRetrievalService');
 const config = require('./vectorConfig');
 
 function parseArgs(argv) {

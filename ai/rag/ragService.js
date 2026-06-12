@@ -1,10 +1,10 @@
-const RetrievalService = require('../vector-db/retrievalService');
+const UnifiedRetrievalService = require('../vector-db/unifiedRetrievalService');
 const LlmService = require('./llmService');
 const { buildRagPrompt } = require('./promptBuilder');
 
 class RagService {
   constructor(options = {}) {
-    this.retrieval = options.retrieval || new RetrievalService();
+    this.retrieval = options.retrieval || new UnifiedRetrievalService();
     this.llm = options.llm || new LlmService();
   }
 

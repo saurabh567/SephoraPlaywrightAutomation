@@ -1,6 +1,6 @@
 const fs = require('fs-extra');
 const path = require('path');
-const IngestionService = require('./ingestionService');
+const IngestionService = require('./unifiedIngestionService');
 const RagService = require('../rag/ragService');
 
 async function main() {
