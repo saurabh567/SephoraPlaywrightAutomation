@@ -42,7 +42,7 @@
     "allure:generate": "npx allure generate allure-results --clean -o allure-report",
     "allure:open": "npx allure open allure-report",
     "vector:start": "node ai/vector-db/startChroma.js",
-    "vector:stop": "docker compose -f docker-compose.chroma.yml down",
+    "vector:stop": "node ai/vector-db/chromaServerManager.js stop",
     "vector:health": "node ai/health/unifiedHealth.js",
     "vector:ingest": "node ai/vector-db/ingest.js",
     "vector:search": "node ai/vector-db/search.js",
@@ -50,6 +50,11 @@
     "rag:test": "node ai/local/localRagTest.js",
     "ai:test": "node ai/vector-db/aiTest.js",
     "ai:analyze-failures": "node ai/local/localAnalyzeFailures.js",
+    "ollama:start": "node ai/health/ollamaManager.js start",
+    "ollama:stop": "node ai/health/ollamaManager.js stop",
+    "ollama:status": "node ai/health/ollamaManager.js status",
+    "ollama:pull-embed": "node -e \"require('./ai/health/ollamaManager').pullModelSync(process.env.OLLAMA_EMBEDDING_MODEL||'nomic-embed-text')\"",
+    "ollama:pull-llm": "node -e \"require('./ai/health/ollamaManager').pullModelSync(process.env.OLLAMA_LLM_MODEL||'llama3.2:3b')\"",
     "ai:generate-tests": "node ai/vector-db/generateTests.js",
     "ai:heal-locators": "node ai/vector-db/healLocators.js",
     "ai:jenkins-rag": "node ai/vector-db/analyzeJenkinsFailure.js",
@@ -60,7 +65,10 @@
     "ai:jenkins": "node ai/index.js --agent JenkinsBuildFailureAnalysisAgent",
     "ai:review": "node ai/index.js --agent PlaywrightCodeReviewAgent",
     "ai:heal": "node ai/index.js --agent SelfHealingAutomationAgent",
-    "ai:all": "node ai/index.js --all"
+    "ai:all": "node ai/index.js --all",
+    "chroma:start": "node ai/vector-db/chromaServerManager.js start",
+    "chroma:stop": "node ai/vector-db/chromaServerManager.js stop",
+    "chroma:status": "node ai/vector-db/chromaServerManager.js status"
   },
   "keywords": [
     "playwright",

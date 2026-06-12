@@ -22,6 +22,22 @@ class TestExecutionAgent {
       throw err;
     }
 
+    // Ensure Ollama and Chroma are running for any subsequent vector operations (non-fatal)
+    try {
+      const ollamaManager = require('../health/ollamaManager');
+      const ores = await ollamaManager.ensureRunning();
+      console.log('[TestExecutionAgent] ollama ensureRunning:', ores && (ores.ok || ores.started || ores.alreadyRunning) ? 'ok' : JSON.stringify(ores));
+    } catch (e) {
+      console.warn('[TestExecutionAgent] ollama ensureRunning failed (continuing):', e.message);
+    }
+    try {
+      const chromaManager = require('../vector-db/chromaServerManager');
+      const ensure = await chromaManager.ensureRunning();
+      console.log('[TestExecutionAgent] chroma ensureRunning:', ensure && ensure.ok ? 'ok' : JSON.stringify(ensure));
+    } catch (e) {
+      console.warn('[TestExecutionAgent] chroma ensureRunning failed (continuing):', e.message);
+    }
+
     const platform = (process.env.TEST_PLATFORM || 'WEB').toUpperCase();
     let testCmd = null;
 

@@ -1,41 +1,17 @@
-const { spawnSync } = require('child_process');
-const path = require('path');
-const ChromaClient = require('./chromaClient');
-
-function runDockerCompose() {
-  const composePath = path.join(process.cwd(), 'docker-compose.chroma.yml');
-  const result = spawnSync('docker', ['compose', '-f', composePath, 'up', '-d'], {
-    stdio: 'inherit'
-  });
-  if (result.error) {
-    throw new Error(`Unable to execute Docker Compose: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    throw new Error(`Docker Compose exited with status ${result.status}.`);
-  }
-}
-
-async function waitForChroma() {
-  const client = new ChromaClient();
-  let lastError;
-  for (let attempt = 1; attempt <= 30; attempt += 1) {
-    try {
-      return await client.healthCheck();
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  }
-  throw new Error(`ChromaDB did not become healthy: ${lastError?.message || 'unknown error'}`);
-}
+const chromaManager = require('./chromaServerManager');
 
 async function main() {
-  runDockerCompose();
-  const health = await waitForChroma();
-  console.log(JSON.stringify(health, null, 2));
+  try {
+    const res = await chromaManager.start();
+    console.log(JSON.stringify(res, null, 2));
+  } catch (error) {
+    console.error(`[VectorDB] ChromaDB startup failed: ${error.message}`);
+    process.exit(1);
+  }
 }
 
-main().catch((error) => {
-  console.error(`[VectorDB] ChromaDB startup failed: ${error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main();
+}
+
+module.exports = { start: chromaManager.start };

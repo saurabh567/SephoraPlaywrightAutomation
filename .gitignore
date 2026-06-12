@@ -41,6 +41,10 @@ mobile/logs/appium-server-state.json
 
 # Local vector store
 ai/local/vector-store.json
+ai/output/chroma-server.pid
+ai/output/chroma.log
+ai/output/ollama-server.pid
+ai/output/ollama.log
 
 # Mac files
 .DS_Store
@@ -50,3 +54,5 @@ ai/local/vector-store.json
 
 # Playwright browser binaries/cache
 .cache/
+
+chroma/

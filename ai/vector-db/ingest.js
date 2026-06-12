@@ -4,6 +4,20 @@ const IngestionService = require('./unifiedIngestionService');
 
 async function main() {
   console.log('[VectorDB] Starting framework knowledge ingestion');
+  // Ensure Ollama and Chroma are running (auto-start if available). Ollama is required for embeddings.
+  try {
+    const ollamaManager = require('../health/ollamaManager');
+    const ores = await ollamaManager.ensureRunning();
+    console.log('[VectorDB] Ollama ensureRunning:', ores && (ores.ok || ores.started || ores.alreadyRunning) ? 'ok' : JSON.stringify(ores));
+  } catch (e) {
+    console.warn('[VectorDB] Ollama ensureRunning failed (embeddings may fail):', e.message);
+  }
+  try {
+    const chromaManager = require('./chromaServerManager');
+    await chromaManager.ensureRunning();
+  } catch (e) {
+    console.warn('[VectorDB] Chroma ensureRunning failed, will fallback to local store:', e.message);
+  }
   const service = new IngestionService();
   const result = await service.ingestAll();
 

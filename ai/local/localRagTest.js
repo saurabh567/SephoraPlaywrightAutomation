@@ -57,6 +57,22 @@ async function askLlm(prompt) {
 async function main() {
   const query = process.argv.slice(2).join(' ') || 'Explain this automation framework and possible failure reasons';
 
+  // Ensure Ollama and Chroma are available (start if framework can). Local RAG may still work without them but embeddings require Ollama.
+  try {
+    const ollamaManager = require('../health/ollamaManager');
+    const ores = await ollamaManager.ensureRunning();
+    console.log('[RAG] ollama ensureRunning:', ores && (ores.ok || ores.started || ores.alreadyRunning) ? 'ok' : JSON.stringify(ores));
+  } catch (e) {
+    console.warn('[RAG] ollama ensureRunning failed (continuing):', e.message);
+  }
+  try {
+    const chromaManager = require('../vector-db/chromaServerManager');
+    const ensure = await chromaManager.ensureRunning();
+    console.log('[RAG] chroma ensureRunning:', ensure && ensure.ok ? 'ok' : JSON.stringify(ensure));
+  } catch (e) {
+    console.warn('[RAG] chroma ensureRunning failed (continuing with local store):', e.message);
+  }
+
   const store = new LocalVectorStore();
 
   if (store.count() === 0) {
