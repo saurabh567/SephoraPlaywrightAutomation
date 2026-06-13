@@ -3,6 +3,9 @@ const path = require('path');
 const BaseAgent = require('./baseAgent');
 const RagService = require('../rag/ragService');
 const { readCucumberSummary } = require('../tools/cucumberReportReader');
+const LocatorApplier = require('./locatorHealingApplier');
+const LocatorAnalyzer = require('../tools/locatorAnalyzer');
+const timestamp = () => new Date().toISOString().replace(/[:.]/g,'-');
 
 const agent = new BaseAgent({
   name: 'Locator Healing Agent',
@@ -18,7 +21,7 @@ function readFailureInput(input = {}) {
     const data = fs.readJsonSync(explicitPath);
     if (Array.isArray(data) && data.length) return data;
   }
-  return readCucumberSummary(input.reportDir || process.env.REPORT_DIR || 'reports').failures || [];
+  return (readCucumberSummary(input.reportDir || process.env.REPORT_DIR || 'reports') || {}).failures || [];
 }
 
 function buildQuery(failures) {
@@ -74,9 +77,94 @@ agent.suggestWithRag = async function suggestWithRag(input = {}) {
 };
 
 agent.suggestWithVectorDb = agent.suggestWithRag;
+
+// Analyze failures using lightweight static heuristics + local evidence
+agent.analyzeFailures = async function analyzeFailures(input = {}) {
+  const failures = readFailureInput(input);
+  if (!failures.length) return { skipped: true, reason: 'No failures found' };
+
+  const candidates = await Promise.all(failures.map(async (f) => {
+    const evidence = await LocatorAnalyzer.findCandidatesForFailure(f, {
+      searchRoots: input.searchRoots || ['pages', 'mobile', 'test-helpers']
+    });
+    return { failure: f, candidates: evidence };
+  }));
+
+  const proposals = [];
+  for (const c of candidates) {
+    for (const cand of (c.candidates || [])) {
+      const risk = LocatorAnalyzer.classifyRisk(c.failure, cand);
+      proposals.push({
+        failure: c.failure,
+        suggested: cand,
+        risk,
+        rationale: cand.heuristic || '',
+        confidence: Math.round((cand.score || 0) * 100)
+      });
+    }
+  }
+
+  proposals.sort((a,b) => (b.confidence||0) - (a.confidence||0));
+
+  const proposalsPath = path.join(process.cwd(), 'reports', 'ai', 'locator-healing-proposals.json');
+  fs.ensureDirSync(path.dirname(proposalsPath));
+  fs.writeJsonSync(proposalsPath, { generatedAt: new Date().toISOString(), proposals }, { spaces: 2 });
+
+  const reportPath = path.join(process.cwd(), 'reports', 'ai', 'locator-healing-report.md');
+  const header = `# Locator Healing Report\\n\\nGenerated: ${new Date().toISOString()}\\n\\nSummary: ${proposals.length} proposals\\n\\n`;
+  fs.writeFileSync(reportPath, header);
+
+  return { proposalsPath: path.relative(process.cwd(), proposalsPath), reportPath: path.relative(process.cwd(), reportPath), proposals };
+};
+
+// Apply only LOW-risk proposals. Creates patches for review and backups when applying.
+agent.applySafeFixes = async function applySafeFixes(options = {}) {
+  const mode = options.mode || 'dry-run';
+  const proposalsFile = options.proposalsFile || path.join(process.cwd(), 'reports', 'ai', 'locator-healing-proposals.json');
+  if (!fs.existsSync(proposalsFile)) return { error: 'No proposals file found', path: proposalsFile };
+
+  const data = fs.readJsonSync(proposalsFile);
+  const lowRisk = (data.proposals || []).filter(p => p.risk === 'LOW');
+  if (!lowRisk.length) return { applied: [], reason: 'No LOW-risk proposals' };
+
+  const applier = new LocatorApplier({ backupRoot: path.join(process.cwd(), 'ai', 'backups', timestamp()) });
+  const applied = [];
+  for (const p of lowRisk) {
+    const patch = applier.createPatchForSuggestion(p);
+    const patchReportDir = path.join(process.cwd(), 'reports', 'ai', 'locator-healing-patches');
+    fs.ensureDirSync(patchReportDir);
+    const patchFile = path.join(patchReportDir, `${p.failure.feature || 'unknown'}-${Math.abs(Math.floor(Math.random()*1e9))}.patch`);
+    fs.writeFileSync(patchFile, patch);
+    if (mode === 'apply') {
+      const ok = await applier.applyPatch(p);
+      if (ok) applied.push({ proposal: p, appliedTo: p.suggested.sourceFile });
+    }
+  }
+
+  return { mode, applied, patchesDir: path.relative(process.cwd(), path.join('reports','ai','locator-healing-patches')) };
+};
+
+agent.rollback = async function rollback(backupRoot) {
+  if (!backupRoot) return { error: 'backupRoot required' };
+  const applier = new LocatorApplier();
+  const restored = await applier.restoreFromBackup(backupRoot);
+  return { restored };
+};
+
+// run supports modes: 'recommend' (RAG), 'analyze' (static), 'apply' (apply low-risk)
 agent.run = async function run(input = {}) {
-  const result = await agent.suggestWithRag(input);
-  return result.response || result.reason;
+  const mode = input.mode || 'recommend';
+  if (mode === 'recommend') {
+    const r = await agent.suggestWithRag(input);
+    return r.response || r.reason;
+  }
+  if (mode === 'analyze') {
+    return agent.analyzeFailures(input);
+  }
+  if (mode === 'apply') {
+    return agent.applySafeFixes({ mode: input.dryRun ? 'dry-run' : 'apply', proposalsFile: input.proposalsFile });
+  }
+  return { error: 'unknown mode' };
 };
 
 module.exports = agent;
