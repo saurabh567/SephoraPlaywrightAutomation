@@ -32,21 +32,45 @@ class LlmService {
     if (!String(userPrompt || '').trim()) throw new Error('LLM user prompt cannot be empty.');
     await this.ollama.ensureModel(this.model);
 
-    const payload = await this.ollama.request('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        model: this.model,
-        stream: false,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        options: {
-          temperature: this.temperature,
-          num_predict: this.maxTokens
+    // Try calling several possible completion endpoints with retries for transient failures
+    const endpoints = ['/api/chat', '/api/completions', '/api/generate', '/api/complete'];
+    let payload = null;
+    let lastErr = null;
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      for (const ep of endpoints) {
+        try {
+          payload = await this.ollama.request(ep, {
+            method: 'POST',
+            body: JSON.stringify({
+              model: this.model,
+              stream: false,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              options: {
+                temperature: this.temperature,
+                num_predict: this.maxTokens
+              }
+            })
+          });
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          const msg = String(e.message || '').toLowerCase();
+          if (msg.includes('404') || msg.includes('not installed') || msg.includes('not available')) {
+            try { await this.ollama.ensureModel(this.model); } catch (_) {}
+          }
+          // try next endpoint
         }
-      })
-    });
+      }
+      if (payload) break;
+      // exponential backoff before next attempt
+      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+    }
+    if (!payload && lastErr) throw lastErr;
 
     const content = payload.message?.content;
     if (!content) throw new Error('Ollama response did not contain generated content.');

@@ -6,7 +6,14 @@ class SharedMemory {
   constructor(memoryPath = config.paths.memory) {
     this.memoryPath = memoryPath;
     fs.ensureFileSync(this.memoryPath);
-    if (!fs.readFileSync(this.memoryPath, 'utf8').trim()) {
+    try {
+      const raw = fs.readFileSync(this.memoryPath, 'utf8').trim();
+      let parsed = {};
+      if (raw) parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.agents) {
+        fs.writeJsonSync(this.memoryPath, { framework: {}, agents: {}, workflows: [] }, { spaces: 2 });
+      }
+    } catch (e) {
       fs.writeJsonSync(this.memoryPath, { framework: {}, agents: {}, workflows: [] }, { spaces: 2 });
     }
   }

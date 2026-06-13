@@ -88,6 +88,62 @@ class TestExecutionAgent {
       console.error('[TestExecutionAgent] Ingest failed:', err.message);
     }
 
+    // 5b) Canonicalize Cucumber JSON to reports/json/cucumber-report.json so post-exec RAG can find it
+    try {
+      const reportsRoot = path.join(process.cwd(), 'reports');
+      function findCucumberReport(dir) {
+        if (!fs.existsSync(dir)) return null;
+        const entries = fs.readdirSync(dir);
+        for (const e of entries) {
+          const full = path.join(dir, e);
+          let stat;
+          try { stat = fs.statSync(full); } catch (ex) { continue; }
+          if (stat.isDirectory()) {
+            const candidate = path.join(full, 'json', 'cucumber-report.json');
+            if (fs.existsSync(candidate)) return candidate;
+            const deeper = findCucumberReport(full);
+            if (deeper) return deeper;
+          }
+        }
+        return null;
+      }
+
+      async function waitForValidJson(filePath, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+          try {
+            const raw = fs.readFileSync(filePath, 'utf8');
+            if (!raw || raw.trim().length === 0) throw new Error('empty');
+            JSON.parse(raw);
+            return true;
+          } catch (e) {
+            // likely incomplete write — wait and retry
+            await new Promise(r => setTimeout(r, intervalMs));
+          }
+        }
+        return false;
+      }
+
+      const found = findCucumberReport(reportsRoot);
+      if (found) {
+        const targetDir = path.join(process.cwd(), 'reports', 'json');
+        fs.ensureDirSync(targetDir);
+        const dest = path.join(targetDir, 'cucumber-report.json');
+        // wait for the source JSON to be fully written and valid
+        const ok = await waitForValidJson(found, { timeoutMs: 30000, intervalMs: 500 });
+        if (ok) {
+          fs.copyFileSync(found, dest);
+          console.log('[TestExecutionAgent] Copied cucumber JSON from', found, 'to', dest);
+        } else {
+          console.warn('[TestExecutionAgent] Found cucumber JSON but it appears incomplete or invalid after waiting; skipping copy to', dest);
+        }
+      } else {
+        console.warn('[TestExecutionAgent] No cucumber-report.json found under reports/**/json; post-exec RAG may fail');
+      }
+    } catch (e) {
+      console.warn('[TestExecutionAgent] Error while canonicalizing cucumber JSON:', e.message);
+    }
+
     // 6) Run post-execution RAG analysis (failure analysis, locator healing, etc.)
     try {
       console.log('[TestExecutionAgent] Running post-execution RAG analysis');
@@ -115,3 +171,9 @@ class TestExecutionAgent {
 }
 
 module.exports = TestExecutionAgent;
+
+// Programmatic convenience: expose run() for orchestrator
+module.exports.run = async function(options = {}) {
+  const inst = new TestExecutionAgent(options);
+  return inst.run();
+};

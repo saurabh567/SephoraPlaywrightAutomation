@@ -13,11 +13,21 @@ class LlmClient {
   }
 
   async complete({ system, user }) {
-    const result = await this.client.complete({
-      systemPrompt: system,
-      userPrompt: user
-    });
-    return result.content;
+    try {
+      const result = await this.client.complete({
+        systemPrompt: system,
+        userPrompt: user
+      });
+      return result.content;
+    } catch (e) {
+      // Fail gracefully: log and return a fallback response so agents can continue.
+      try {
+        const fs = require('fs');
+        const p = require('path').join(process.cwd(), 'ai', 'output', 'ollama-error.log');
+        fs.appendFileSync(p, `[${new Date().toISOString()}] LlmClient.complete error: ${e.message}\n`);
+      } catch (e2) { /* ignore */ }
+      return `LLM unavailable: ${e.message}. Agent proceeding with best-effort fallback.`;
+    }
   }
 }
 

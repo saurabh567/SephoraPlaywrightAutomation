@@ -66,6 +66,13 @@
     "ai:review": "node ai/index.js --agent PlaywrightCodeReviewAgent",
     "ai:heal": "node ai/index.js --agent SelfHealingAutomationAgent",
     "ai:all": "node ai/index.js --all",
+    "ai:orchestrate": "node ai/orchestrator/orchestrator.js",
+    "ai:self-heal": "node -e \"(async()=>{const a=require('./ai/agents/locatorHealingAgent'); if(a.run) {console.log(await a.run());} else if(a.suggestWithRag){console.log(await a.suggestWithRag());}})()\"",
+    "ai:retry-fix-rerun": "node -e \"(async()=>{const a=require('./ai/agents/selfHealingAutomationAgent'); if(a.run){console.log(await a.run());} else {console.log('no-run');}})()\"",
+    "ai:root-cause": "node -e \"(async()=>{const a=require('./ai/agents/rootCauseAnalysisAgent'); if(a.run){console.log(await a.run());} else {console.log('no-run');}})()\"",
+    "ai:prepare-pr": "node -e \"(async()=>{const a=require('./ai/agents/prPreparationAgent'); if(a.prepare){console.log(await a.prepare({}));} else {console.log('no-op');}})()\"",
+    "ai:jenkins-recover": "node -e \"(async()=>{const a=require('./ai/agents/jenkinsBuildFailureAnalysisAgent'); if(a.analyze){console.log(await a.analyze());} else {console.log('no-op');}})()\"",
+    "ai:full-auto": "node ai/orchestrator/fullAuto.js",
     "chroma:start": "node ai/vector-db/chromaServerManager.js start",
     "chroma:stop": "node ai/vector-db/chromaServerManager.js stop",
     "chroma:status": "node ai/vector-db/chromaServerManager.js status"
