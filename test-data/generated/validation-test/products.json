@@ -1,0 +1,172 @@
+[
+  {
+    "id": "prod_1",
+    "name": "Wireless Bluetooth Headphones",
+    "category": "Electronics",
+    "price": 12224.53,
+    "currency": "INR",
+    "rating": 3.6,
+    "reviewCount": 2674,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Apple",
+      "color": "Green",
+      "size": "500ml"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_2",
+    "name": "Smart LED TV 55 inch",
+    "category": "Books",
+    "price": 9908.76,
+    "currency": "INR",
+    "rating": 3.6,
+    "reviewCount": 3321,
+    "inStock": true,
+    "primeEligible": false,
+    "attributes": {
+      "brand": "Adidas",
+      "color": "Silver",
+      "size": "500ml"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_3",
+    "name": "Stainless Steel Water Bottle",
+    "category": "Clothing",
+    "price": 1810.71,
+    "currency": "INR",
+    "rating": 3.5,
+    "reviewCount": 2440,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Amazon Basics",
+      "color": "Black",
+      "size": "500ml"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_4",
+    "name": "Organic Green Tea Pack",
+    "category": "Home & Kitchen",
+    "price": 5115.6,
+    "currency": "INR",
+    "rating": 4.3,
+    "reviewCount": 4322,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Philips",
+      "color": "Blue",
+      "size": "M"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_5",
+    "name": "Yoga Mat Premium",
+    "category": "Beauty",
+    "price": 13554.28,
+    "currency": "INR",
+    "rating": 4.8,
+    "reviewCount": 3872,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Samsung",
+      "color": "Green",
+      "size": "5kg"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_6",
+    "name": "USB-C Charging Cable",
+    "category": "Sports",
+    "price": 5812.44,
+    "currency": "INR",
+    "rating": 4.7,
+    "reviewCount": 2396,
+    "inStock": false,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Apple",
+      "color": "Silver",
+      "size": "M"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_7",
+    "name": "Leather Wallet for Men",
+    "category": "Toys",
+    "price": 7571.24,
+    "currency": "INR",
+    "rating": 4.1,
+    "reviewCount": 2384,
+    "inStock": true,
+    "primeEligible": false,
+    "attributes": {
+      "brand": "Nike",
+      "color": "Black",
+      "size": "L"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_8",
+    "name": "Cotton Bedsheet Set",
+    "category": "Automotive",
+    "price": 3943.18,
+    "currency": "INR",
+    "rating": 4.8,
+    "reviewCount": 2452,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Nike",
+      "color": "White",
+      "size": "1L"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_9",
+    "name": "Indian Cookbook - 100 Recipes",
+    "category": "Groceries",
+    "price": 13148.67,
+    "currency": "INR",
+    "rating": 3.1,
+    "reviewCount": 603,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Apple",
+      "color": "Gold",
+      "size": "One Size"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  },
+  {
+    "id": "prod_10",
+    "name": "Running Shoes Air Cushion",
+    "category": "Health",
+    "price": 4521.55,
+    "currency": "INR",
+    "rating": 3,
+    "reviewCount": 3688,
+    "inStock": true,
+    "primeEligible": true,
+    "attributes": {
+      "brand": "Mivi",
+      "color": "White",
+      "size": "S"
+    },
+    "createdAt": "2026-06-14T07:35:48.001Z"
+  }
+]

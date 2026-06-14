@@ -1,0 +1,715 @@
+{
+  "metadata": {
+    "generatedAt": "2026-06-14T07:35:48.002Z",
+    "agent": "TestDataPipelineAgent",
+    "version": "1.0.0"
+  },
+  "users": [
+    {
+      "id": "user_1",
+      "username": "kavya.nair1",
+      "password": "Test@1#Pass",
+      "firstName": "Kavya",
+      "lastName": "Nair",
+      "email": "kavya.nair1@outlook.com",
+      "phone": "9818701604",
+      "address": {
+        "street": "153, Connaught Place",
+        "city": "Mumbai",
+        "state": "Telangana",
+        "pincode": "978509",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "user_2",
+      "username": "kavya.kumar2",
+      "password": "Test@2#Pass",
+      "firstName": "Kavya",
+      "lastName": "Kumar",
+      "email": "kavya.kumar2@amazon.in",
+      "phone": "9836323730",
+      "address": {
+        "street": "858, Brigade Road",
+        "city": "Kolkata",
+        "state": "Gujarat",
+        "pincode": "943810",
+        "country": "India"
+      },
+      "profileType": "business",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "user_3",
+      "username": "riya.patel3",
+      "password": "Test@3#Pass",
+      "firstName": "Riya",
+      "lastName": "Patel",
+      "email": "riya.patel3@outlook.com",
+      "phone": "9875802397",
+      "address": {
+        "street": "50, Connaught Place",
+        "city": "Ahmedabad",
+        "state": "Tamil Nadu",
+        "pincode": "236920",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "user_4",
+      "username": "pranav.nair4",
+      "password": "Test@4#Pass",
+      "firstName": "Pranav",
+      "lastName": "Nair",
+      "email": "pranav.nair4@outlook.com",
+      "phone": "9898139452",
+      "address": {
+        "street": "562, Park Street",
+        "city": "Mumbai",
+        "state": "Tamil Nadu",
+        "pincode": "616932",
+        "country": "India"
+      },
+      "profileType": "prime",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "user_5",
+      "username": "krishna.joshi5",
+      "password": "Test@5#Pass",
+      "firstName": "Krishna",
+      "lastName": "Joshi",
+      "email": "krishna.joshi5@gmail.com",
+      "phone": "9824256934",
+      "address": {
+        "street": "686, Park Street",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "742390",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_1",
+      "name": "Wireless Bluetooth Headphones",
+      "category": "Electronics",
+      "price": 12224.53,
+      "currency": "INR",
+      "rating": 3.6,
+      "reviewCount": 2674,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Apple",
+        "color": "Green",
+        "size": "500ml"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_2",
+      "name": "Smart LED TV 55 inch",
+      "category": "Books",
+      "price": 9908.76,
+      "currency": "INR",
+      "rating": 3.6,
+      "reviewCount": 3321,
+      "inStock": true,
+      "primeEligible": false,
+      "attributes": {
+        "brand": "Adidas",
+        "color": "Silver",
+        "size": "500ml"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_3",
+      "name": "Stainless Steel Water Bottle",
+      "category": "Clothing",
+      "price": 1810.71,
+      "currency": "INR",
+      "rating": 3.5,
+      "reviewCount": 2440,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Amazon Basics",
+        "color": "Black",
+        "size": "500ml"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_4",
+      "name": "Organic Green Tea Pack",
+      "category": "Home & Kitchen",
+      "price": 5115.6,
+      "currency": "INR",
+      "rating": 4.3,
+      "reviewCount": 4322,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Philips",
+        "color": "Blue",
+        "size": "M"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_5",
+      "name": "Yoga Mat Premium",
+      "category": "Beauty",
+      "price": 13554.28,
+      "currency": "INR",
+      "rating": 4.8,
+      "reviewCount": 3872,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Samsung",
+        "color": "Green",
+        "size": "5kg"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_6",
+      "name": "USB-C Charging Cable",
+      "category": "Sports",
+      "price": 5812.44,
+      "currency": "INR",
+      "rating": 4.7,
+      "reviewCount": 2396,
+      "inStock": false,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Apple",
+        "color": "Silver",
+        "size": "M"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_7",
+      "name": "Leather Wallet for Men",
+      "category": "Toys",
+      "price": 7571.24,
+      "currency": "INR",
+      "rating": 4.1,
+      "reviewCount": 2384,
+      "inStock": true,
+      "primeEligible": false,
+      "attributes": {
+        "brand": "Nike",
+        "color": "Black",
+        "size": "L"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_8",
+      "name": "Cotton Bedsheet Set",
+      "category": "Automotive",
+      "price": 3943.18,
+      "currency": "INR",
+      "rating": 4.8,
+      "reviewCount": 2452,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Nike",
+        "color": "White",
+        "size": "1L"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_9",
+      "name": "Indian Cookbook - 100 Recipes",
+      "category": "Groceries",
+      "price": 13148.67,
+      "currency": "INR",
+      "rating": 3.1,
+      "reviewCount": 603,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Apple",
+        "color": "Gold",
+        "size": "One Size"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    {
+      "id": "prod_10",
+      "name": "Running Shoes Air Cushion",
+      "category": "Health",
+      "price": 4521.55,
+      "currency": "INR",
+      "rating": 3,
+      "reviewCount": 3688,
+      "inStock": true,
+      "primeEligible": true,
+      "attributes": {
+        "brand": "Mivi",
+        "color": "White",
+        "size": "S"
+      },
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    }
+  ],
+  "addresses": [
+    {
+      "id": "addr_1",
+      "type": "home",
+      "fullName": "Ananya Singh",
+      "phone": "9852663011",
+      "line1": "719, MG Road",
+      "line2": "Next to Park",
+      "city": "Lucknow",
+      "state": "Uttar Pradesh",
+      "pincode": "772846",
+      "country": "India",
+      "isDefault": true
+    },
+    {
+      "id": "addr_2",
+      "type": "work",
+      "fullName": "Ananya Singh",
+      "phone": "9825160631",
+      "line1": "842, Marine Drive",
+      "line2": "Near Hospital",
+      "city": "Pune",
+      "state": "Madhya Pradesh",
+      "pincode": "157693",
+      "country": "India",
+      "isDefault": false
+    },
+    {
+      "id": "addr_3",
+      "type": "other",
+      "fullName": "Arjun Kumar",
+      "phone": "9830532813",
+      "line1": "89, Park Street",
+      "line2": "Next to Park",
+      "city": "Bhopal",
+      "state": "Delhi",
+      "pincode": "224304",
+      "country": "India",
+      "isDefault": false
+    },
+    {
+      "id": "addr_4",
+      "type": "home",
+      "fullName": "Priya Verma",
+      "phone": "9894888402",
+      "line1": "684, MG Road",
+      "line2": "Sector 14 Market",
+      "city": "Chennai",
+      "state": "West Bengal",
+      "pincode": "704626",
+      "country": "India",
+      "isDefault": false
+    },
+    {
+      "id": "addr_5",
+      "type": "work",
+      "fullName": "Aarav Sharma",
+      "phone": "9829429327",
+      "line1": "594, Sector 18",
+      "line2": "Near Hospital",
+      "city": "Pune",
+      "state": "Tamil Nadu",
+      "pincode": "573799",
+      "country": "India",
+      "isDefault": false
+    }
+  ],
+  "paymentMethods": [
+    {
+      "id": "pay_1",
+      "type": "netbanking",
+      "cardType": "MasterCard",
+      "lastFourDigits": "5689",
+      "maskedNumber": "XXXX-XXXX-XXXX-5689",
+      "nameOnCard": "Aarav Sharma",
+      "expiryMonth": "09",
+      "expiryYear": "2032",
+      "upiId": "user1@upi",
+      "bankName": "Yes Bank",
+      "isDefault": true
+    },
+    {
+      "id": "pay_2",
+      "type": "upi",
+      "cardType": "RuPay",
+      "lastFourDigits": "1711",
+      "maskedNumber": "XXXX-XXXX-XXXX-1711",
+      "nameOnCard": "Vivaan Patel",
+      "expiryMonth": "09",
+      "expiryYear": "2029",
+      "upiId": "user2@upi",
+      "bankName": "HDFC",
+      "isDefault": false
+    },
+    {
+      "id": "pay_3",
+      "type": "netbanking",
+      "cardType": "Visa",
+      "lastFourDigits": "8666",
+      "maskedNumber": "XXXX-XXXX-XXXX-8666",
+      "nameOnCard": "Vivaan Patel",
+      "expiryMonth": "08",
+      "expiryYear": "2028",
+      "upiId": "user3@upi",
+      "bankName": "SBI",
+      "isDefault": false
+    },
+    {
+      "id": "pay_4",
+      "type": "debit",
+      "cardType": "Visa",
+      "lastFourDigits": "2343",
+      "maskedNumber": "XXXX-XXXX-XXXX-2343",
+      "nameOnCard": "Priya Verma",
+      "expiryMonth": "02",
+      "expiryYear": "2031",
+      "upiId": "user4@upi",
+      "bankName": "ICICI",
+      "isDefault": false
+    },
+    {
+      "id": "pay_5",
+      "type": "cod",
+      "cardType": "Amex",
+      "lastFourDigits": "1630",
+      "maskedNumber": "XXXX-XXXX-XXXX-1630",
+      "nameOnCard": "Vivaan Patel",
+      "expiryMonth": "01",
+      "expiryYear": "2027",
+      "upiId": "user5@upi",
+      "bankName": "Kotak",
+      "isDefault": false
+    }
+  ],
+  "searchQueries": [
+    {
+      "id": "search_1",
+      "query": "wireless headphones",
+      "category": "electronics",
+      "expectedResults": 151,
+      "isInvalid": false
+    },
+    {
+      "id": "search_2",
+      "query": "smartphone under 15000",
+      "category": "fashion",
+      "expectedResults": 413,
+      "isInvalid": false
+    },
+    {
+      "id": "search_3",
+      "query": "laptop for coding",
+      "category": "home",
+      "expectedResults": 58,
+      "isInvalid": false
+    },
+    {
+      "id": "search_4",
+      "query": "books by Indian authors",
+      "category": "books",
+      "expectedResults": 189,
+      "isInvalid": false
+    },
+    {
+      "id": "search_5",
+      "query": "men casual shirts",
+      "category": "beauty",
+      "expectedResults": 103,
+      "isInvalid": false
+    },
+    {
+      "id": "search_6",
+      "query": "women ethnic wear",
+      "category": "sports",
+      "expectedResults": 461,
+      "isInvalid": false
+    },
+    {
+      "id": "search_7",
+      "query": "kitchen appliances",
+      "category": "toys",
+      "expectedResults": 471,
+      "isInvalid": false
+    },
+    {
+      "id": "search_8",
+      "query": "fitness tracker",
+      "category": "electronics",
+      "expectedResults": 420,
+      "isInvalid": false
+    },
+    {
+      "id": "search_9",
+      "query": "board games for kids",
+      "category": "fashion",
+      "expectedResults": 296,
+      "isInvalid": false
+    },
+    {
+      "id": "search_10",
+      "query": "organic food",
+      "category": "home",
+      "expectedResults": 204,
+      "isInvalid": true
+    }
+  ],
+  "testSessions": [
+    {
+      "sessionId": "session_1781422548002",
+      "createdAt": "2026-06-14T07:35:48.002Z",
+      "user": {
+        "id": "user_3",
+        "username": "riya.patel3",
+        "password": "Test@3#Pass",
+        "firstName": "Riya",
+        "lastName": "Patel",
+        "email": "riya.patel3@outlook.com",
+        "phone": "9875802397",
+        "address": {
+          "street": "50, Connaught Place",
+          "city": "Ahmedabad",
+          "state": "Tamil Nadu",
+          "pincode": "236920",
+          "country": "India"
+        },
+        "profileType": "guest",
+        "createdAt": "2026-06-14T07:35:48.001Z"
+      },
+      "cart": {
+        "items": [
+          {
+            "productId": "prod_7",
+            "productName": "Leather Wallet for Men",
+            "price": 7571.24,
+            "quantity": 2,
+            "subtotal": "15142.48"
+          },
+          {
+            "productId": "prod_6",
+            "productName": "USB-C Charging Cable",
+            "price": 5812.44,
+            "quantity": 1,
+            "subtotal": "5812.44"
+          }
+        ],
+        "total": 20954.92
+      },
+      "searchHistory": [
+        "laptop",
+        "home decor"
+      ],
+      "selectedAddress": null,
+      "selectedPayment": null
+    },
+    {
+      "sessionId": "session_1781422548002",
+      "createdAt": "2026-06-14T07:35:48.002Z",
+      "user": {
+        "id": "user_1",
+        "username": "kavya.nair1",
+        "password": "Test@1#Pass",
+        "firstName": "Kavya",
+        "lastName": "Nair",
+        "email": "kavya.nair1@outlook.com",
+        "phone": "9818701604",
+        "address": {
+          "street": "153, Connaught Place",
+          "city": "Mumbai",
+          "state": "Telangana",
+          "pincode": "978509",
+          "country": "India"
+        },
+        "profileType": "guest",
+        "createdAt": "2026-06-14T07:35:48.001Z"
+      },
+      "cart": {
+        "items": [
+          {
+            "productId": "prod_6",
+            "productName": "USB-C Charging Cable",
+            "price": 5812.44,
+            "quantity": 1,
+            "subtotal": "5812.44"
+          },
+          {
+            "productId": "prod_3",
+            "productName": "Stainless Steel Water Bottle",
+            "price": 1810.71,
+            "quantity": 2,
+            "subtotal": "3621.42"
+          }
+        ],
+        "total": 9433.86
+      },
+      "searchHistory": [
+        "books",
+        "kitchen"
+      ],
+      "selectedAddress": null,
+      "selectedPayment": null
+    },
+    {
+      "sessionId": "session_1781422548002",
+      "createdAt": "2026-06-14T07:35:48.002Z",
+      "user": {
+        "id": "user_5",
+        "username": "krishna.joshi5",
+        "password": "Test@5#Pass",
+        "firstName": "Krishna",
+        "lastName": "Joshi",
+        "email": "krishna.joshi5@gmail.com",
+        "phone": "9824256934",
+        "address": {
+          "street": "686, Park Street",
+          "city": "Pune",
+          "state": "Maharashtra",
+          "pincode": "742390",
+          "country": "India"
+        },
+        "profileType": "guest",
+        "createdAt": "2026-06-14T07:35:48.001Z"
+      },
+      "cart": {
+        "items": [
+          {
+            "productId": "prod_4",
+            "productName": "Organic Green Tea Pack",
+            "price": 5115.6,
+            "quantity": 2,
+            "subtotal": "10231.20"
+          },
+          {
+            "productId": "prod_5",
+            "productName": "Yoga Mat Premium",
+            "price": 13554.28,
+            "quantity": 2,
+            "subtotal": "27108.56"
+          }
+        ],
+        "total": 37339.76
+      },
+      "searchHistory": [
+        "clothing",
+        "kitchen"
+      ],
+      "selectedAddress": null,
+      "selectedPayment": null
+    },
+    {
+      "sessionId": "session_1781422548002",
+      "createdAt": "2026-06-14T07:35:48.002Z",
+      "user": {
+        "id": "user_1",
+        "username": "kavya.nair1",
+        "password": "Test@1#Pass",
+        "firstName": "Kavya",
+        "lastName": "Nair",
+        "email": "kavya.nair1@outlook.com",
+        "phone": "9818701604",
+        "address": {
+          "street": "153, Connaught Place",
+          "city": "Mumbai",
+          "state": "Telangana",
+          "pincode": "978509",
+          "country": "India"
+        },
+        "profileType": "guest",
+        "createdAt": "2026-06-14T07:35:48.001Z"
+      },
+      "cart": {
+        "items": [
+          {
+            "productId": "prod_10",
+            "productName": "Running Shoes Air Cushion",
+            "price": 4521.55,
+            "quantity": 1,
+            "subtotal": "4521.55"
+          },
+          {
+            "productId": "prod_6",
+            "productName": "USB-C Charging Cable",
+            "price": 5812.44,
+            "quantity": 2,
+            "subtotal": "11624.88"
+          }
+        ],
+        "total": 16146.43
+      },
+      "searchHistory": [
+        "clothing",
+        "fitness"
+      ],
+      "selectedAddress": null,
+      "selectedPayment": null
+    },
+    {
+      "sessionId": "session_1781422548002",
+      "createdAt": "2026-06-14T07:35:48.002Z",
+      "user": {
+        "id": "user_5",
+        "username": "krishna.joshi5",
+        "password": "Test@5#Pass",
+        "firstName": "Krishna",
+        "lastName": "Joshi",
+        "email": "krishna.joshi5@gmail.com",
+        "phone": "9824256934",
+        "address": {
+          "street": "686, Park Street",
+          "city": "Pune",
+          "state": "Maharashtra",
+          "pincode": "742390",
+          "country": "India"
+        },
+        "profileType": "guest",
+        "createdAt": "2026-06-14T07:35:48.001Z"
+      },
+      "cart": {
+        "items": [
+          {
+            "productId": "prod_3",
+            "productName": "Stainless Steel Water Bottle",
+            "price": 1810.71,
+            "quantity": 2,
+            "subtotal": "3621.42"
+          }
+        ],
+        "total": 3621.42
+      },
+      "searchHistory": [
+        "books",
+        "fitness"
+      ],
+      "selectedAddress": null,
+      "selectedPayment": null
+    }
+  ],
+  "totals": {
+    "users": 5,
+    "products": 10,
+    "addresses": 5,
+    "paymentMethods": 5,
+    "searchQueries": 10,
+    "testSessions": 5
+  }
+}

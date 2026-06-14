@@ -1,0 +1,230 @@
+[
+  {
+    "sessionId": "session_1781422548002",
+    "createdAt": "2026-06-14T07:35:48.002Z",
+    "user": {
+      "id": "user_3",
+      "username": "riya.patel3",
+      "password": "Test@3#Pass",
+      "firstName": "Riya",
+      "lastName": "Patel",
+      "email": "riya.patel3@outlook.com",
+      "phone": "9875802397",
+      "address": {
+        "street": "50, Connaught Place",
+        "city": "Ahmedabad",
+        "state": "Tamil Nadu",
+        "pincode": "236920",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    "cart": {
+      "items": [
+        {
+          "productId": "prod_7",
+          "productName": "Leather Wallet for Men",
+          "price": 7571.24,
+          "quantity": 2,
+          "subtotal": "15142.48"
+        },
+        {
+          "productId": "prod_6",
+          "productName": "USB-C Charging Cable",
+          "price": 5812.44,
+          "quantity": 1,
+          "subtotal": "5812.44"
+        }
+      ],
+      "total": 20954.92
+    },
+    "searchHistory": [
+      "laptop",
+      "home decor"
+    ],
+    "selectedAddress": null,
+    "selectedPayment": null
+  },
+  {
+    "sessionId": "session_1781422548002",
+    "createdAt": "2026-06-14T07:35:48.002Z",
+    "user": {
+      "id": "user_1",
+      "username": "kavya.nair1",
+      "password": "Test@1#Pass",
+      "firstName": "Kavya",
+      "lastName": "Nair",
+      "email": "kavya.nair1@outlook.com",
+      "phone": "9818701604",
+      "address": {
+        "street": "153, Connaught Place",
+        "city": "Mumbai",
+        "state": "Telangana",
+        "pincode": "978509",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    "cart": {
+      "items": [
+        {
+          "productId": "prod_6",
+          "productName": "USB-C Charging Cable",
+          "price": 5812.44,
+          "quantity": 1,
+          "subtotal": "5812.44"
+        },
+        {
+          "productId": "prod_3",
+          "productName": "Stainless Steel Water Bottle",
+          "price": 1810.71,
+          "quantity": 2,
+          "subtotal": "3621.42"
+        }
+      ],
+      "total": 9433.86
+    },
+    "searchHistory": [
+      "books",
+      "kitchen"
+    ],
+    "selectedAddress": null,
+    "selectedPayment": null
+  },
+  {
+    "sessionId": "session_1781422548002",
+    "createdAt": "2026-06-14T07:35:48.002Z",
+    "user": {
+      "id": "user_5",
+      "username": "krishna.joshi5",
+      "password": "Test@5#Pass",
+      "firstName": "Krishna",
+      "lastName": "Joshi",
+      "email": "krishna.joshi5@gmail.com",
+      "phone": "9824256934",
+      "address": {
+        "street": "686, Park Street",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "742390",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    "cart": {
+      "items": [
+        {
+          "productId": "prod_4",
+          "productName": "Organic Green Tea Pack",
+          "price": 5115.6,
+          "quantity": 2,
+          "subtotal": "10231.20"
+        },
+        {
+          "productId": "prod_5",
+          "productName": "Yoga Mat Premium",
+          "price": 13554.28,
+          "quantity": 2,
+          "subtotal": "27108.56"
+        }
+      ],
+      "total": 37339.76
+    },
+    "searchHistory": [
+      "clothing",
+      "kitchen"
+    ],
+    "selectedAddress": null,
+    "selectedPayment": null
+  },
+  {
+    "sessionId": "session_1781422548002",
+    "createdAt": "2026-06-14T07:35:48.002Z",
+    "user": {
+      "id": "user_1",
+      "username": "kavya.nair1",
+      "password": "Test@1#Pass",
+      "firstName": "Kavya",
+      "lastName": "Nair",
+      "email": "kavya.nair1@outlook.com",
+      "phone": "9818701604",
+      "address": {
+        "street": "153, Connaught Place",
+        "city": "Mumbai",
+        "state": "Telangana",
+        "pincode": "978509",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    "cart": {
+      "items": [
+        {
+          "productId": "prod_10",
+          "productName": "Running Shoes Air Cushion",
+          "price": 4521.55,
+          "quantity": 1,
+          "subtotal": "4521.55"
+        },
+        {
+          "productId": "prod_6",
+          "productName": "USB-C Charging Cable",
+          "price": 5812.44,
+          "quantity": 2,
+          "subtotal": "11624.88"
+        }
+      ],
+      "total": 16146.43
+    },
+    "searchHistory": [
+      "clothing",
+      "fitness"
+    ],
+    "selectedAddress": null,
+    "selectedPayment": null
+  },
+  {
+    "sessionId": "session_1781422548002",
+    "createdAt": "2026-06-14T07:35:48.002Z",
+    "user": {
+      "id": "user_5",
+      "username": "krishna.joshi5",
+      "password": "Test@5#Pass",
+      "firstName": "Krishna",
+      "lastName": "Joshi",
+      "email": "krishna.joshi5@gmail.com",
+      "phone": "9824256934",
+      "address": {
+        "street": "686, Park Street",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "742390",
+        "country": "India"
+      },
+      "profileType": "guest",
+      "createdAt": "2026-06-14T07:35:48.001Z"
+    },
+    "cart": {
+      "items": [
+        {
+          "productId": "prod_3",
+          "productName": "Stainless Steel Water Bottle",
+          "price": 1810.71,
+          "quantity": 2,
+          "subtotal": "3621.42"
+        }
+      ],
+      "total": 3621.42
+    },
+    "searchHistory": [
+      "books",
+      "fitness"
+    ],
+    "selectedAddress": null,
+    "selectedPayment": null
+  }
+]

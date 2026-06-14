@@ -1,0 +1,72 @@
+[
+  {
+    "id": "search_1",
+    "query": "wireless headphones",
+    "category": "electronics",
+    "expectedResults": 151,
+    "isInvalid": false
+  },
+  {
+    "id": "search_2",
+    "query": "smartphone under 15000",
+    "category": "fashion",
+    "expectedResults": 413,
+    "isInvalid": false
+  },
+  {
+    "id": "search_3",
+    "query": "laptop for coding",
+    "category": "home",
+    "expectedResults": 58,
+    "isInvalid": false
+  },
+  {
+    "id": "search_4",
+    "query": "books by Indian authors",
+    "category": "books",
+    "expectedResults": 189,
+    "isInvalid": false
+  },
+  {
+    "id": "search_5",
+    "query": "men casual shirts",
+    "category": "beauty",
+    "expectedResults": 103,
+    "isInvalid": false
+  },
+  {
+    "id": "search_6",
+    "query": "women ethnic wear",
+    "category": "sports",
+    "expectedResults": 461,
+    "isInvalid": false
+  },
+  {
+    "id": "search_7",
+    "query": "kitchen appliances",
+    "category": "toys",
+    "expectedResults": 471,
+    "isInvalid": false
+  },
+  {
+    "id": "search_8",
+    "query": "fitness tracker",
+    "category": "electronics",
+    "expectedResults": 420,
+    "isInvalid": false
+  },
+  {
+    "id": "search_9",
+    "query": "board games for kids",
+    "category": "fashion",
+    "expectedResults": 296,
+    "isInvalid": false
+  },
+  {
+    "id": "search_10",
+    "query": "organic food",
+    "category": "home",
+    "expectedResults": 204,
+    "isInvalid": true
+  }
+]

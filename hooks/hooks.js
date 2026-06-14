@@ -91,13 +91,17 @@ After(async function (scenario) {
     logger.error(`Scenario failed: ${scenario.pickle.name}`);
 
     if (this.page || this.driver) {
-      const screenshot = await ScreenshotUtility.capture({
-        page: this.page,
-        driver: this.driver,
-        filePath: screenshotPath
-      });
-      await this.attach(screenshot, 'image/png');
-      logger.error(`Screenshot captured: ${screenshotPath}`);
+      try {
+        const screenshot = await ScreenshotUtility.capture({
+          page: this.page,
+          driver: this.driver,
+          filePath: screenshotPath
+        });
+        await this.attach(screenshot, 'image/png');
+        logger.error(`Screenshot captured: ${screenshotPath}`);
+      } catch (err) {
+        logger.warn(`Screenshot capture failed (session may be dead): ${err.message}`);
+      }
     } else {
       logger.warn(`Screenshot skipped because no browser page or mobile driver was created: ${scenario.pickle.name}`);
     }
@@ -112,7 +116,11 @@ After(async function (scenario) {
 
   if (this.driver) {
     await closeMobileApp(this.driver);
-    await this.driver.deleteSession();
+    try {
+      await this.driver.deleteSession();
+    } catch (err) {
+      logger.warn(`Session delete failed (may already be dead): ${err.message}`);
+    }
   }
 });
 
