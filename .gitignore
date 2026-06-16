@@ -57,3 +57,4 @@ ai/output/ollama.log
 
 chroma/
 .aider*
+ai/vault/

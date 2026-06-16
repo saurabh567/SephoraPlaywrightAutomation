@@ -13,7 +13,9 @@ const AppiumAgent = require('../ai/agents/AppiumAgent');
 let browser;
 const workerId = process.env.CUCUMBER_WORKER_ID || 'main';
 const isWebExecution = config.testPlatform === TEST_PLATFORMS.WEB;
-const isMobileExecution = [TEST_PLATFORMS.ANDROID, TEST_PLATFORMS.IOS].includes(config.testPlatform);
+const isAndroidExecution = config.testPlatform === TEST_PLATFORMS.ANDROID;
+const isIOSExecution = config.testPlatform === TEST_PLATFORMS.IOS;
+const isMobileExecution = isAndroidExecution || isIOSExecution;
 
 setDefaultTimeout(config.timeout + 10000);
 
@@ -48,6 +50,43 @@ async function closeMobileApp(driver) {
   }
 }
 
+/**
+ * Create a mobile driver with retry logic for session startup failures
+ * (e.g. WDA not ready yet on fresh simulator boot).
+ */
+async function createMobileDriverWithRetry(config, retries = 2, delayMs = 15000) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
+    try {
+      const driver = await MobileDriverFactory.createDriver(config);
+      return driver;
+    } catch (err) {
+      lastError = err;
+      const msg = String(err.message || '');
+      // Only retry on session-startup-type failures (WDA not ready, no targets, etc.)
+      const isRetryable =
+        msg.includes('session is either terminated') ||
+        msg.includes('No targets') ||
+        msg.includes('could not be matched') ||
+        msg.includes('An unknown server-side error');
+
+      if (attempt <= retries && isRetryable) {
+        logger.warn(
+          `[iOS] Mobile driver creation attempt ${attempt} failed: ${msg.substring(0, 120)}. ` +
+          `Retrying in ${delayMs / 1000}s ...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        // Non-retryable or out of retries — throw
+        throw err;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 BeforeAll(async function () {
   fs.ensureDirSync(path.join(config.reportDir, 'screenshots'));
   fs.ensureDirSync(path.join(config.reportDir, 'videos', `worker-${workerId}`));
@@ -57,7 +96,11 @@ BeforeAll(async function () {
     browser = await WebDriverFactory.launch(config);
     logger.info(`Browser launched: ${config.browser}, headless: ${config.headless}, worker: ${workerId}`);
   } else if (isMobileExecution) {
-    await AppiumAgent.startServerIfNeeded();
+    // For Android: Appium server is managed by runAndroidWithLifecycle.js.
+    // For iOS: start Appium if not already running.
+    if (isIOSExecution) {
+      await AppiumAgent.startServerIfNeeded();
+    }
     logger.info(`Mobile platform selected: ${config.testPlatform}. Appium session will start per scenario.`);
   }
 });
@@ -79,7 +122,12 @@ Before(async function (scenario) {
     return;
   }
 
-  this.driver = await MobileDriverFactory.createDriver(config);
+  // For iOS, create the driver with retry logic to handle WDA cold-start
+  if (isIOSExecution) {
+    this.driver = await createMobileDriverWithRetry(config);
+  } else {
+    this.driver = await MobileDriverFactory.createDriver(config);
+  }
 });
 
 After(async function (scenario) {
@@ -130,7 +178,9 @@ AfterAll(async function () {
     logger.info(`Browser closed successfully for worker: ${workerId}`);
   }
 
-  if (isMobileExecution) {
+  // For Android: Appium lifecycle is managed by runAndroidWithLifecycle.js.
+  // For iOS: stop Appium if it was started by the framework.
+  if (isIOSExecution) {
     await AppiumAgent.stopServerIfStartedByFramework();
   }
 });
