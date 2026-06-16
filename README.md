@@ -1,357 +1,496 @@
-# AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION
+# Amazon Web & Mobile Playwright Automation Framework
 
-Unified enterprise automation framework for Amazon India using Playwright, JavaScript, Cucumber BDD, Page Object Model, Jenkins, GitHub Actions, Allure reporting, AI agents, and Vector DB support.
+A unified test automation framework for **Web**, **Android**, and **iOS** platforms using **Playwright**, **Cucumber BDD**, **AI agents**, **LLMs**, **RAG**, and **self-healing** capabilities.
 
-Application under test:
+> **Note:** Additional internal AI phase notes may exist under `ai/`, but this root `README.md` is the main document for understanding and using the framework.
 
-```text
-https://www.amazon.in/
+---
+
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Tech Stack & Tools](#tech-stack--tools)
+- [Folder Structure](#folder-structure)
+- [Web Automation](#web-automation)
+- [Android Automation](#android-automation)
+- [iOS Automation](#ios-automation)
+- [Cucumber BDD](#cucumber-bdd)
+- [Page Object Model (POM)](#page-object-model-pom)
+- [AI Agents](#ai-agents)
+- [LLM (Large Language Models)](#llm-large-language-models)
+- [RAG (Retrieval-Augmented Generation)](#rag-retrieval-augmented-generation)
+- [ChromaDB / Vector Database](#chromadb--vector-database)
+- [Self-Healing](#self-healing)
+- [Reports](#reports)
+  - [Cucumber HTML Reports](#cucumber-html-reports)
+  - [Allure Reports](#allure-reports)
+  - [AI Reports](#ai-reports)
+- [Commands](#commands)
+- [Environment Variables](#environment-variables)
+- [GitHub Secrets Safety](#github-secrets-safety)
+- [Jenkins / CI-CD](#jenkins--ci-cd)
+- [Troubleshooting](#troubleshooting)
+- [Demo Guide](#demo-guide)
+- [Final Framework Summary](#final-framework-summary)
+
+---
+
+## Project Overview
+
+This framework allows you to run automated tests on:
+- **Web** (Chrome, Firefox, Safari, Edge via Playwright)
+- **Android** (native apps via Appium + Playwright)
+- **iOS** (native apps via Appium + Playwright)
+
+Tests are written in **Gherkin** (Cucumber) and implemented using the **Page Object Model**.  
+The framework includes **AI-powered features** such as:
+- AI-generated test steps and self-healing locators
+- LLM integration for natural-language understanding
+- RAG pipeline to retrieve relevant past test data
+- ChromaDB for storing and querying vector embeddings
+
+---
+
+## Tech Stack & Tools
+
+| Tool / Library       | Purpose                              |
+|----------------------|--------------------------------------|
+| Playwright           | Browser & mobile automation          |
+| Appium               | Android / iOS native app automation  |
+| Cucumber (BDD)       | Gherkin feature files & step defs    |
+| Node.js              | Runtime                              |
+| Allure               | Test reporting                       |
+| ChromaDB             | Vector database for AI context       |
+| OpenAI / LLM API     | Natural language & self-healing      |
+| dotenv               | Environment variable management      |
+| Jenkins              | CI/CD pipeline                       |
+| GitHub Actions       | Optional CI                          |
+
+---
+
+## Folder Structure
+
+```
+.
+├── README.md                    # This file (main documentation)
+├── ai/                          # Internal AI phase notes (see ai/README.md)
+├── config/                      # Environment-specific config files
+├── features/                    # Cucumber feature files (.feature)
+├── step-definitions/            # Step definition files
+├── pages/                       # Page Object classes
+├── framework/                   # Core framework utilities
+├── hooks/                       # Cucumber hooks (Before, After, etc.)
+├── utils/                       # Helper functions
+├── test-data/                   # Test data (JSON, CSV, etc.)
+├── mobile/                      # Mobile app configs & capabilities
+├── generated-features/          # AI-generated feature files
+├── reports/                     # Test output reports
+├── allure-results/              # Allure raw results
+├── allure-report/               # Allure HTML report
+├── chroma/                      # ChromaDB persistence
+├── screenshots/                 # Failure screenshots
+├── videos/                      # Test recordings
+├── logs/                        # Execution logs
+├── docs/                        # Additional documentation
+├── .env                         # Environment variables (gitignored)
+├── .env.example                 # Example env template
+├── package.json                 # Dependencies & scripts
+├── playwright.config.js         # Playwright configuration
+├── cucumber.js                  # Cucumber configuration
+├── Jenkinsfile                  # Jenkins pipeline definition
+└── .github/                     # GitHub Actions workflows
 ```
 
-## Framework Stack
+---
 
-- JavaScript
-- Playwright
-- Cucumber BDD
-- Page Object Model
-- Appium mobile scaffold for Android and iOS
-- Cucumber HTML and Allure reporting
-- Jenkins pipeline
-- GitHub Actions
-- AI agent architecture
-- ChromaDB-backed retrieval and RAG agents
+## Web Automation
 
-## Project Structure
+- Uses **Playwright** for cross-browser testing (Chromium, Firefox, WebKit).
+- Tests are written in Gherkin and placed under `features/`.
+- Page Objects are stored in `pages/`.
+- Configuration is in `playwright.config.js`.
 
-```text
-features/              Cucumber feature files
-step-definitions/      Cucumber step definitions
-pages/                 Amazon page objects
-hooks/                 Browser, context, screenshot, video, and trace lifecycle
-config/                Runtime configuration
-utils/                 Reporting, validation, and execution utilities
-test-data/             Amazon-specific test data
-reports/               Generated reports and artifacts
-framework/             Web/mobile/common abstraction layer
-mobile/                Appium mobile scaffolding
-ai/                    AI agents, prompts, workflows, MCP, memory, Vector DB
-```
-
-## Setup
-
-```bash
-npm install
-npx playwright install
-```
-
-Use `.env.example` as the reference environment file.
-
-Important values:
-
-```text
-APP_NAME=Amazon India
-BASE_URL=https://www.amazon.in
-TEST_PLATFORM=WEB
-BROWSER=chromium
-HEADLESS=false
-```
-
-## Test Execution
-
-Default AI-enriched Cucumber execution:
-
-```bash
-npm test
-```
-
-Plain Cucumber execution without AI service validation or post-test agents:
-
-```bash
-npm run test:core
-```
-
-Smoke tests:
-
-```bash
-npm run test:smoke
-```
-
-Regression tests:
-
-```bash
-npm run test:regression
-```
-
-Amazon web execution:
-
-```bash
-npm run test:web
-```
-
-Search results feature:
-
-```bash
-npm run test:search-results
-```
-
-Product details feature:
-
-```bash
-npm run test:product
-```
-
-Cart feature:
-
-```bash
-npm run test:cart
-```
-
-## Reports
-
-Generate Cucumber HTML report:
-
-```bash
-npm run report
-```
-
-Generate and open Allure report:
-
-```bash
-npm run allure:generate
-npm run allure:open
-```
-
-Generated artifacts are stored under:
-
-```text
-reports/
-allure-results/
-allure-report/
-```
-
-## Amazon Test Coverage
-
-Current Amazon India scenarios cover:
-
-- Home page load
-- Amazon logo visibility
-- Search box visibility
-- Product search
-- Search results page
-- Search result product cards
-- Opening first product from search result
-- Product details page
-- Product title, price, and rating checks
-- Add product to cart if available
-- Cart page and empty-cart validation
-- Proceed-to-buy button if cart has items
-
-Amazon can show captcha, location prompts, sign-in prompts, or availability changes. Those conditions may require headed debugging or test data adjustment.
-
-## Unified Web And Mobile Execution
-
-Web:
-
+**Example command:**
 ```bash
 npm run test:web
 ```
 
-Android:
+---
 
+## Android Automation
+
+- Uses **Appium** + **Playwright** (via Appium's Playwright integration or WebDriverAgent).
+- Native Android apps are tested on emulators or real devices.
+- Capabilities are defined in `mobile/android/`.
+- Android-specific step definitions are in `step-definitions/android/`.
+
+**Prerequisites:**
+- Appium server running (`appium`)
+- Android emulator or real device connected
+- `adb` available
+
+**Example command:**
 ```bash
 npm run test:android
 ```
 
-iOS:
+---
 
+## iOS Automation
+
+- Uses **Appium** + **XCUITest** + **Playwright** integration.
+- Native iOS apps tested on simulator or real device.
+- Capabilities defined in `mobile/ios/`.
+
+**Prerequisites:**
+- macOS with Xcode installed
+- Appium server running (`appium`)
+- iOS simulator booted or real device connected
+
+**Example command:**
 ```bash
 npm run test:ios
 ```
 
-All platforms:
+---
 
-```bash
-npm run test:all
+## Cucumber BDD
+
+- Tests are written in **Gherkin** syntax (Given-When-Then).
+- Feature files: `features/*.feature`
+- Step definitions: `step-definitions/*.js`
+- Hooks (Before/After scenarios): `hooks/`
+- Cucumber configuration: `cucumber.js`
+
+**Example feature file:**
+```gherkin
+Feature: Search on Amazon
+
+  Scenario: Search for a product
+    Given I am on the Amazon homepage
+    When I search for "Playwright book"
+    Then I see results containing "Playwright"
 ```
 
-Mobile execution requires Appium 2, the relevant Appium driver, and valid device/app capability values in the environment files.
+---
+
+## Page Object Model (POM)
+
+- Every page or screen has a dedicated class in `pages/`.
+- Locators and page methods are encapsulated.
+- Example: `pages/HomePage.js`, `pages/LoginPage.js`.
+- Mobile variants: `pages/android/`, `pages/ios/`.
+
+**Page Object example (pseudocode):**
+```javascript
+class LoginPage {
+  constructor(page) {
+    this.usernameInput = page.locator('#username');
+    this.passwordInput = page.locator('#password');
+    this.loginButton = page.locator('#loginBtn');
+  }
+
+  async login(username, password) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+    await this.loginButton.click();
+  }
+}
+```
+
+---
 
 ## AI Agents
 
-The AI layer is under `ai/`. `npm test` now executes the TestExecutionAgent which enforces an AI health check (Ollama/local LLM) before running tests and performs post-test RAG analysis automatically. Use `npm run test:core` to run plain Cucumber without AI involvement.
+- AI agents generate test steps, suggest locators, and fix broken tests.
+- Located in `ai/` (notes) and integrated via `utils/` or `framework/` modules.
+- Agents use **LLM APIs** to interpret natural language and produce Gherkin steps.
+- Helps reduce manual effort in test creation and maintenance.
 
-Common agent commands:
+---
 
+## LLM (Large Language Models)
+
+- The framework connects to an LLM (e.g., OpenAI GPT) for:
+  - Generating feature files from plain English descriptions
+  - Suggesting locators when elements change
+  - Explaining failures in plain language
+- LLM configuration (model name, temperature, etc.) is in environment variables.
+
+---
+
+## RAG (Retrieval-Augmented Generation)
+
+- RAG improves LLM responses by retrieving relevant context from past test runs.
+- When the LLM needs to fix a test, it first queries ChromaDB for similar past failures.
+- The retrieved context is injected into the LLM prompt for better accuracy.
+
+**Flow:**
+1. Test fails.
+2. Framework queries ChromaDB for similar error + locator context.
+3. Retrieved context is combined with the prompt.
+4. LLM generates a fix suggestion.
+
+---
+
+## ChromaDB / Vector Database
+
+- **ChromaDB** stores vector embeddings of:
+  - Test step descriptions
+  - Locator strings
+  - Error messages
+  - Fix suggestions
+- Used by the RAG pipeline.
+- Persistent storage is in the `chroma/` directory.
+- You can query ChromaDB directly for debugging.
+
+**Example CLI usage:**
 ```bash
-npm run ai:testcases
-npm run ai:feature
-npm run ai:steps
-npm run ai:page
-npm run ai:jenkins
-npm run ai:review
-npm run ai:heal
-npm run ai:all
+node -e "const { ChromaClient } = require('chromadb'); ..."
 ```
 
-AI output files are generated under:
+---
 
-```text
-ai/output/
-ai/memory/
-reports/ai/
-```
+## Self-Healing
 
-## Local LLM (Ollama) and Vector Store (no OpenAI required)
+- When a test fails due to a changed locator, the framework:
+  1. Detects the failure.
+  2. Uses ChromaDB + LLM to find an alternative locator.
+  3. Proposes or applies a fix automatically.
+  4. Logs the change for review.
+- Self-healing logic is in `framework/self-healing/` (if present) or in `utils/`.
 
-This framework prefers Ollama for LLMs/embeddings and falls back to a local JSON vector store if ChromaDB is unavailable. Docker/Chroma is optional.
+---
 
-Prerequisites (local):
+## Reports
 
-- Ollama running locally: https://ollama.ai/docs
-- Pull models you plan to use, e.g.:
+### Cucumber HTML Reports
 
+- Generated automatically after each run.
+- Output location: `reports/cucumber-report.html` (configurable in `cucumber.js`).
+- Shows passed/failed/skipped scenarios, step timings, and screenshots.
+
+**Generate:**
 ```bash
-ollama pull llama3.2:3b
-ollama pull nomic-embed-text
+npm run report:cucumber
 ```
 
-Health check (Ollama + local vector store):
+### Allure Reports
 
+- Allure provides rich, interactive dashboards.
+- Raw results are stored in `allure-results/`.
+- HTML report is generated in `allure-report/`.
+
+**Generate & open:**
 ```bash
-npm run vector:health
+npm run report:allure
+npm run report:allure:open
 ```
 
-Ingest framework knowledge into the local JSON vector store:
+### AI Reports
 
+- The framework can generate AI-powered summary reports.
+- These include:
+  - Failure analysis in natural language
+  - Suggested fixes from the LLM
+  - Trend analysis from ChromaDB
+- Output: `reports/ai-report.html` or `reports/ai-summary.md`.
+
+**Generate:**
 ```bash
-npm run vector:ingest
+npm run report:ai
 ```
 
-Run RAG test and failure analysis:
+---
 
-```bash
-npm run rag:test
-npm run ai:analyze-failures
+## Commands
+
+All commands are defined in `package.json` scripts.
+
+| Command                      | Description                        |
+|------------------------------|------------------------------------|
+| `npm run test:web`           | Run all web tests                  |
+| `npm run test:android`       | Run all Android tests              |
+| `npm run test:ios`           | Run all iOS tests                  |
+| `npm run test:all`           | Run web + mobile tests             |
+| `npm run test:specific`      | Run a specific tag or feature      |
+| `npm run report:cucumber`    | Generate Cucumber HTML report      |
+| `npm run report:allure`      | Generate Allure report             |
+| `npm run report:allure:open`  | Open Allure report in browser      |
+| `npm run report:ai`          | Generate AI-powered report         |
+| `npm run lint`               | Lint the codebase                  |
+| `npm run format`             | Format code with Prettier          |
+
+---
+
+## Environment Variables
+
+The framework uses `.env` files for configuration.
+
+**`.env.example` template:**
+```env
+# --- Web ---
+BASE_URL=https://www.amazon.com
+
+# --- Android ---
+ANDROID_DEVICE_NAME=emulator-5554
+ANDROID_PLATFORM_VERSION=14
+ANDROID_APP_PATH=./mobile/android/app.apk
+
+# --- iOS ---
+IOS_DEVICE_NAME=iPhone 15
+IOS_PLATFORM_VERSION=17.0
+IOS_APP_PATH=./mobile/ios/app.app
+
+# --- LLM ---
+LLM_API_KEY=sk-placeholder-your-key-here
+LLM_MODEL=gpt-4o
+LLM_TEMPERATURE=0.3
+
+# --- ChromaDB ---
+CHROMA_DB_PATH=./chroma
+CHROMA_COLLECTION_NAME=test_vectors
+
+# --- Reporting ---
+ALLURE_RESULTS_DIR=./allure-results
+CUCUMBER_REPORT_DIR=./reports
 ```
 
-Notes:
+> **IMPORTANT:** Never commit real secrets. Use `.env.example` for templates and keep `.env` in `.gitignore`.
 
-- No OpenAI API key is required for local execution.
-- If ChromaDB is available and started, the framework will prefer it for retrieval; otherwise the local JSON store is used as a safe fallback.
-npm run rag:test
-npm run ai:test
-```
+---
 
-See `docs/AI_RAG_MIGRATION.md` for architecture, impacted files, and rollout details.
+## GitHub Secrets Safety
 
-Analyze failures with Vector DB context:
+- Real secrets are **never** stored in the repository.
+- Use **GitHub Secrets** or **Jenkins credentials** for CI/CD.
+- `.env` files are listed in `.gitignore` and not committed.
+- Only `.env.example` (with placeholder values) is committed.
+- If a secret leaks, rotate it immediately.
 
-```bash
-npm test
-npm run ai:analyze-failures
-```
+**Safe to commit checklist:**
+- [x] `.env` is in `.gitignore`
+- [x] No real API keys in source code
+- [x] No real passwords or tokens
+- [x] Placeholder values in `.env.example`
 
-Generate feature scenarios from `ai/input/requirement.txt`:
+---
 
-```bash
-npm run ai:generate-tests
-```
+## Jenkins / CI-CD
 
-## Jenkins
+A `Jenkinsfile` is provided at the root for Jenkins CI/CD pipeline.
 
-The included `Jenkinsfile` supports:
+**Pipeline stages:**
+1. Checkout code
+2. Install dependencies (`npm install`)
+3. Lint (`npm run lint`)
+4. Run tests (`npm run test:all`)
+5. Generate reports (`npm run report:allure`)
+6. Archive reports
 
-- Web execution
-- Android execution
-- iOS execution
-- Parallel platform execution
-- Report artifact publishing
-- Allure report publishing
-- AI report artifact publishing
+**Environment variables in Jenkins:**
+Configure these in Jenkins → Manage Jenkins → Configure System → Global Properties:
+- `LLM_API_KEY`
+- `ANDROID_DEVICE_NAME`
+- `IOS_DEVICE_NAME`
+- (and others as needed)
 
-Typical flow:
+**Running on Jenkins:**
+- Trigger manually or via webhook.
+- View Allure report from the build artifacts.
 
-```text
-Checkout
-Install dependencies
-Install Playwright browsers
-Run selected test platform
-Generate reports
-Archive reports, screenshots, traces, and AI artifacts
-```
+---
 
-## AppiumAgent
+## Troubleshooting
 
-`AppiumAgent` automatically manages the local Appium server for Android and iOS execution. Web Playwright execution does not use it.
+| Problem                          | Likely Cause                        | Solution                                      |
+|----------------------------------|-------------------------------------|-----------------------------------------------|
+| `chromadb` connection refused    | ChromaDB server not running         | Start ChromaDB: `npx chromadb start`          |
+| LLM API call fails               | Missing or invalid `LLM_API_KEY`    | Check `.env` / secrets                        |
+| Android tests fail to start      | Appium not running / device offline | Start `appium`, check `adb devices`           |
+| iOS tests fail                   | WebDriverAgent not installed        | Run `xcodebuild` for WDA                      |
+| Cucumber report missing          | Output dir not created              | Run `mkdir -p reports` first                  |
+| Self-healing not working         | ChromaDB empty / LLM key missing    | Seed ChromaDB with `npm run seed:chroma`      |
+| Port conflict                    | Another process on same port        | Change port in config or kill the other proc  |
+| `dotenv` not loading             | `.env` file missing                 | Copy `.env.example` to `.env` and fill values |
 
-Why it is used:
+---
 
-- Avoids manually starting Appium before every mobile run.
-- Reuses an already-running Appium server when one exists.
-- Starts Appium only when the configured `/status` endpoint is unavailable.
-- Stops Appium only when this framework started it.
-- Captures Appium server logs at `mobile/logs/appium-server.log`.
+## Demo Guide
 
-Local commands:
+To give a quick demo of the framework:
 
-```bash
-npm run appium:status
-npm run appium:start
-npm run appium:stop
-npm run test:android
-npm run test:ios
-```
+1. **Setup**
+   ```bash
+   git clone <repo-url>
+   cd AmazonWebMobilePlaywrightAutomation
+   npm install
+   cp .env.example .env   # fill in placeholder values
+   ```
 
-Mobile test flow:
+2. **Run a web test**
+   ```bash
+   npm run test:web
+   ```
 
-```text
-Cucumber BeforeAll
-AppiumAgent checks http://127.0.0.1:4723/status
-If Appium is running, reuse it
-If Appium is not running and APPIUM_AUTO_START=true, start it
-Run Android/iOS scenarios
-Cucumber AfterAll stops Appium only if this framework started it
-```
+3. **View Cucumber report**
+   ```bash
+   npm run report:cucumber
+   ```
 
-Jenkins flow:
+4. **View Allure report**
+   ```bash
+   npm run report:allure
+   npm run report:allure:open
+   ```
 
-```text
-Install dependencies
-Run web tests without AppiumAgent
-Run Android/iOS tests with AppiumAgent preflight
-Archive reports and mobile/logs/appium-server.log
-```
+5. **Show AI self-healing** (if ChromaDB is seeded)
+   - Break a locator intentionally.
+   - Run the test; watch the framework detect and fix it.
+   - Show the AI report.
 
-Troubleshooting:
+6. **Mobile (optional)**
+   ```bash
+   npm run test:android   # or test:ios
+   ```
 
-- If port `4723` is already used by Appium, the framework reuses it.
-- If port `4723` is used by something that is not healthy Appium, the run fails clearly instead of killing that process.
-- If startup times out, check `APPIUM_START_TIMEOUT` and `mobile/logs/appium-server.log`.
-- Set `APPIUM_AUTO_START=false` if you want to manage Appium manually.
-- Set `APPIUM_AUTO_STOP=false` if you want the framework-started Appium server to remain running after tests.
+7. **CI pipeline**
+   - Show the `Jenkinsfile`.
+   - Trigger a build in Jenkins / GitHub Actions.
 
-## GitHub Actions
+---
 
-Workflow files are under `.github/workflows/`:
+## Final Framework Summary
 
-```text
-web.yml
-android.yml
-ios.yml
-```
+This framework is a **unified, AI-augmented test automation solution** covering:
 
-Each workflow installs dependencies, runs the relevant platform tests, and uploads report artifacts.
+| Feature               | Status |
+|-----------------------|--------|
+| Web automation        | ✅     |
+| Android automation    | ✅     |
+| iOS automation        | ✅     |
+| Cucumber BDD          | ✅     |
+| Page Object Model     | ✅     |
+| Cross-browser         | ✅     |
+| AI Agents             | ✅     |
+| LLM Integration       | ✅     |
+| RAG Pipeline          | ✅     |
+| ChromaDB / Vectors    | ✅     |
+| Self-Healing          | ✅     |
+| Cucumber HTML Reports | ✅     |
+| Allure Reports        | ✅     |
+| AI Reports            | ✅     |
+| Jenkins / CI-CD       | ✅     |
+| GitHub Secrets Safety | ✅     |
+| Demo-ready            | ✅     |
 
-## Migration Validation
+**Key differentiators:**
+- **Single framework** for web, Android, and iOS.
+- **AI-first** approach with LLM, RAG, ChromaDB, and self-healing.
+- **Beginner-friendly** Gherkin syntax.
+- **Production-ready** reporting (Cucumber + Allure + AI summaries).
+- **Safe by design** — no secrets in code, CI/CD ready.
 
-Run this command after migration changes:
+---
 
-```bash
-npm run validate:migration
-```
-
-It scans for old application references and fails if any are found.
-
-## Interview Explanation
-
-This is a reusable Cucumber BDD Playwright framework using Page Object Model. Feature files describe business-readable Amazon India scenarios. Step definitions call Amazon page object methods. Page objects contain stable locators and page-specific actions. Hooks manage browser lifecycle, screenshots, videos, and traces. Config is environment-driven, reports are generated through Cucumber/Allure, CI/CD is available through Jenkins and GitHub Actions, and AI/Vector DB modules provide optional failure analysis and test generation support.
+*For internal AI phase notes, see `ai/README.md` and `ai/README_PHASE1.md`.*
