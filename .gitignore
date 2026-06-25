@@ -58,3 +58,17 @@ ai/output/ollama.log
 chroma/
 .aider*
 ai/vault/
+
+# Generated reports
+reports/
+allure-results/
+allure-report/
+screenshots/
+videos/
+traces/
+
+# Stray JSON artifacts
+{"resultsDir":*}
+
+# Temp fix files
+_fix_*.js

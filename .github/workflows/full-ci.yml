@@ -1,0 +1,128 @@
+name: Full CI - Playwright + Cucumber + JMeter + AI Analysis
+
+on:
+  push:
+    branches: [main, develop, feature/**]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_performance:
+        description: 'Run JMeter performance tests'
+        required: true
+        default: true
+        type: boolean
+      run_ai_analysis:
+        description: 'Run AI analysis'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  full-ci:
+    name: Full CI Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup JMeter
+        run: |
+          if command -v jmeter &> /dev/null; then
+            echo "JMeter already installed: $(jmeter --version)"
+          else
+            echo "Installing JMeter..."
+            JMETER_VERSION="5.6.3"
+            wget -q https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz
+            tar -xzf apache-jmeter-${JMETER_VERSION}.tgz
+            sudo mv apache-jmeter-${JMETER_VERSION} /opt/jmeter
+            sudo ln -sf /opt/jmeter/bin/jmeter /usr/local/bin/jmeter
+            echo "JMeter installed: $(jmeter --version)"
+          fi
+
+      - name: Create env file
+        run: |
+          echo "BASE_URL=https://www.amazon.in" > .env
+          echo "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" >> .env || true
+
+      - name: Run Playwright/Cucumber tests
+        continue-on-error: true
+        run: npm run test:web || echo "Playwright tests completed (some may have failed)"
+
+      - name: Run JMeter Performance Tests
+        if: ${{ github.event.inputs.run_performance != 'false' }}
+        continue-on-error: true
+        run: npm run perf:jmeter || echo "JMeter tests completed with threshold violations"
+
+      - name: Run AI Performance Analysis
+        if: ${{ github.event.inputs.run_ai_analysis != 'false' }}
+        continue-on-error: true
+        run: npm run ai:jmeter-analysis || echo "AI analysis completed (non-fatal)"
+
+      - name: Generate reports
+        continue-on-error: true
+        run: |
+          npm run report || true
+          npm run allure:generate || true
+
+      - name: Upload Cucumber HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cucumber-report
+          path: reports/html/
+          retention-days: 30
+
+      - name: Upload Allure Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 30
+
+      - name: Upload JMeter Performance Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-performance-report
+          path: reports/jmeter/
+          retention-days: 30
+
+      - name: Upload AI Analysis Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-analysis-report
+          path: reports/ai/
+          retention-days: 30
+
+      - name: Upload Screenshots & Videos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots/
+          retention-days: 7
+
+      - name: Upload Performance Summary
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-summary
+          path: reports/jmeter/summary/
+          retention-days: 30

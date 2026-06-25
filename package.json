@@ -2,7 +2,7 @@
   "name": "amazonwebmobileplaywrightautomation",
   "displayName": "AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION",
   "version": "1.0.0",
-  "description": "Industry-standard Playwright JavaScript Cucumber BDD automation framework for Amazon India UI.",
+  "description": "Industry-standard Playwright JavaScript Cucumber BDD automation framework for Amazon India UI. Includes JMeter performance testing with AI analysis.",
   "main": "index.js",
   "scripts": {
     "pretest": "node utils/cleanReports.js",
@@ -87,7 +87,16 @@
     "ai:full-auto": "node ai/orchestrator/fullAuto.js",
     "chroma:start": "node ai/vector-db/chromaServerManager.js start",
     "chroma:stop": "node ai/vector-db/chromaServerManager.js stop",
-    "chroma:status": "node ai/vector-db/chromaServerManager.js status"
+    "chroma:status": "node ai/vector-db/chromaServerManager.js status",
+    "perf:jmeter": "node scripts/runJMeter.js",
+    "perf:jmeter:gui": "node scripts/runJMeter.js --gui",
+    "perf:jmeter:kill": "pkill -f ApacheJMeter || true; pkill -f jmeter || true",
+    "perf:jmeter:html": "node -e \"const p=require('path');const f=p.join(__dirname,'reports','jmeter','html','index.html');console.log('JMeter HTML report: '+f);\"",
+    "ai:jmeter-analysis": "node ai/agents/jmeterPerformanceAnalysisAgent.js",
+    "dashboard:generate": "node utils/runDashboard.js",
+    "dashboard:open": "node -e \"const p=require('path');const f=p.join(__dirname,'reports','dashboard','index.html');console.log('Dashboard: '+f);\"",
+    "test:full-with-performance": "npm run test:ai && npm run perf:jmeter && npm run ai:jmeter-analysis && npm run dashboard:generate",
+    "ci:full": "npm run test:full-with-performance"
   },
   "keywords": [
     "playwright",
@@ -96,7 +105,10 @@
     "javascript",
     "pom",
     "amazon",
-    "automation"
+    "automation",
+    "jmeter",
+    "performance",
+    "load-testing"
   ],
   "author": "Kumar Saurabh",
   "license": "ISC",

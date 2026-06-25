@@ -1,4 +1,5 @@
-// Jenkins pipeline for unified Web, Android, and iOS automation execution.
+// Jenkins pipeline for unified Web, Android, iOS, and JMeter Performance automation execution.
+// Includes automated AI Executive Dashboard generation.
 pipeline {
     agent any
 
@@ -9,6 +10,9 @@ pipeline {
     parameters {
         choice(name: 'TEST_PLATFORM', choices: ['WEB', 'ANDROID', 'IOS', 'ALL'], description: 'Target platform to execute')
         choice(name: 'ENVIRONMENT', choices: ['qa', 'stage', 'prod'], description: 'Environment configuration')
+        booleanParam(name: 'RUN_PERFORMANCE', defaultValue: false, description: 'Run JMeter performance tests')
+        booleanParam(name: 'RUN_AI_ANALYSIS', defaultValue: true, description: 'Run AI analysis on reports')
+        booleanParam(name: 'GENERATE_DASHBOARD', defaultValue: true, description: 'Generate AI Executive Dashboard')
     }
 
     environment {
@@ -32,6 +36,12 @@ pipeline {
         EMBEDDING_DIMENSIONS = '1536'
         AI_MODEL = 'gpt-4.1-mini'
         OPENAI_API_KEY = credentials('openai-api-key')
+        // JMeter Performance thresholds
+        THRESHOLD_ERROR_PCT = '5'
+        THRESHOLD_RESPONSE_TIME = '5000'
+        JMETER_USERS = '10'
+        JMETER_RAMPUP = '5'
+        JMETER_DURATION = '60'
     }
 
     stages {
@@ -45,6 +55,7 @@ pipeline {
             steps {
                 sh 'npm install'
                 sh 'npx playwright install --with-deps'
+                sh 'which jmeter || echo "JMeter not found in PATH — install or set JMETER_HOME"'
             }
         }
 
@@ -124,10 +135,64 @@ pipeline {
             }
         }
 
-        stage('Generate HTML Report') {
+        // ──────────────────────────────────────────────
+        // JMeter Performance Testing Stage
+        // ──────────────────────────────────────────────
+        stage('JMeter Performance Tests') {
+            when {
+                expression { params.RUN_PERFORMANCE }
+            }
+            steps {
+                script {
+                    try {
+                        sh 'npm run perf:jmeter'
+                    } catch (err) {
+                        echo "JMeter performance tests completed with threshold violations: ${err}"
+                        // Do not fail the pipeline yet — let AI analysis run
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // AI Performance Analysis Stage
+        // ──────────────────────────────────────────────
+        stage('AI Performance Analysis') {
+            when {
+                expression { params.RUN_AI_ANALYSIS }
+            }
+            steps {
+                script {
+                    sh 'npm run ai:jmeter-analysis || echo "AI analysis completed (non-fatal)"'
+                }
+            }
+        }
+
+        stage('Generate HTML Reports') {
             steps {
                 sh 'npm run report || true'
                 sh 'npm run allure:generate || true'
+                // JMeter HTML report is generated automatically by the runner
+                echo "JMeter HTML report: reports/jmeter/html/index.html"
+                echo "JMeter AI analysis: reports/ai/jmeter-performance-report.md"
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // AI Executive Dashboard Generation Stage
+        // ──────────────────────────────────────────────
+        stage('Generate AI Executive Dashboard') {
+            when {
+                expression { params.GENERATE_DASHBOARD }
+            }
+            steps {
+                script {
+                    sh 'npm run dashboard:generate'
+                    echo "✅ AI Executive Dashboard generated: reports/dashboard/index.html"
+                    echo "📊 Dashboard Data: reports/dashboard/dashboard-data.json"
+                    echo "📝 Dashboard Summary: reports/dashboard/dashboard-summary.md"
+                }
             }
         }
     }
@@ -141,7 +206,15 @@ pipeline {
             sh 'npm run ai:jenkins-rag -- logs/jenkins-console.log'
         }
         cleanup {
-            archiveArtifacts artifacts: 'reports/**, allure-results/**, allure-report/**, ai/output/**, ai/memory/**, mobile/logs/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'reports/**, allure-results/**, allure-report/**, ai/output/**, ai/memory/**, mobile/logs/**, performance/jmeter/**', allowEmptyArchive: true
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports/jmeter/html',
+                reportFiles: 'index.html',
+                reportName: 'JMeter Performance Report'
+            ])
             publishHTML(target: [
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,
@@ -149,6 +222,15 @@ pipeline {
                 reportDir: 'reports/html',
                 reportFiles: 'cucumber-html-report.html,cucumber-report.html',
                 reportName: 'Cucumber HTML Report'
+            ])
+            // Publish AI Executive Dashboard
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports/dashboard',
+                reportFiles: 'index.html',
+                reportName: 'AI Executive Dashboard'
             ])
             allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
             sh 'npm run vector:stop || true'
