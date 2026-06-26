@@ -10,7 +10,8 @@ const agents = {
   PageObjectGenerationAgent: require('../agents/pageObjectGenerationAgent'),
   JenkinsBuildFailureAnalysisAgent: require('../agents/jenkinsBuildFailureAnalysisAgent'),
   PlaywrightCodeReviewAgent: require('../agents/playwrightCodeReviewAgent'),
-  SelfHealingAutomationAgent: require('../agents/selfHealingAutomationAgent')
+  SelfHealingAutomationAgent: require('../agents/selfHealingAutomationAgent'),
+  ApiAnalysisAgent: require('../agents/apiAnalysisAgent')
 };
 
 class AgentRunner {

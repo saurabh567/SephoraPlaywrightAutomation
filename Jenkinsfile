@@ -1,4 +1,4 @@
-// Jenkins pipeline for unified Web, Android, iOS, and JMeter Performance automation execution.
+// Jenkins pipeline for unified Web, Android, iOS, API Automation, and JMeter Performance testing.
 // Includes automated AI Executive Dashboard generation.
 pipeline {
     agent any
@@ -13,6 +13,7 @@ pipeline {
         booleanParam(name: 'RUN_PERFORMANCE', defaultValue: false, description: 'Run JMeter performance tests')
         booleanParam(name: 'RUN_AI_ANALYSIS', defaultValue: true, description: 'Run AI analysis on reports')
         booleanParam(name: 'GENERATE_DASHBOARD', defaultValue: true, description: 'Generate AI Executive Dashboard')
+        booleanParam(name: 'RUN_API_TESTS', defaultValue: true, description: 'Run API automation tests')
     }
 
     environment {
@@ -67,6 +68,9 @@ pipeline {
             }
         }
 
+        // ──────────────────────────────────────────────
+        // Web / Android / iOS — Platform Execution
+        // ──────────────────────────────────────────────
         stage('Run Selected Platform') {
             when {
                 expression { params.TEST_PLATFORM != 'ALL' }
@@ -136,6 +140,56 @@ pipeline {
         }
 
         // ──────────────────────────────────────────────
+        // API Tests Stage
+        // ──────────────────────────────────────────────
+        stage('API Tests') {
+            when {
+                expression { params.RUN_API_TESTS }
+            }
+            steps {
+                script {
+                    try {
+                        sh 'npm run test:api'
+                        echo "✅ API tests completed — all scenarios executed"
+                    } catch (err) {
+                        echo "⚠️ API tests completed with failures: ${err}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "📄 API cucumber report: reports/api/cucumber-report.json"
+                    echo "📄 API summary report: reports/api/api-summary.md"
+                    echo "📄 API HTML report: reports/api/api-report.html"
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // API AI Analysis Stage
+        // ──────────────────────────────────────────────
+        stage('API AI Analysis') {
+            when {
+                allOf {
+                    expression { params.RUN_API_TESTS }
+                    expression { params.RUN_AI_ANALYSIS }
+                }
+            }
+            steps {
+                script {
+                    sh 'npm run ai:api-analysis-agent || echo "⚠️ API AI analysis completed (non-fatal)"'
+                    echo "✅ API AI analysis generated: reports/ai/api-analysis-report.md"
+                }
+            }
+            post {
+                success {
+                    echo "🤖 AI API Analysis Report: reports/ai/api-analysis-report.md"
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
         // JMeter Performance Testing Stage
         // ──────────────────────────────────────────────
         stage('JMeter Performance Tests') {
@@ -148,7 +202,6 @@ pipeline {
                         sh 'npm run perf:jmeter'
                     } catch (err) {
                         echo "JMeter performance tests completed with threshold violations: ${err}"
-                        // Do not fail the pipeline yet — let AI analysis run
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -169,13 +222,17 @@ pipeline {
             }
         }
 
+        // ──────────────────────────────────────────────
+        // Generate HTML Reports Stage
+        // ──────────────────────────────────────────────
         stage('Generate HTML Reports') {
             steps {
                 sh 'npm run report || true'
                 sh 'npm run allure:generate || true'
-                // JMeter HTML report is generated automatically by the runner
                 echo "JMeter HTML report: reports/jmeter/html/index.html"
                 echo "JMeter AI analysis: reports/ai/jmeter-performance-report.md"
+                echo "API report: reports/api/api-report.html"
+                echo "API AI analysis: reports/ai/api-analysis-report.md"
             }
         }
 
@@ -205,6 +262,22 @@ pipeline {
             }
             sh 'npm run ai:jenkins-rag -- logs/jenkins-console.log'
         }
+        // ──────────────────────────────────────────────
+        // API Reports Archive
+        // ──────────────────────────────────────────────
+        success {
+            script {
+                // Archive API-specific reports when API tests were run
+                if (params.RUN_API_TESTS) {
+                    echo "📦 Archiving API reports..."
+                    echo "   - reports/api/cucumber-report.json"
+                    echo "   - reports/api/api-summary.json"
+                    echo "   - reports/api/api-summary.md"
+                    echo "   - reports/api/api-report.html"
+                    echo "   - reports/ai/api-analysis-report.md"
+                }
+            }
+        }
         cleanup {
             archiveArtifacts artifacts: 'reports/**, allure-results/**, allure-report/**, ai/output/**, ai/memory/**, mobile/logs/**, performance/jmeter/**', allowEmptyArchive: true
             publishHTML(target: [
@@ -222,6 +295,24 @@ pipeline {
                 reportDir: 'reports/html',
                 reportFiles: 'cucumber-html-report.html,cucumber-report.html',
                 reportName: 'Cucumber HTML Report'
+            ])
+            // Publish API HTML Report
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports/api',
+                reportFiles: 'api-report.html',
+                reportName: 'API Test Report'
+            ])
+            // Publish API AI Analysis Report
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports/ai',
+                reportFiles: 'api-analysis-report.md',
+                reportName: 'API AI Analysis Report'
             ])
             // Publish AI Executive Dashboard
             publishHTML(target: [

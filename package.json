@@ -2,7 +2,7 @@
   "name": "amazonwebmobileplaywrightautomation",
   "displayName": "AMAZONWEBMOBILEPLAYWRIGHTAUTOMATION",
   "version": "1.0.0",
-  "description": "Industry-standard Playwright JavaScript Cucumber BDD automation framework for Amazon India UI. Includes JMeter performance testing with AI analysis.",
+  "description": "Industry-standard Playwright JavaScript Cucumber BDD automation framework for Amazon India UI. Includes JMeter performance testing with AI analysis and API automation module.",
   "main": "index.js",
   "scripts": {
     "pretest": "node utils/cleanReports.js",
@@ -39,6 +39,10 @@
     "test:headed": "HEADLESS=false cucumber-js --config cucumber.js",
     "test:firefox": "BROWSER=firefox cucumber-js --config cucumber.js",
     "test:webkit": "BROWSER=webkit cucumber-js --config cucumber.js",
+    "pretest:api": "node -e \"require('fs-extra').ensureDirSync('reports/api'); require('fs-extra').ensureDirSync('reports/ai');\"",
+    "test:api": "cucumber-js --config cucumber.api.js",
+    "test:api:report": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Reports ===\\\");files.forEach(f=>{const ok=fs.existsSync(f);console.log((ok?\\\"✅\\\":\\\"❌\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\"\\\"));});console.log(\\\"\\\");\"",
+    "test:all:with-api": "npm run test:web; npm run test:api; npm run perf:jmeter; npm run ai:jmeter-analysis; npm run dashboard:generate",
     "report": "node utils/generateReport.js",
     "report:web": "node utils/generateReports.js web",
     "report:android": "node utils/generateReports.js android",
@@ -96,7 +100,12 @@
     "dashboard:generate": "node utils/runDashboard.js",
     "dashboard:open": "node -e \"const p=require('path');const f=p.join(__dirname,'reports','dashboard','index.html');console.log('Dashboard: '+f);\"",
     "test:full-with-performance": "npm run test:ai && npm run perf:jmeter && npm run ai:jmeter-analysis && npm run dashboard:generate",
-    "ci:full": "npm run test:full-with-performance"
+    "ci:full": "npm run test:full-with-performance",
+    "test:api:ai": "npm run test:api && node utils/generateApiAiAnalysis.js && node ai/agents/apiAnalysisAgent.js",
+    "report:api": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Report Summary ===\\\");let all=true;files.forEach(f=>{const ok=fs.existsSync(f);if(!ok)all=false;console.log((ok?\\\"✅\\\":\\\"❌\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\" (MISSING)\\\"));});if(all){try{const j=JSON.parse(fs.readFileSync(\\\"reports/api/api-summary.json\\\"));console.log(\\\"\\\\nTotal: \\\"+j.totalAPIs+\\\" | Passed: \\\"+j.passed+\\\" | Failed: \\\"+j.failed+\\\" | Pass%: \\\"+j.passRate);}catch(e){console.log(\\\"\\\\nCould not parse summary JSON\\\");}}console.log(\\\"\\\");\"",
+    "clean:api-reports": "node -e \"const fs=require(\\\"fs-extra\\\");const dirs=[\\\"reports/api\\\",\\\"reports/ai/api-analysis-report.md\\\"];dirs.forEach(d=>{if(fs.existsSync(d)){fs.removeSync(d);console.log(\\\"Removed: \\\"+d);}});console.log(\\\"API reports cleaned.\\\");\"",
+    "ai:api-analysis": "node utils/generateApiAiAnalysis.js",
+    "ai:api-analysis-agent": "node ai/agents/apiAnalysisAgent.js"
   },
   "keywords": [
     "playwright",
@@ -108,7 +117,8 @@
     "automation",
     "jmeter",
     "performance",
-    "load-testing"
+    "load-testing",
+    "api-testing"
   ],
   "author": "Kumar Saurabh",
   "license": "ISC",

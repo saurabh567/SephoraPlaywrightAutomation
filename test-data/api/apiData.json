@@ -1,0 +1,16 @@
+{
+  "createPost": {
+    "title": "foo",
+    "body": "bar",
+    "userId": 1
+  },
+  "updatePost": {
+    "id": 1,
+    "title": "updated title",
+    "body": "updated body",
+    "userId": 1
+  },
+  "patchPost": {
+    "title": "patched title value"
+  }
+}
