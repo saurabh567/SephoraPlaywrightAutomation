@@ -1,5 +1,5 @@
 // Jenkins pipeline for unified Web, Android, iOS, API Automation, and JMeter Performance testing.
-// Includes automated AI Executive Dashboard generation.
+// Includes automated AI Executive Dashboard generation and Consolidated Reporting.
 pipeline {
     agent any
 
@@ -14,6 +14,7 @@ pipeline {
         booleanParam(name: 'RUN_AI_ANALYSIS', defaultValue: true, description: 'Run AI analysis on reports')
         booleanParam(name: 'GENERATE_DASHBOARD', defaultValue: true, description: 'Generate AI Executive Dashboard')
         booleanParam(name: 'RUN_API_TESTS', defaultValue: true, description: 'Run API automation tests')
+        booleanParam(name: 'GENERATE_CONSOLIDATED_REPORT', defaultValue: true, description: 'Generate Consolidated Dashboard Report')
     }
 
     environment {
@@ -69,71 +70,73 @@ pipeline {
         }
 
         // ──────────────────────────────────────────────
-        // Web / Android / iOS — Platform Execution
+        // Web Tests Stage
         // ──────────────────────────────────────────────
-        stage('Run Selected Platform') {
+        stage('Web Tests') {
             when {
-                expression { params.TEST_PLATFORM != 'ALL' }
+                expression { params.TEST_PLATFORM == 'WEB' || params.TEST_PLATFORM == 'ALL' }
             }
             steps {
                 script {
-                    if (params.TEST_PLATFORM == 'WEB') {
+                    try {
                         sh 'npm run test:web'
-                    } else if (params.TEST_PLATFORM == 'ANDROID') {
-                        sh 'npm run appium:status || true'
-                        sh 'npm run appium:start'
-                        try {
-                            sh 'npm run test:android'
-                        } finally {
-                            sh 'npm run appium:stop || true'
-                        }
-                    } else if (params.TEST_PLATFORM == 'IOS') {
-                        sh 'npm run appium:status || true'
-                        sh 'npm run appium:start'
-                        try {
-                            sh 'npm run test:ios'
-                        } finally {
-                            sh 'npm run appium:stop || true'
-                        }
+                        echo "✅ Web tests completed successfully"
+                    } catch (err) {
+                        echo "⚠️ Web tests completed with failures: ${err}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "📄 Web report: reports/web/cucumber-report.json"
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Android Tests Stage
+        // ──────────────────────────────────────────────
+        stage('Android Tests') {
+            when {
+                expression { params.TEST_PLATFORM == 'ANDROID' || params.TEST_PLATFORM == 'ALL' }
+            }
+            steps {
+                script {
+                    sh 'npm run appium:status || true'
+                    sh 'npm run appium:start'
+                    try {
+                        sh 'npm run test:android'
+                        echo "✅ Android tests completed successfully"
+                    } catch (err) {
+                        echo "⚠️ Android tests completed with failures: ${err}"
+                        currentBuild.result = 'UNSTABLE'
+                    } finally {
+                        sh 'npm run appium:stop || true'
                     }
                 }
             }
         }
 
-        stage('Run All Platforms') {
+        // ──────────────────────────────────────────────
+        // iOS Tests Stage
+        // ──────────────────────────────────────────────
+        stage('iOS Tests') {
             when {
-                expression { params.TEST_PLATFORM == 'ALL' }
+                expression { params.TEST_PLATFORM == 'IOS' || params.TEST_PLATFORM == 'ALL' }
             }
-            parallel {
-                stage('Web') {
-                    steps {
-                        sh 'npm run test:web'
-                    }
-                }
-                stage('Android') {
-                    steps {
-                        script {
-                            sh 'npm run appium:status || true'
-                            sh 'npm run appium:start'
-                            try {
-                                sh 'npm run test:android'
-                            } finally {
-                                sh 'npm run appium:stop || true'
-                            }
-                        }
-                    }
-                }
-                stage('iOS') {
-                    steps {
-                        script {
-                            sh 'npm run appium:status || true'
-                            sh 'npm run appium:start'
-                            try {
-                                sh 'npm run test:ios'
-                            } finally {
-                                sh 'npm run appium:stop || true'
-                            }
-                        }
+            steps {
+                script {
+                    sh 'npm run appium:status || true'
+                    sh 'npm run appium:start'
+                    try {
+                        sh 'npm run test:ios'
+                        echo "✅ iOS tests completed successfully"
+                    } catch (err) {
+                        echo "⚠️ iOS tests completed with failures: ${err}"
+                        currentBuild.result = 'UNSTABLE'
+                    } finally {
+                        sh 'npm run appium:stop || true'
                     }
                 }
             }
@@ -192,7 +195,7 @@ pipeline {
         // ──────────────────────────────────────────────
         // JMeter Performance Testing Stage
         // ──────────────────────────────────────────────
-        stage('JMeter Performance Tests') {
+        stage('Performance Tests') {
             when {
                 expression { params.RUN_PERFORMANCE }
             }
@@ -211,7 +214,7 @@ pipeline {
         // ──────────────────────────────────────────────
         // AI Performance Analysis Stage
         // ──────────────────────────────────────────────
-        stage('AI Performance Analysis') {
+        stage('AI Analysis') {
             when {
                 expression { params.RUN_AI_ANALYSIS }
             }
@@ -252,6 +255,42 @@ pipeline {
                 }
             }
         }
+
+        // ──────────────────────────────────────────────
+        // CONSOLIDATED DASHBOARD GENERATION
+        // ──────────────────────────────────────────────
+        stage('Consolidated Dashboard Generation') {
+            when {
+                expression { params.GENERATE_CONSOLIDATED_REPORT }
+            }
+            steps {
+                script {
+                    sh 'npm run report:dashboard'
+                    echo "✅ Consolidated Dashboard generated:"
+                    echo "   📄 reports/dashboard/index.html"
+                    echo "   📊 reports/dashboard/dashboard-data.json"
+                    echo "   📝 reports/dashboard/consolidated-summary.md"
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // AI Consolidated Report Agent
+        // ──────────────────────────────────────────────
+        stage('AI Consolidated Report') {
+            when {
+                allOf {
+                    expression { params.GENERATE_CONSOLIDATED_REPORT }
+                    expression { params.RUN_AI_ANALYSIS }
+                }
+            }
+            steps {
+                script {
+                    sh 'npm run ai:consolidated-report || true'
+                    echo "🤖 AI Consolidated Report Agent completed"
+                }
+            }
+        }
     }
 
     post {
@@ -263,7 +302,7 @@ pipeline {
             sh 'npm run ai:jenkins-rag -- logs/jenkins-console.log'
         }
         // ──────────────────────────────────────────────
-        // API Reports Archive
+        // Reports Archive
         // ──────────────────────────────────────────────
         success {
             script {
@@ -275,6 +314,12 @@ pipeline {
                     echo "   - reports/api/api-summary.md"
                     echo "   - reports/api/api-report.html"
                     echo "   - reports/ai/api-analysis-report.md"
+                }
+                if (params.GENERATE_CONSOLIDATED_REPORT) {
+                    echo "📦 Archiving Consolidated Reports..."
+                    echo "   - reports/dashboard/index.html"
+                    echo "   - reports/dashboard/dashboard-data.json"
+                    echo "   - reports/dashboard/consolidated-summary.md"
                 }
             }
         }
@@ -322,6 +367,15 @@ pipeline {
                 reportDir: 'reports/dashboard',
                 reportFiles: 'index.html',
                 reportName: 'AI Executive Dashboard'
+            ])
+            // Publish Consolidated Dashboard
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports/dashboard',
+                reportFiles: 'index.html',
+                reportName: 'Consolidated Test Dashboard'
             ])
             allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
             sh 'npm run vector:stop || true'

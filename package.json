@@ -41,7 +41,7 @@
     "test:webkit": "BROWSER=webkit cucumber-js --config cucumber.js",
     "pretest:api": "node -e \"require('fs-extra').ensureDirSync('reports/api'); require('fs-extra').ensureDirSync('reports/ai');\"",
     "test:api": "cucumber-js --config cucumber.api.js",
-    "test:api:report": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Reports ===\\\");files.forEach(f=>{const ok=fs.existsSync(f);console.log((ok?\\\"✅\\\":\\\"❌\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\"\\\"));});console.log(\\\"\\\");\"",
+    "test:api:report": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Reports ===\\\");files.forEach(f=>{const ok=fs.existsSync(f);console.log((ok?\\\"\u2705\\\":\\\"\u274c\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\"\\\"));});console.log(\\\"\\\");\"",
     "test:all:with-api": "npm run test:web; npm run test:api; npm run perf:jmeter; npm run ai:jmeter-analysis; npm run dashboard:generate",
     "report": "node utils/generateReport.js",
     "report:web": "node utils/generateReports.js web",
@@ -102,10 +102,15 @@
     "test:full-with-performance": "npm run test:ai && npm run perf:jmeter && npm run ai:jmeter-analysis && npm run dashboard:generate",
     "ci:full": "npm run test:full-with-performance",
     "test:api:ai": "npm run test:api && node utils/generateApiAiAnalysis.js && node ai/agents/apiAnalysisAgent.js",
-    "report:api": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Report Summary ===\\\");let all=true;files.forEach(f=>{const ok=fs.existsSync(f);if(!ok)all=false;console.log((ok?\\\"✅\\\":\\\"❌\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\" (MISSING)\\\"));});if(all){try{const j=JSON.parse(fs.readFileSync(\\\"reports/api/api-summary.json\\\"));console.log(\\\"\\\\nTotal: \\\"+j.totalAPIs+\\\" | Passed: \\\"+j.passed+\\\" | Failed: \\\"+j.failed+\\\" | Pass%: \\\"+j.passRate);}catch(e){console.log(\\\"\\\\nCould not parse summary JSON\\\");}}console.log(\\\"\\\");\"",
+    "report:api": "node -e \"const fs=require(\\\"fs-extra\\\");const p=require(\\\"path\\\");const files=[\\\"reports/api/api-summary.json\\\",\\\"reports/api/api-summary.md\\\",\\\"reports/api/api-report.html\\\",\\\"reports/ai/api-analysis-report.md\\\"];console.log(\\\"\\\\n=== API Report Summary ===\\\");let all=true;files.forEach(f=>{const ok=fs.existsSync(f);if(!ok)all=false;console.log((ok?\\\"\u2705\\\":\\\"\u274c\\\")+\\\" \\\"+f+(ok?\\\" (\\\"+fs.statSync(f).size+\\\" bytes)\\\":\\\" (MISSING)\\\"));});if(all){try{const j=JSON.parse(fs.readFileSync(\\\"reports/api/api-summary.json\\\"));console.log(\\\"\\\\nTotal: \\\"+j.totalAPIs+\\\" | Passed: \\\"+j.passed+\\\" | Failed: \\\"+j.failed+\\\" | Pass%: \\\"+j.passRate);}catch(e){console.log(\\\"\\\\nCould not parse summary JSON\\\");}}console.log(\\\"\\\");\"",
     "clean:api-reports": "node -e \"const fs=require(\\\"fs-extra\\\");const dirs=[\\\"reports/api\\\",\\\"reports/ai/api-analysis-report.md\\\"];dirs.forEach(d=>{if(fs.existsSync(d)){fs.removeSync(d);console.log(\\\"Removed: \\\"+d);}});console.log(\\\"API reports cleaned.\\\");\"",
     "ai:api-analysis": "node utils/generateApiAiAnalysis.js",
-    "ai:api-analysis-agent": "node ai/agents/apiAnalysisAgent.js"
+    "ai:api-analysis-agent": "node ai/agents/apiAnalysisAgent.js",
+    "report:dashboard": "node utils/runAllSuitesAndGenerateDashboard.js",
+    "test:all:dashboard": "npm run clean:reports && npm run test:web && npm run test:android && npm run test:ios && npm run test:api && npm run perf:jmeter && npm run test:ai && npm run report:dashboard",
+    "test:all:dashboard:safe": "node utils/runAllSuitesAndGenerateDashboard.js",
+    "ai:consolidated-report": "node ai/agents/ConsolidatedReportAgent.js",
+    "report:dashboard:only": "node utils/generateConsolidatedDashboard.js"
   },
   "keywords": [
     "playwright",

@@ -334,7 +334,13 @@ async function runIOSTests() {
 
     child.on('exit', (code) => {
       console.log('\n────────────────────────────────────────────────────────────────');
-      pass('iosTestExecuted');
+      if (code === 0) {
+        console.log('[lifecycle] iOS test scenarios completed successfully.');
+        pass('iosTestExecuted');
+      } else {
+        console.log('[lifecycle] iOS test scenarios finished with exit code ' + code);
+        fail('iosTestExecuted');
+      }
       resolve(code === 0);
     });
 
@@ -408,6 +414,12 @@ function generateLifecycleReport(exitCode) {
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   const succeeded = exitCode === 0;
 
+  var cucumberJsonPath = path.join(ROOT, 'reports', 'ios', 'cucumber-report.json');
+  var cucumberReportFound = fs.existsSync(cucumberJsonPath);
+  var cucumberReportStatus = cucumberReportFound ? 'Found' : 'Not found';
+  var allureResultsPath = path.join(ROOT, 'reports', 'allure', 'ios', 'allure-results');
+  var allureResultsFound = fs.existsSync(allureResultsPath) && fs.readdirSync(allureResultsPath).length > 0;
+
   const report = `# iOS Execution Lifecycle Summary
 
 **Generated:** ${timestamp}
@@ -416,6 +428,8 @@ function generateLifecycleReport(exitCode) {
 **Keep Simulator:** ${KEEP_SIMULATOR}
 **Keep Appium:** ${KEEP_APPIUM}
 **WDA Warmup:** ${results.wdaWarmup}
+**Cucumber Report:** ${cucumberReportStatus}
+**Allure Results:** ${allureResultsFound ? 'Found' : 'Not found'}
 
 ## Results
 
@@ -427,6 +441,13 @@ function generateLifecycleReport(exitCode) {
 | iOS Scenarios Executed | ${results.iosTestExecuted} |
 | iOS Simulator Auto-Stop | ${results.simulatorAutoStop} |
 | Appium Auto-Stop | ${results.appiumAutoStop} |
+
+## Report Files
+
+| Report | Status |
+|--------|--------|
+| Cucumber JSON | ${cucumberReportStatus} |
+| Allure Results | ${allureResultsFound ? 'Found' : 'Not found'} |
 
 ## Overall
 
@@ -507,9 +528,17 @@ async function main() {
     const testOk = await runIOSTests();
     if (!testOk) exitCode = 1;
 
-    // Generate iOS Cucumber HTML report if JSON exists
+    // Check if cucumber JSON report was generated
     const iosJsonPath = path.join(ROOT, 'reports', 'ios', 'cucumber-report.json');
-    if (fs.existsSync(iosJsonPath)) {
+    var iosReportGenerated = fs.existsSync(iosJsonPath);
+    if (iosReportGenerated) {
+      console.log('[lifecycle] iOS Cucumber JSON report found at ' + iosJsonPath);
+    } else {
+      console.log('[lifecycle] iOS Cucumber JSON report NOT found at ' + iosJsonPath);
+    }
+
+    // Generate iOS Cucumber HTML report if JSON exists
+    if (iosReportGenerated) {
       try {
         const { execSync: exec } = require('child_process');
         exec(`node "${__dirname}/generateReports.js" ios`, { stdio: 'inherit', timeout: 60000 });
