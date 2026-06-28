@@ -24,6 +24,10 @@ const { execSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// Use locally installed allure binary — avoids npx download triggers that cause
+// macOS Gatekeeper "Malicious Script Blocked" false positives.
+const ALLURE_BIN = path.resolve(ROOT, 'node_modules', '.bin', 'allure');
+
 // ---------------------------------------------------------------------------
 // Platform configuration
 // ---------------------------------------------------------------------------
@@ -322,7 +326,7 @@ function generateCombinedCucumberHtml() {
 }
 
 // ---------------------------------------------------------------------------
-// Allure report generation (via allure CLI)
+// Allure report generation (via locally installed allure CLI)
 // ---------------------------------------------------------------------------
 
 function generateAllureReport(platform) {
@@ -351,7 +355,7 @@ function generateAllureReport(platform) {
   ensureDir(cfg.allureReport);
 
   try {
-    execSync(`npx allure generate "${resultsDir}" -o "${reportDir}" --clean`, {
+    execSync(`"${ALLURE_BIN}" generate "${resultsDir}" -o "${reportDir}" --clean`, {
       cwd: ROOT,
       stdio: 'pipe',
       timeout: 60000
@@ -408,7 +412,7 @@ function generateCombinedAllureReport() {
   ensureDir('reports/allure/combined/allure-report');
 
   try {
-    execSync(`npx allure generate "${combinedResultsDir}" -o "${combinedReportDir}" --clean`, {
+    execSync(`"${ALLURE_BIN}" generate "${combinedResultsDir}" -o "${combinedReportDir}" --clean`, {
       cwd: ROOT,
       stdio: 'pipe',
       timeout: 60000
@@ -427,166 +431,125 @@ function generateCombinedAllureReport() {
 
 function generateAiSummaryReport() {
   const lines = [];
-  const timestamp = new Date().toISOString().split('.')[0].replace('T', ' ');
-  lines.push('# AI Summary Report - Multi-Platform Test Execution');
+  const timestamp = new Date().toISOString().split('.').shift() + 'Z';
+  lines.push('# AI Summary Report');
   lines.push('');
   lines.push(`**Generated:** ${timestamp}`);
   lines.push('');
-  lines.push('## Platform Results');
-  lines.push('');
-  lines.push('| Platform | Cucumber JSON | Cucumber HTML | Allure Report | Scenarios | Passed | Failed | Skipped |');
-  lines.push('|----------|--------------|---------------|---------------|-----------|--------|--------|---------|');
 
+  const platforms = ['web', 'android', 'ios'];
   let totalScenarios = 0;
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
 
-  for (const p of ['web', 'android', 'ios']) {
+  for (const p of platforms) {
     const cfg = PLATFORMS[p];
     const jsonPath = path.resolve(ROOT, cfg.jsonReport);
-    let jsonStatus = 'N/A';
-    let htmlStatus = 'N/A';
-    let allureStatus = 'N/A';
-    let scenarios = 'N/A';
-    let passed = 'N/A';
-    let failed = 'N/A';
-    let skipped = 'N/A';
-
-    if (fs.existsSync(jsonPath)) {
-      jsonStatus = 'EXISTS';
-      try {
-        const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        if (Array.isArray(data)) {
-          scenarios = data.length;
-          totalScenarios += data.length;
-          let pCount = 0;
-          let fCount = 0;
-          let sCount = 0;
-          for (const feature of data) {
-            const elements = feature.elements || [];
-            for (const el of elements) {
-              const st = (el.status || (el.steps && el.steps[el.steps.length - 1]?.result?.status) || '').toLowerCase();
-              if (st === 'passed') pCount++;
-              else if (st === 'failed') fCount++;
-              else sCount++;
-            }
-          }
-          passed = pCount;
-          failed = fCount;
-          skipped = sCount;
-          totalPassed += pCount;
-          totalFailed += fCount;
-          totalSkipped += sCount;
-        }
-      } catch (e) {
-        jsonStatus = 'INVALID';
-      }
+    if (!fs.existsSync(jsonPath)) {
+      lines.push(`## ${cfg.label}\n\nNo results found.\n`);
+      continue;
     }
 
-    const htmlPath = path.resolve(ROOT, cfg.htmlReport);
-    if (fs.existsSync(htmlPath)) htmlStatus = 'EXISTS';
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    } catch {
+      lines.push(`## ${cfg.label}\n\nInvalid JSON.\n`);
+      continue;
+    }
 
-    const allureReportPath = path.resolve(ROOT, cfg.allureReport);
-    if (fs.existsSync(allureReportPath)) allureStatus = 'EXISTS';
+    if (!Array.isArray(data) || data.length === 0) {
+      lines.push(`## ${cfg.label}\n\nNo scenarios.\n`);
+      continue;
+    }
 
-    lines.push(`| ${cfg.label} | ${jsonStatus} | ${htmlStatus} | ${allureStatus} | ${scenarios} | ${passed} | ${failed} | ${skipped} |`);
-  }
-
-  lines.push('');
-  lines.push('## Totals');
-  lines.push('');
-  lines.push(`- **Total Scenarios:** ${totalScenarios}`);
-  lines.push(`- **Total Passed:** ${totalPassed}`);
-  lines.push(`- **Total Failed:** ${totalFailed}`);
-  lines.push(`- **Total Skipped:** ${totalSkipped}`);
-  lines.push('');
-
-  if (totalFailed > 0) {
-    lines.push('## Failures');
-    lines.push('');
-    for (const p of ['web', 'android', 'ios']) {
-      const cfg = PLATFORMS[p];
-      const jsonPath = path.resolve(ROOT, cfg.jsonReport);
-      if (fs.existsSync(jsonPath)) {
-        try {
-          const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-          if (Array.isArray(data)) {
-            for (const feature of data) {
-              const elements = feature.elements || [];
-              for (const el of elements) {
-                const status = (el.status || '').toLowerCase();
-                if (status === 'failed') {
-                  lines.push(`- **${cfg.label}:** ${el.name || el.keyword || 'Unknown scenario'}`);
-                  const steps = el.steps || [];
-                  for (const step of steps) {
-                    if (step.result && step.result.status === 'failed') {
-                      lines.push(`  - ${step.keyword}${step.name}: ${step.result.error_message || 'Unknown error'}`);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // skip
-        }
+    let scenarios = 0, passed = 0, failed = 0, skipped = 0;
+    for (const feature of data) {
+      const elements = feature.elements || [];
+      for (const el of elements) {
+        scenarios++;
+        const st = (el.status || (el.steps && el.steps[el.steps.length - 1]?.result?.status) || '').toLowerCase();
+        if (st === 'passed') passed++;
+        else if (st === 'failed') failed++;
+        else skipped++;
       }
     }
+    totalScenarios += scenarios;
+    totalPassed += passed;
+    totalFailed += failed;
+    totalSkipped += skipped;
+
+    const passRate = scenarios > 0 ? ((passed / scenarios) * 100).toFixed(1) : 'N/A';
+    lines.push(`## ${cfg.label}\n`);
+    lines.push(`| Metric | Value |`);
+    lines.push(`|--------|-------|`);
+    lines.push(`| Total Scenarios | ${scenarios} |`);
+    lines.push(`| Passed | ${passed} |`);
+    lines.push(`| Failed | ${failed} |`);
+    lines.push(`| Skipped | ${skipped} |`);
+    lines.push(`| Pass Rate | ${passRate}% |`);
     lines.push('');
   }
 
-  lines.push('## Report Links');
+  const overallRate = totalScenarios > 0 ? ((totalPassed / totalScenarios) * 100).toFixed(1) : 'N/A';
+  lines.push(`## Overall\n`);
+  lines.push(`| Metric | Value |`);
+  lines.push(`|--------|-------|`);
+  lines.push(`| Total Scenarios | ${totalScenarios} |`);
+  lines.push(`| Passed | ${totalPassed} |`);
+  lines.push(`| Failed | ${totalFailed} |`);
+  lines.push(`| Skipped | ${totalSkipped} |`);
+  lines.push(`| Pass Rate | ${overallRate}% |`);
   lines.push('');
-  for (const p of ['web', 'android', 'ios']) {
-    const cfg = PLATFORMS[p];
-    lines.push(`- **${cfg.label} Cucumber HTML:** ${cfg.htmlReport}`);
-    lines.push(`- **${cfg.label} Allure Report:** ${cfg.allureReport}/index.html`);
-  }
-  lines.push(`- **Combined Cucumber HTML:** reports/combined/cucumber-html-report.html`);
-  lines.push(`- **Combined Allure Report:** reports/allure/combined/allure-report/index.html`);
-  lines.push('');
-
   lines.push('---');
-  lines.push('*Report auto-generated by utils/generateReports.js*');
+  lines.push(`*Generated by generateReports.js at ${timestamp}*`);
+  lines.push('');
 
-  const reportContent = lines.join('\n');
+  const aiReportDir = path.resolve(ROOT, 'reports', 'ai');
   ensureDir('reports/ai');
-  fs.writeFileSync(path.resolve(ROOT, 'reports/ai/ai-summary-report.md'), reportContent, 'utf8');
+  fs.writeFileSync(path.join(aiReportDir, 'ai-summary-report.md'), lines.join('\n'), 'utf8');
   log(`${PASS} AI summary report generated: reports/ai/ai-summary-report.md`);
-  return true;
 }
 
 // ---------------------------------------------------------------------------
-// Validation output
+// Validation summary
 // ---------------------------------------------------------------------------
 
 function printValidationSummary() {
   console.log('\n========================================');
-  console.log('  REPORT GENERATION VALIDATION');
+  console.log('  Report Generation Validation Summary');
   console.log('========================================');
 
   const results = {};
 
-  for (const p of ['web', 'android', 'ios']) {
-    const cfg = PLATFORMS[p];
+  const webOk = fileExists('reports/web/cucumber-html-report.html');
+  console.log(`  Web Cucumber HTML:   ${webOk ? PASS : FAIL}`);
+  results.web_html = webOk;
 
-    const jsonOk = fileExists(cfg.jsonReport);
-    console.log(`  ${p} Cucumber JSON:     ${jsonOk ? PASS : FAIL}`);
-    results[`${p}_json`] = jsonOk;
+  const androidOk = fileExists('reports/android/cucumber-html-report.html');
+  console.log(`  Android Cucumber HTML: ${androidOk ? PASS : FAIL}`);
+  results.android_html = androidOk;
 
-    const htmlOk = fileExists(cfg.htmlReport);
-    console.log(`  ${p} Cucumber HTML:     ${htmlOk ? PASS : FAIL}`);
-    results[`${p}_html`] = htmlOk;
-
-    const allureIndexOk = fileExists(`${cfg.allureReport}/index.html`);
-    console.log(`  ${p} Allure Report:     ${allureIndexOk ? PASS : FAIL}`);
-    results[`${p}_allure`] = allureIndexOk;
-  }
+  const iosOk = fileExists('reports/ios/cucumber-html-report.html');
+  console.log(`  iOS Cucumber HTML:   ${iosOk ? PASS : FAIL}`);
+  results.ios_html = iosOk;
 
   const combinedOk = fileExists('reports/combined/cucumber-html-report.html');
-  console.log(`  Combined report:     ${combinedOk ? PASS : FAIL}`);
-  results.combined = combinedOk;
+  console.log(`  Combined Cucumber HTML: ${combinedOk ? PASS : FAIL}`);
+  results.combined_html = combinedOk;
+
+  const webAllureOk = fileExists('reports/allure/web/allure-report/index.html');
+  console.log(`  Web Allure:          ${webAllureOk ? PASS : FAIL}`);
+  results.web_allure = webAllureOk;
+
+  const androidAllureOk = fileExists('reports/allure/android/allure-report/index.html');
+  console.log(`  Android Allure:      ${androidAllureOk ? PASS : FAIL}`);
+  results.android_allure = androidAllureOk;
+
+  const iosAllureOk = fileExists('reports/allure/ios/allure-report/index.html');
+  console.log(`  iOS Allure:          ${iosAllureOk ? PASS : FAIL}`);
+  results.ios_allure = iosAllureOk;
 
   const combinedAllureOk = fileExists('reports/allure/combined/allure-report/index.html');
   console.log(`  Combined Allure:     ${combinedAllureOk ? PASS : FAIL}`);
