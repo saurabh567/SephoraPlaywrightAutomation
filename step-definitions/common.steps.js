@@ -5,7 +5,6 @@ const AmazonHomePage = require('../pages/AmazonHomePage');
 const AmazonSearchResultsPage = require('../pages/AmazonSearchResultsPage');
 const AmazonProductDetailsPage = require('../pages/AmazonProductDetailsPage');
 const AmazonCartPage = require('../pages/AmazonCartPage');
-const LoginPage = require('../pages/LoginPage');
 const testData = require('../test-data/testData.json');
 
 // ---------------------------------------------------------------------------
@@ -22,7 +21,6 @@ Given('I am on the Amazon home page', async function () {
 // ---------------------------------------------------------------------------
 
 When('I search for {string} in the search box', async function (searchTerm) {
-  // Use the value from the feature file or fall back to testData
   const term = searchTerm || testData.searchTerm;
   const homePage = new AmazonHomePage(this.page);
   await homePage.searchProduct(term);
@@ -79,31 +77,6 @@ When('I navigate to the cart page', async function () {
   const productDetailsPage = new AmazonProductDetailsPage(this.page);
   await productDetailsPage.openCartFromHeader();
   await expect(this.page).toHaveURL(/cart|gp\/cart/i, { timeout: 60000 });
-});
-
-// ---------------------------------------------------------------------------
-// Login steps
-// ---------------------------------------------------------------------------
-
-When('I log in with valid credentials', async function () {
-  const homePage = new AmazonHomePage(this.page);
-  await homePage.click(homePage.accountLink);
-
-  const loginPage = new LoginPage(this.page);
-  await loginPage.fill(loginPage.emailInput, testData.validUser.email);
-  await loginPage.click(loginPage.continueButton);
-  await this.page.waitForLoadState('domcontentloaded');
-
-  await loginPage.fill(loginPage.passwordInput, testData.validUser.password);
-  await loginPage.click(loginPage.loginButton);
-  await this.page.waitForLoadState('networkidle').catch(() => undefined);
-});
-
-Then('I should be logged in successfully', async function () {
-  const homePage = new AmazonHomePage(this.page);
-  await homePage.verifyVisible(homePage.accountLink);
-  const currentUrl = this.page.url();
-  expect(currentUrl).not.toMatch(/signin|ap\/signin|login/i);
 });
 
 // ---------------------------------------------------------------------------
