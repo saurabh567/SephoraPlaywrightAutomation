@@ -1,4 +1,5 @@
 // Cucumber hooks that manage browser, context, page, screenshots, videos, and traces.
+// Also performs automatic browser cache cleanup before/after test scenarios.
 const { Before, After, BeforeAll, AfterAll, Status, setDefaultTimeout } = require('@cucumber/cucumber');
 const fs = require('fs-extra');
 const path = require('path');
@@ -7,6 +8,7 @@ const logger = require('../utils/logger');
 const WebDriverFactory = require('../framework/web/WebDriverFactory');
 const MobileDriverFactory = require('../framework/mobile/MobileDriverFactory');
 const ScreenshotUtility = require('../framework/common/ScreenshotUtility');
+const BrowserCacheCleanup = require('../framework/common/BrowserCacheCleanup');
 const { TEST_PLATFORMS } = require('../framework/common/platforms');
 const AppiumAgent = require('../ai/agents/AppiumAgent');
 
@@ -23,25 +25,18 @@ function getMobileAppId() {
   if (config.testPlatform === TEST_PLATFORMS.ANDROID) {
     return config.mobile.appPackage;
   }
-
   if (config.testPlatform === TEST_PLATFORMS.IOS) {
     if (config.mobile.browserName.toLowerCase() === 'safari') {
       return process.env.IOS_SAFARI_BUNDLE_ID || 'com.apple.mobilesafari';
     }
-
     return config.mobile.bundleId;
   }
-
   return '';
 }
 
 async function closeMobileApp(driver) {
   const appId = getMobileAppId();
-
-  if (!driver || !appId) {
-    return;
-  }
-
+  if (!driver || !appId) return;
   try {
     await driver.terminateApp(appId);
     logger.info(`Mobile app closed successfully: ${appId}`);
@@ -50,42 +45,33 @@ async function closeMobileApp(driver) {
   }
 }
 
-/**
- * Create a mobile driver with retry logic for session startup failures
- * (e.g. WDA not ready yet on fresh simulator boot).
- */
 async function createMobileDriverWithRetry(config, retries = 2, delayMs = 15000) {
   let lastError;
-
   for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
     try {
-      const driver = await MobileDriverFactory.createDriver(config);
-      return driver;
+      return await MobileDriverFactory.createDriver(config);
     } catch (err) {
       lastError = err;
       const msg = String(err.message || '');
-      // Only retry on session-startup-type failures (WDA not ready, no targets, etc.)
       const isRetryable =
         msg.includes('session is either terminated') ||
         msg.includes('No targets') ||
         msg.includes('could not be matched') ||
+        msg.includes('instrumentation process cannot be initialized') ||
+        msg.includes('instrumentation process crashed') ||
         msg.includes('An unknown server-side error');
-
       if (attempt <= retries && isRetryable) {
-        logger.warn(
-          `[iOS] Mobile driver creation attempt ${attempt} failed: ${msg.substring(0, 120)}. ` +
-          `Retrying in ${delayMs / 1000}s ...`
-        );
+        logger.warn(`[mobile] Mobile driver creation attempt ${attempt} failed: ${msg.substring(0, 120)}. Retrying in ${delayMs / 1000}s ...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       } else {
-        // Non-retryable or out of retries — throw
         throw err;
       }
     }
   }
-
   throw lastError;
 }
+
+// ── BeforeAll: runs once per worker ────────────────────────────────────────
 
 BeforeAll(async function () {
   fs.ensureDirSync(path.join(config.reportDir, 'screenshots'));
@@ -93,42 +79,80 @@ BeforeAll(async function () {
   fs.ensureDirSync(path.join(config.reportDir, 'traces'));
 
   if (isWebExecution) {
+    // Launch browser once per worker; context+page are created per-scenario in Before
     browser = await WebDriverFactory.launch(config);
     logger.info(`Browser launched: ${config.browser}, headless: ${config.headless}, worker: ${workerId}`);
   } else if (isMobileExecution) {
-    // For Android: Appium server is managed by runAndroidWithLifecycle.js.
-    // For iOS: start Appium if not already running.
     if (isIOSExecution) {
       await AppiumAgent.startServerIfNeeded();
     }
-    logger.info(`Mobile platform selected: ${config.testPlatform}. Appium session will start per scenario.`);
+    logger.info(`Mobile platform: ${config.testPlatform}. Driver created per-scenario.`);
+
+    if (isAndroidExecution) {
+      // ADB cache clear once per worker (supplemented per-scenario in Before)
+      try {
+        const { execSync } = require('child_process');
+        execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_AMAZON_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
+        execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_CHROME_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
+        logger.info('[CacheCleanup] Android pre-session app data cleared via ADB');
+      } catch (err) {
+        logger.warn(`[CacheCleanup] Android pre-session ADB cleanup failed: ${err.message}`);
+      }
+    }
   }
 });
+
+// ── Before: runs before each scenario ──────────────────────────────────────
 
 Before(async function (scenario) {
   this.scenarioName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '_');
   this.artifactName = `${this.scenarioName}_worker_${workerId}`;
   logger.info(`Scenario started: ${scenario.pickle.name}`);
-
   this.platform = config.testPlatform;
 
   if (isWebExecution) {
-    this.browser = browser;
+    // Create fresh context + page per scenario (no state leakage)
     this.context = await WebDriverFactory.newContext(browser, config);
     await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     this.page = await this.context.newPage();
     this.page.setDefaultTimeout(config.timeout);
     this.page.setDefaultNavigationTimeout(config.timeout);
+
+    // Clear any residual browser state (cookies, localStorage, IndexedDB, etc.)
+    await BrowserCacheCleanup.clearWeb({ page: this.page }).catch(function(err) {
+      logger.warn('Pre-scenario web cache cleanup failed (non-fatal): ' + err.message);
+    });
     return;
   }
 
-  // For iOS, create the driver with retry logic to handle WDA cold-start
+  // Mobile: create fresh driver per scenario
   if (isIOSExecution) {
     this.driver = await createMobileDriverWithRetry(config);
   } else {
-    this.driver = await MobileDriverFactory.createDriver(config);
+    // Android: use retry logic to handle transient instrumentation errors
+    this.driver = await createMobileDriverWithRetry(config);
+  }
+  this.page = this.driver;
+
+  // Per-scenario mobile cache cleanup (ADB, Appium commands, JS WebView)
+  if (this.driver) {
+    const isSafari = isIOSExecution && config.mobile.browserName &&
+      config.mobile.browserName.toLowerCase() === 'safari';
+    try {
+      await BrowserCacheCleanup.clearAll({
+        driver: this.driver,
+        platform: config.testPlatform,
+        isSafari,
+        skipAdb: false  // Run ADB pm clear per scenario for thorough cleanup
+      });
+      logger.info(`[CacheCleanup] Pre-scenario cache cleared for ${config.testPlatform}`);
+    } catch (err) {
+      logger.warn(`[CacheCleanup] Pre-scenario cleanup failed (non-fatal): ${err.message}`);
+    }
   }
 });
+
+// ── After: runs after each scenario ────────────────────────────────────────
 
 After(async function (scenario) {
   const safeName = this.artifactName;
@@ -140,11 +164,7 @@ After(async function (scenario) {
 
     if (this.page || this.driver) {
       try {
-        const screenshot = await ScreenshotUtility.capture({
-          page: this.page,
-          driver: this.driver,
-          filePath: screenshotPath
-        });
+        const screenshot = await ScreenshotUtility.capture({ page: this.page, driver: this.driver, filePath: screenshotPath });
         await this.attach(screenshot, 'image/png');
         logger.error(`Screenshot captured: ${screenshotPath}`);
       } catch (err) {
@@ -157,11 +177,18 @@ After(async function (scenario) {
     logger.info(`Scenario passed: ${scenario.pickle.name}`);
   }
 
+  // Post-scenario cache cleanup to prevent state leakage
+  if (isWebExecution && this.page) {
+    await BrowserCacheCleanup.clearPostScenario({ page: this.page, platform: 'WEB' }).catch(() => {});
+  }
+
+  // Close web context (clears all state for the next scenario)
   if (this.context) {
     await this.context.tracing.stop({ path: tracePath });
     await this.context.close();
   }
 
+  // Close mobile driver session
   if (this.driver) {
     await closeMobileApp(this.driver);
     try {
@@ -172,14 +199,13 @@ After(async function (scenario) {
   }
 });
 
+// ── AfterAll: runs once per worker ─────────────────────────────────────────
+
 AfterAll(async function () {
   if (isWebExecution && browser) {
     await browser.close();
     logger.info(`Browser closed successfully for worker: ${workerId}`);
   }
-
-  // For Android: Appium lifecycle is managed by runAndroidWithLifecycle.js.
-  // For iOS: stop Appium if it was started by the framework.
   if (isIOSExecution) {
     await AppiumAgent.stopServerIfStartedByFramework();
   }

@@ -34,7 +34,6 @@ A unified test automation framework for **Web**, **Android**, and **iOS** platfo
   - [Report](#ai-analysis-report)
 - [Reports](#reports)
   - [Cucumber HTML Reports](#cucumber-html-reports)
-  - [Allure Reports](#allure-reports)
   - [AI Reports](#ai-reports)
   - [JMeter Reports](#jmeter-reports)
 - [Commands](#commands)
@@ -75,7 +74,6 @@ The framework includes **AI-powered features** such as:
 | Appium               | Android / iOS native app automation  |
 | Cucumber (BDD)       | Gherkin feature files & step defs    |
 | Node.js              | Runtime                              |
-| Allure               | Test reporting                       |
 | ChromaDB             | Vector database for AI context       |
 | OpenAI / LLM API     | Natural language & self-healing      |
 | dotenv               | Environment variable management      |
@@ -114,8 +112,6 @@ The framework includes **AI-powered features** such as:
 │   │   └── summary/             # JSON + Markdown summaries
 │   ├── ai/                      # AI analysis reports
 │   └── ...
-├── allure-results/              # Allure raw results
-├── allure-report/               # Allure HTML report
 ├── chroma/                      # ChromaDB persistence
 ├── screenshots/                 # Failure screenshots
 ├── videos/                      # Test recordings
@@ -525,21 +521,6 @@ The agent generates `reports/ai/jmeter-performance-report.md` containing:
 ```bash
 npm run report:cucumber
 ```
-
-### Allure Reports
-
-- Allure provides rich, interactive dashboards.
-- Raw results are stored in `allure-results/`.
-- HTML report is generated in `allure-report/`.
-
-**Generate & open:**
-```bash
-npm run report:allure
-npm run report:allure:open
-```
-
-### AI Reports
-
 - The framework can generate AI-powered summary reports.
 - These include:
   - Failure analysis in natural language
@@ -580,8 +561,6 @@ All commands are defined in `package.json` scripts.
 | `npm run test:all` | Run web + mobile tests |
 | `npm run test:specific` | Run a specific tag or feature |
 | `npm run report:cucumber` | Generate Cucumber HTML report |
-| `npm run report:allure` | Generate Allure report |
-| `npm run report:allure:open` | Open Allure report in browser |
 | `npm run report:ai` | Generate AI-powered report |
 | `npm run lint` | Lint the codebase |
 | `npm run format` | Format code with Prettier |
@@ -627,7 +606,6 @@ CHROMA_DB_PATH=./chroma
 CHROMA_COLLECTION_NAME=test_vectors
 
 # --- Reporting ---
-ALLURE_RESULTS_DIR=./allure-results
 CUCUMBER_REPORT_DIR=./reports
 
 # --- JMeter Performance ---
@@ -670,7 +648,6 @@ A `Jenkinsfile` is provided at the root for Jenkins CI/CD pipeline.
 4. Run Playwright/Cucumber tests (web, android, ios)
 5. **Run JMeter Performance Tests** (configurable via `RUN_PERFORMANCE` parameter)
 6. **Run AI Performance Analysis** (configurable via `RUN_AI_ANALYSIS` parameter)
-7. Generate reports (Cucumber, Allure, JMeter HTML)
 8. Archive artifacts (reports, JMeter JTL, AI analysis)
 
 **Jenkins parameters:**
@@ -688,7 +665,6 @@ A `Jenkinsfile` is provided at the root for Jenkins CI/CD pipeline.
 
 **Archived artifacts include:**
 - `reports/**` (includes JMeter JTL, HTML, summaries)
-- `allure-results/**`, `allure-report/**`
 - `ai/output/**`, `ai/memory/**`
 - `mobile/logs/**`
 - `performance/jmeter/**`
@@ -703,7 +679,6 @@ Configure these in Jenkins → Manage Jenkins → Configure System → Global Pr
 
 **Running on Jenkins:**
 - Trigger manually (with performance checkbox) or via webhook.
-- View Allure and JMeter HTML reports from build artifacts.
 
 ---
 
@@ -728,8 +703,6 @@ A GitHub Actions workflow `.github/workflows/full-ci.yml` is provided for cloud 
 7. Run Playwright/Cucumber tests
 8. Run JMeter performance tests
 9. Run AI performance analysis
-10. Generate reports (Cucumber, Allure)
-11. Upload artifacts (Cucumber report, Allure report, JMeter report, AI analysis, screenshots)
 
 ### Workflow Inputs
 | Input | Default | Description |
@@ -741,7 +714,6 @@ A GitHub Actions workflow `.github/workflows/full-ci.yml` is provided for cloud 
 | Artifact | Path | Retention |
 |----------|------|-----------|
 | Cucumber HTML Report | `reports/html/` | 30 days |
-| Allure Report | `allure-report/` | 30 days |
 | JMeter Performance Report | `reports/jmeter/` | 30 days |
 | AI Analysis Report | `reports/ai/` | 30 days |
 | Screenshots & Videos | `screenshots/` | 7 days |
@@ -790,10 +762,7 @@ To give a quick demo of the framework:
    npm run report:cucumber
    ```
 
-4. **View Allure report**
    ```bash
-   npm run report:allure
-   npm run report:allure:open
    ```
 
 5. **Show AI self-healing** (if ChromaDB is seeded)
@@ -897,7 +866,6 @@ This framework is a **unified, AI-augmented test automation solution** covering:
 | ChromaDB / Vectors | ✅ |
 | Self-Healing | ✅ |
 | Cucumber HTML Reports | ✅ |
-| Allure Reports | ✅ |
 | AI Reports | ✅ |
 | **JMeter Performance Tests** | **✅** |
 | **AI Performance Analysis** | **✅** |
@@ -910,7 +878,6 @@ This framework is a **unified, AI-augmented test automation solution** covering:
 - **Single framework** for web, Android, iOS, and performance testing.
 - **AI-first** approach with LLM, RAG, ChromaDB, self-healing, and performance analysis.
 - **Beginner-friendly** Gherkin syntax.
-- **Production-ready** reporting (Cucumber + Allure + AI summaries + JMeter dashboards).
 - **Safe by design** — no secrets in code, CI/CD ready.
 - **Performance-gated** — builds fail automatically on performance regression.
 

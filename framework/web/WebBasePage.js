@@ -3,6 +3,21 @@ const ConfigReader = require('../../utils/configReader');
 
 class WebBasePage {
   constructor(page) {
+    if (!page) {
+      throw new Error(
+        'WebBasePage: page is undefined. ' +
+        'Mobile test scenarios set this.driver instead of this.page. ' +
+        'Use MobileBasePage subclasses (framework/mobile/MobileBasePage) for mobile page objects.'
+      );
+    }
+    if (typeof page.locator !== 'function') {
+      throw new Error(
+        'WebBasePage: page.locator is not a function. ' +
+        'A WebDriverIO driver was passed to a Playwright-based page object. ' +
+        'For mobile tests, extend your page object from framework/mobile/MobileBasePage ' +
+        'instead of pages/BasePage (which extends WebBasePage).'
+      );
+    }
     this.page = page;
   }
 

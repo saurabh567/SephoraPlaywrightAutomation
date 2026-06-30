@@ -13,16 +13,6 @@ const REPORT_DIR = process.env.REPORT_DIR || (() => {
   }
 })();
 
-// Default ALLURE_RESULTS_DIR per platform
-const ALLURE_RESULTS_DIR = process.env.ALLURE_RESULTS_DIR || (() => {
-  switch (testPlatform) {
-    case 'web': return 'reports/allure/web/allure-results';
-    case 'android': return 'reports/allure/android/allure-results';
-    case 'ios': return 'reports/allure/ios/allure-results';
-    default: return 'reports/allure/web/allure-results';
-  }
-})();
-
 module.exports = {
   default: {
     require: [
@@ -33,11 +23,7 @@ module.exports = {
     format: [
       'summary',
       `json:${REPORT_DIR}/cucumber-report.json`,
-      `html:${REPORT_DIR}/cucumber-html-report.html`,
-      [
-        'allure-cucumberjs/reporter',
-        JSON.stringify({ resultsDir: ALLURE_RESULTS_DIR })
-      ]
+      `html:${REPORT_DIR}/cucumber-html-report.html`
     ],
     formatOptions: {
       snippetInterface: 'async-await'

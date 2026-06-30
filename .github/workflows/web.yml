@@ -42,7 +42,6 @@ jobs:
         if: always()
         run: |
           npm run report || true
-          npm run allure:generate || true
 
       - name: Upload artifacts
         if: always()
@@ -51,6 +50,4 @@ jobs:
           name: web-automation-artifacts
           path: |
             reports/**
-            allure-results/**
-            allure-report/**
             logs/**

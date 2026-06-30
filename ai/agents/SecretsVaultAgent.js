@@ -127,12 +127,6 @@ var VAULT_PROFILES = {
     envVars: ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD'],
     description: 'SMTP email credentials for notification alerts',
   },
-  allure: {
-    service: 'Allure TestOps',
-    fields: { endpoint: 'ALLURE_ENDPOINT', token: 'ALLURE_TOKEN' },
-    envVars: ['ALLURE_ENDPOINT', 'ALLURE_TOKEN'],
-    description: 'Allure TestOps integration credentials',
-  },
 };
 
 // ---------- Main Agent ----------

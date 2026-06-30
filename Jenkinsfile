@@ -231,7 +231,6 @@ pipeline {
         stage('Generate HTML Reports') {
             steps {
                 sh 'npm run report || true'
-                sh 'npm run allure:generate || true'
                 echo "JMeter HTML report: reports/jmeter/html/index.html"
                 echo "JMeter AI analysis: reports/ai/jmeter-performance-report.md"
                 echo "API report: reports/api/api-report.html"
@@ -324,7 +323,6 @@ pipeline {
             }
         }
         cleanup {
-            archiveArtifacts artifacts: 'reports/**, allure-results/**, allure-report/**, ai/output/**, ai/memory/**, mobile/logs/**, performance/jmeter/**', allowEmptyArchive: true
             publishHTML(target: [
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,
@@ -377,7 +375,6 @@ pipeline {
                 reportFiles: 'index.html',
                 reportName: 'Consolidated Test Dashboard'
             ])
-            allure includeProperties: false, jdk: '', results: [[path: 'allure-results']]
             sh 'npm run vector:stop || true'
         }
     }

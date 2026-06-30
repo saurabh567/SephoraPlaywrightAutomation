@@ -37,6 +37,9 @@ const net = require('net');
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 const AVD_NAME = process.env.ANDROID_AVD_NAME || 'Pixel_9_Pro';
+const HEADLESS_EMULATOR = process.env.HEADLESS_EMULATOR === 'true' || process.env.CI === 'true' || process.env.HEADLESS !== 'false';
+console.log("[android-lifecycle] HEADLESS_EMULATOR=" + HEADLESS_EMULATOR + " (" + (HEADLESS_EMULATOR ? "no-window (headless)" : "windowed (headed)") + ")");
+const EMULATOR_MEMORY = process.env.EMULATOR_MEMORY || '3072';
 const APPIUM_HOST = process.env.APPIUM_HOST || '127.0.0.1';
 const APPIUM_PORT = parseInt(process.env.APPIUM_PORT, 10) || 4723;
 const KEEP_EMULATOR = process.env.KEEP_ANDROID_EMULATOR === 'true';
@@ -384,11 +387,12 @@ async function phaseStartEmulator() {
       '-avd', AVD_NAME,
       '-no-snapshot',
       '-no-audio',
+      ...(HEADLESS_EMULATOR ? ['-no-window'] : []),
       '-gpu', 'swiftshader_indirect',
       '-no-boot-anim',
       '-netdelay', 'none',
       '-netspeed', 'full',
-      '-memory', '2048',
+      '-memory', EMULATOR_MEMORY,
       '-cores', '2',
     ], {
       detached: true,
@@ -609,6 +613,21 @@ async function phaseAmazonApp() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 5.5: Cache cleanup before tests
+// ---
+async function phaseCacheCleanup() {
+  log("cache cleanup before tests");
+  try {
+    runCmd("adb shell pm clear in.amazon.mShop.android.shopping 2>/dev/null || true", { timeout: 15000 });
+    runCmd("adb shell pm clear com.android.chrome 2>/dev/null || true", { timeout: 15000 });
+    log("cache cleaned via adb pm clear");
+  } catch (_) {
+    log("cache cleanup skipped (non-fatal)");
+  }
+  await sleep(2000);
+  return true;
+}
+
 // Phase 6: Run real Android tests
 // ─────────────────────────────────────────────────────────────────────────────
 async function phaseRunRealTests() {
@@ -915,10 +934,9 @@ ${reportFilesCheck}
   // Generate android-summary.md in reports/android/ for dashboard detection
   var androidReportDir = path.join(ROOT, 'reports', 'android');
   var androidSummaryPath = path.join(androidReportDir, 'android-summary.md');
-  var allureExists = false;
-  try {
-    allureExists = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-report', 'index.html'));
-  } catch (_) {}
+  // (removed redundant outer try)
+
+
   if (!fs.existsSync(path.join(ROOT, 'reports', 'android', 'cucumber-report.json'))) {
     try {
       fs.mkdirSync(androidReportDir, { recursive: true });
@@ -937,7 +955,7 @@ ${reportFilesCheck}
       lines.push('| Emulator Started | ' + (executionState.emulatorStarted ? 'Yes' : 'No') + ' |');
       lines.push('| Tests Started | ' + (executionState.rawTestStarted ? 'Yes' : 'No') + ' |');
       lines.push('| Cucumber Report | Not generated |');
-      lines.push('| Allure Report | ' + (allureExists ? 'Available' : 'Not available') + ' |');
+      lines.push('|-- | -- |');
       lines.push('| AVD Name | ' + executionState.avdName + ' |');
       lines.push('| ADB Device | ' + (executionState.adbDeviceId || 'N/A') + ' |');
       lines.push('');
@@ -971,6 +989,7 @@ async function main() {
     await phaseStartAppium();
     await phaseVerifyDeviceHealth();
     await phaseAmazonApp();
+    await phaseCacheCleanup();
 
     const testOk = await phaseRunRealTests();
     if (!testOk) exitCode = 1;

@@ -57,8 +57,6 @@ const PATHS = {
   perfJtlDir:        path.join(ROOT, 'reports', 'jmeter', 'jtl'),
   perfHtmlDir:       path.join(ROOT, 'reports', 'jmeter', 'html'),
 
-  allureResults:     path.join(ROOT, 'allure-results'),
-  allureReport:      path.join(ROOT, 'allure-report'),
 
   aiOutput:          path.join(ROOT, 'ai', 'output'),
   locatorHistory:    path.join(ROOT, 'ai', 'memory', 'locator-history'),
@@ -157,10 +155,7 @@ function findSuiteStatus(statusArr, suiteName) {
 }
 
 function scanAndroidReportPaths() {
-  const found = { androidDir: false, allureAndroid: false, allureReport: false, htmlAndroid: false, jsonAndroid: false, lifecycleSummary: false };
   found.androidDir = fs.existsSync(path.join(ROOT, 'reports', 'android'));
-  found.allureAndroid = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android'));
-  found.allureReport = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-report'));
   found.htmlAndroid = fs.existsSync(path.join(ROOT, 'reports', 'html', 'android'));
   found.jsonAndroid = fs.existsSync(path.join(ROOT, 'reports', 'json', 'android'));
   found.lifecycleSummary = fs.existsSync(path.join(ROOT, 'reports', 'ai', 'android-execution-lifecycle-summary.md'));
@@ -168,10 +163,7 @@ function scanAndroidReportPaths() {
 }
 
 function scanIOSReportPaths() {
-  const found = { iosDir: false, allureIOS: false, allureReport: false, htmlIOS: false, jsonIOS: false, lifecycleSummary: false };
   found.iosDir = fs.existsSync(path.join(ROOT, 'reports', 'ios'));
-  found.allureIOS = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'ios'));
-  found.allureReport = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'ios', 'allure-report'));
   found.htmlIOS = fs.existsSync(path.join(ROOT, 'reports', 'html', 'ios'));
   found.jsonIOS = fs.existsSync(path.join(ROOT, 'reports', 'json', 'ios'));
   found.lifecycleSummary = fs.existsSync(path.join(ROOT, 'reports', 'ai', 'ios-execution-lifecycle-summary.md'));
@@ -272,7 +264,6 @@ function collectWebData() {
     env,
     webHtmlReport: fs.existsSync(PATHS.webHtmlReport) ? PATHS.webHtmlReport : null,
     screenshots, videos, traces,
-    allureResultsDir: fs.existsSync(PATHS.allureResults) ? PATHS.allureResults : null,
   };
 }
 
@@ -300,18 +291,14 @@ function collectAndroidData(execStatus, lifecycleSummary) {
     // No cucumber JSON - check if execution actually ran
     if (execInfo && (execInfo.status === 'PASSED' || execInfo.status === 'FAILED')) {
       // Check what reports ARE available
-      var allureResExist = reportPaths.allureAndroid || fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-results'));
-      var allureRepExist = reportPaths.allureReport || fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-report', 'index.html'));
       var lifecycleExist = reportPaths.lifecycleSummary || (lsContent && lsContent.available);
       var androidSummaryExist = fs.existsSync(path.join(ROOT, 'reports', 'android', 'android-summary.md'));
 
       var reportMsg = 'Execution completed but no cucumber report was generated.';
       var reportStatus = 'Cucumber report not generated';
       var extraReports = [];
-      if (allureRepExist) extraReports.push('Allure');
       if (lifecycleExist) extraReports.push('Lifecycle summary');
       if (androidSummaryExist) extraReports.push('Android summary');
-      if (allureResExist && !allureRepExist) extraReports.push('Allure results (unprocessed)');
 
       if (extraReports.length > 0) {
         reportMsg = 'Cucumber report not generated. Other reports available: ' + extraReports.join(', ') + '.';
@@ -332,7 +319,6 @@ function collectAndroidData(execStatus, lifecycleSummary) {
         _reportMissing: true,
         _reportStatus: reportStatus,
         _execMessage: reportMsg,
-        _allureReportAvailable: allureRepExist,
         _lifecycleAvailable: lifecycleExist,
         _androidSummaryAvailable: androidSummaryExist,
       };
@@ -398,8 +384,6 @@ function collectiOSData(execStatus, lifecycleSummary) {
       var simLaunched = execStatus ? (execStatus.simulatorLaunched || false) : false;
       var actualExecStarted = execStatus ? (execStatus.actualExecutionStarted || false) : false;
       var testReportGenerated = execStatus ? (execStatus.testReportGenerated || false) : false;
-      var allureResExist = reportPaths.allureIOS || fs.existsSync(path.join(ROOT, 'reports', 'allure', 'ios', 'allure-results'));
-      var allureRepExist = reportPaths.allureReport || fs.existsSync(path.join(ROOT, 'reports', 'allure', 'ios', 'allure-report', 'index.html'));
       var lifecycleExist = reportPaths.lifecycleSummary || (lsContent && lsContent.available);
       var iosSummaryExist = fs.existsSync(path.join(ROOT, 'reports', 'ios', 'ios-summary.md'));
 
@@ -418,14 +402,6 @@ function collectiOSData(execStatus, lifecycleSummary) {
         reportStatus = 'Simulator did not launch';
       }
 
-      // Check allure as secondary source
-      if (allureRepExist) {
-        reportMsg = 'Cucumber report not generated. Allure report is available but may lack scenario details.';
-        reportStatus = 'Allure report available';
-      } else if (allureResExist && !allureRepExist) {
-        reportMsg = 'Cucumber report not generated. Allure result files found but not processed into a report.';
-        reportStatus = 'Allure results (unprocessed)';
-      }
 
       // If summary exists, note it
       if (iosSummaryExist) {
@@ -434,10 +410,8 @@ function collectiOSData(execStatus, lifecycleSummary) {
       }
 
       // If simulator launched but nothing else, that's the primary message
-      if (simLaunched && !actualExecStarted && !allureRepExist && !allureResExist && !iosSummaryExist) {
         reportMsg = 'Simulator launched, but iOS test execution did not start. Only simulator lifecycle ran.';
         reportStatus = 'Simulator only — no tests executed';
-      }
 
       return {
         available: false,
@@ -456,7 +430,6 @@ function collectiOSData(execStatus, lifecycleSummary) {
         _simulatorLaunched: simLaunched,
         _actualExecutionStarted: actualExecStarted,
         _testReportGenerated: testReportGenerated,
-        _allureReportAvailable: allureRepExist,
         _lifecycleAvailable: lifecycleExist,
         _iosSummaryAvailable: iosSummaryExist,
       };
@@ -733,8 +706,6 @@ function buildQuickLinks() {
   const jmeterPerfReport = path.join(ROOT, 'reports', 'ai', 'jmeter-performance-report.md');
   if (fs.existsSync(jmeterPerfReport)) links.push({ label: 'JMeter Performance Report', url: path.relative(OUT, jmeterPerfReport), icon: '⚡' });
 
-  const allureWebReport = path.join(ROOT, 'reports', 'allure', 'web', 'allure-report', 'index.html');
-  if (fs.existsSync(allureWebReport)) links.push({ label: 'Allure Report (Web)', url: path.relative(OUT, allureWebReport), icon: '📊' });
 
   const screenshotsDir = path.join(ROOT, 'reports', 'screenshots');
   if (fs.existsSync(screenshotsDir)) links.push({ label: 'Screenshots', url: path.relative(OUT, screenshotsDir), icon: '🖼️' });
@@ -1080,8 +1051,6 @@ function generateHTML(data) {
   const webHtml = PATHS.webHtmlReport;
   if (fs.existsSync(webHtml)) quickLinks.push({ icon: '🌐', label: 'Web Cucumber Report', path: path.relative(OUT, webHtml) });
 
-  const allureCombined = path.join(ROOT, 'reports', 'allure', 'combined', 'allure-report', 'index.html');
-  if (fs.existsSync(allureCombined)) quickLinks.push({ icon: '📊', label: 'Allure Combined Report', path: path.relative(OUT, allureCombined) });
 
   const apiHtml = PATHS.apiSummaryJson.replace('.json', '-report.html');
   if (fs.existsSync(apiHtml)) quickLinks.push({ icon: '🔌', label: 'API Test Report', path: path.relative(OUT, apiHtml) });
@@ -1178,7 +1147,6 @@ function generateHTML(data) {
     const msg = aData && aData._execMessage ? aData._execMessage : 'Execution completed but no cucumber report was generated.';
     const reportStatus = aData && aData._reportStatus ? aData._reportStatus : 'Cucumber report not generated';
     const hasLifecycle = rp.lifecycleSummary || (ls && ls.available);
-    const hasAllureReport = (aData && aData._allureReportAvailable) || rp.allureReport;
     const hasAndroidSummary = (aData && aData._androidSummaryAvailable);
     const lsPathRel = 'reports/ai/android-execution-lifecycle-summary.md';
     var clStatus = es ? (es.androidCleanupStatus || null) : null;
@@ -1194,23 +1162,15 @@ function generateHTML(data) {
     if (ei && ei.status === 'PASSED') execBadgeClass = 'badge-pass';
     else if (ei && ei.status === 'FAILED') execBadgeClass = 'badge-fail';
 
-    if (rp.allureReport || rp.allureAndroid || hasLifecycle || hasAndroidSummary) {
+    if (reportBadgeText && reportBadgeText.includes('Cucumber report not generated')) {
       reportBadgeClass = 'badge-info';
-      if (ei && ei.status === 'PASSED' && !rp.allureAndroid && !rp.allureReport && !hasLifecycle && !hasAndroidSummary) {
-        finalResult = 'INCOMPLETE - Execution completed, no reports generated';
-        finalBadgeClass = 'badge-warning';
-      } else if (ei && ei.status === 'PASSED' && rp.allureAndroid) {
-        finalResult = 'PARTIAL - Execution completed, Allure available, Cucumber report missing';
-        finalBadgeClass = 'badge-warning';
-      } else if (ei && ei.status === 'PASSED') {
-        finalResult = 'PARTIAL - Execution completed, some reports available';
-        finalBadgeClass = 'badge-warning';
-      } else {
-        finalResult = 'INCOMPLETE - Execution had issues';
-        finalBadgeClass = 'badge-warning';
-      }
+      finalResult = 'INCOMPLETE - Execution completed, no reports generated';
+      finalBadgeClass = 'badge-warning';
+    } else if (ei && ei.status === 'PASSED') {
+      finalResult = 'PARTIAL - Execution completed, some reports available';
+      finalBadgeClass = 'badge-warning';
     } else {
-      finalResult = 'INCOMPLETE - No reports generated';
+      finalResult = 'INCOMPLETE - Execution had issues';
       finalBadgeClass = 'badge-warning';
     }
 
@@ -1229,9 +1189,6 @@ function generateHTML(data) {
     // Device / emulator status
     var devName = (aData && aData.env && (aData.env.DEVICE_NAME || aData.env.deviceName)) || 'N/A';
     card += '<div class="card-row"><span class="lbl">Device / Emulator</span><span class="vl" style="color:var(--cyan)">' + escHtml(devName) + '</span></div>';
-    // Allure report status
-    if (rp.allureAndroid) card += '<div class="card-row"><span class="lbl">Allure Report Status</span><span class="vl"><span class="badge badge-pass">Allure results found</span></span></div>';
-    if (rp.allureReport) card += '<div class="card-row"><span class="lbl">Allure Report</span><span class="vl"><span class="badge badge-pass">Report found</span></span></div>';
     if (hasAndroidSummary) card += '<div class="card-row"><span class="lbl">Android Summary</span><span class="vl"><span class="badge badge-pass">Summary found</span></span></div>';
     if (hasLifecycle) {
       card += '<div class="card-row"><span class="lbl">Lifecycle Summary</span><span class="vl"><a href="' + lsPathRel + '" target="_blank" style="color:var(--blue)">View &rarr;</a></span></div>';
@@ -1280,11 +1237,8 @@ function generateHTML(data) {
       finalResult = 'INCOMPLETE - Simulator launched but testcases did not execute';
       finalBadgeClass = 'badge-warning';
       reportBadgeClass = 'badge-fail';
-    } else if (actualExecStarted && !rp.allureIOS && !rp.allureReport) {
       finalResult = 'INCOMPLETE - Tests started but no reports generated';
       finalBadgeClass = 'badge-warning';
-    } else if (rp.allureReport || rp.allureIOS) {
-      finalResult = 'PARTIAL - Allure available, Cucumber report missing';
       finalBadgeClass = 'badge-warning';
       reportBadgeClass = 'badge-info';
     } else {
@@ -1292,9 +1246,6 @@ function generateHTML(data) {
       finalBadgeClass = 'badge-warning';
     }
 
-    if (rp.allureReport || rp.allureIOS || hasLifecycle) {
-      reportBadgeClass = 'badge-info';
-    }
     if (!simLaunched) {
       reportBadgeClass = 'badge-fail';
     }
@@ -1317,8 +1268,6 @@ function generateHTML(data) {
     // Report availability
     var devName = (iData && iData.env && (iData.env.DEVICE_NAME || iData.env.deviceName)) || 'N/A';
     card += '<div class="card-row"><span class="lbl">Simulator</span><span class="vl" style="color:var(--cyan)">' + escHtml(devName) + '</span></div>';
-    if (rp.allureIOS) card += '<div class="card-row"><span class="lbl">Allure Results</span><span class="vl"><span class="badge badge-pass">Found</span></span></div>';
-    if (rp.allureReport) card += '<div class="card-row"><span class="lbl">Allure Report</span><span class="vl"><span class="badge badge-pass">Found</span></span></div>';
     if (hasLifecycle) {
       card += '<div class="card-row"><span class="lbl">Lifecycle Summary</span><span class="vl"><a href="' + lsPathRel + '" target="_blank" style="color:var(--blue)">View &rarr;</a></span></div>';
     }

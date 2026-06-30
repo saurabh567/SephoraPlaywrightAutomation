@@ -12,17 +12,30 @@ const environments = {
 const activeEnv = process.env.ENV || 'dev';
 const testPlatform = normalizePlatform(process.env.TEST_PLATFORM || TEST_PLATFORMS.WEB);
 
+// Headless mode: default TRUE (no visible browser windows).
+// Only explicit HEADLESS=false from the shell overrides this.
+// Values like '0', '', 'FALSE', 'false' are all treated as headed=false → headless=true.
+const rawHeadless = process.env.HEADLESS;
+let isHeadless = true;
+if (rawHeadless !== undefined && rawHeadless !== null) {
+  const lower = String(rawHeadless).toLowerCase().trim();
+  // Only explicit 'false' or '0' disables headless
+  if (lower === 'false' || lower === '0') {
+    isHeadless = false;
+  }
+}
+
 module.exports = {
   env: activeEnv,
   testPlatform,
   appName: process.env.APP_NAME || 'Amazon India',
   baseUrl: (environments[activeEnv] || environments.dev).baseUrl,
   browser: process.env.BROWSER || 'chromium',
-  headless: process.env.HEADLESS !== 'false',
+  headless: isHeadless,
   timeout: Number(process.env.TIMEOUT || 60000),
   reportDir: process.env.REPORT_DIR || 'reports',
   retries: Number(process.env.RETRIES || 1),
-  parallel: Number(process.env.PARALLEL || 2),
+  parallel: Number(process.env.PARALLEL || 1),
   viewport: {
     width: Number(process.env.VIEWPORT_WIDTH || 1440),
     height: Number(process.env.VIEWPORT_HEIGHT || 900)
@@ -57,3 +70,8 @@ module.exports = {
     fullReset: process.env.FULL_RESET === 'true'
   }
 };
+
+// Log headless state at startup for debugging
+if (typeof console !== 'undefined' && console.log) {
+  console.log(`[config] HEADLESS=${rawHeadless === undefined ? '(unset)' : rawHeadless} → headless=${isHeadless}, parallel=${module.exports.parallel}, browser=${module.exports.browser}`);
+}

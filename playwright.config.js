@@ -1,4 +1,7 @@
 // Playwright configuration for browser defaults, artifacts, viewport, and Playwright HTML reporting.
+// Note: API tests (cucumber.api.js) do NOT use this config.
+// API tests use Playwright APIRequestContext directly — no Browser, Context, or Page instances.
+// The Cucumber config (cucumber.api.js) drives API test execution independently.
 require('dotenv').config();
 
 module.exports = {

@@ -440,12 +440,8 @@ function generateAndroidFallbackReport() {
   }
 
   var timestamp = new Date().toISOString();
-  var allureExists = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-report', 'index.html'));
-  var allureResExists = fs.existsSync(path.join(ROOT, 'reports', 'allure', 'android', 'allure-results'));
 
   var notes = 'Detailed Cucumber report was not generated.';
-  if (allureExists) notes += ' Allure report is available at reports/allure/android/allure-report/index.html.';
-  if (allureResExists && !allureExists) notes += ' Allure results are available (unprocessed).';
 
   var summaryMd = [
     '# Android Automation Summary',
@@ -475,8 +471,6 @@ function generateAndroidFallbackReport() {
     '| Report | Status |',
     '|--------|--------|',
     '| Cucumber JSON | Missing |',
-    '| Allure Results | ' + (allureResExists ? 'Present' : 'Missing') + ' |',
-    '| Allure Report | ' + (allureExists ? 'Present' : 'Missing') + ' |',
     '',
     '## Notes',
     '',
@@ -498,8 +492,6 @@ function generateAndroidFallbackReport() {
     osVersion: osVersion,
     cleanupStatus: cleanupSt,
     cleanupMessage: cleanupMsg,
-    allureReportAvailable: allureExists,
-    allureResultsAvailable: allureResExists,
   }, null, 2), 'utf-8');
   fs.writeFileSync(path.join(ROOT, 'reports', 'html', 'android', 'index.html'), '<!DOCTYPE html><html><head><title>Android Summary</title></head><body><h1>Android Automation Summary</h1><pre>' + summaryMd.replace(/</g, '&lt;') + '</pre></body></html>', 'utf-8');
 

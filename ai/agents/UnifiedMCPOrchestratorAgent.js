@@ -303,8 +303,6 @@ var UnifiedMCPOrchestratorAgent = {
     var hasDotEnv = fs.existsSync(path.join(process.cwd(), '.env'));
     lines.push('| ' + (hasDotEnv ? '&#x2705;' : '&#x274C;') + ' Environment Config | ' + (hasDotEnv ? 'Configured' : 'Not found') + ' | .env file ' + (hasDotEnv ? 'present' : 'missing') + ' |');
 
-    var hasAllure = fs.existsSync(path.join(process.cwd(), 'allure-report')) || fs.existsSync(path.join(process.cwd(), 'allure-results'));
-    lines.push('| ' + (hasAllure ? '&#x2705;' : '&#x274C;') + ' Allure Reporting | ' + (hasAllure ? 'Configured' : 'Not found') + ' | Allure ' + (hasAllure ? 'configured' : 'not configured') + ' |');
 
     var hasAppium = fs.existsSync(path.join(process.cwd(), 'mobile'));
     lines.push('| ' + (hasAppium ? '&#x2705;' : '&#x274C;') + ' Appium Mobile | ' + (hasAppium ? 'Configured' : 'Not found') + ' | mobile/ directory ' + (hasAppium ? 'present' : 'missing') + ' |');

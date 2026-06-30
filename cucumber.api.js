@@ -1,5 +1,6 @@
 // Cucumber runtime configuration for API tests only.
 // Does NOT load hooks/hooks.js (no browser launch).
+// API tests use Playwright APIRequestContext directly — no Browser, Context, or Page instances.
 module.exports = {
   default: {
     require: [
@@ -14,7 +15,7 @@ module.exports = {
       snippetInterface: 'async-await'
     },
     retry: 0,
-    parallel: 1,
+    parallel: Number(process.env.API_PARALLEL || 4),
     timeout: 30000
   }
 };

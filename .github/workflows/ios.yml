@@ -43,7 +43,6 @@ jobs:
 
       - name: Generate reports
         if: always()
-        run: npm run allure:generate || true
 
       - name: Upload artifacts
         if: always()
@@ -52,7 +51,5 @@ jobs:
           name: ios-automation-artifacts
           path: |
             reports/**
-            allure-results/**
-            allure-report/**
             logs/**
             appium.log

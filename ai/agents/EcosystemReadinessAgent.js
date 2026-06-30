@@ -174,8 +174,6 @@ function checkInfrastructure() {
   } catch { /* ignore */ }
   checks.push({ component: 'Environment Profiles', count: envFiles.length, files: envFiles, status: envFiles.length > 1 ? 'OK' : 'WARN' });
 
-  var allureExists = dirExists(path.join(process.cwd(), 'allure-results'));
-  checks.push({ component: 'Allure Reporting', exists: allureExists, status: allureExists ? 'OK' : 'NOT CONFIGURED' });
 
   var vectorDbExists = dirExists(path.join(process.cwd(), 'ai/vector-db'));
   checks.push({ component: 'Vector DB (RAG)', exists: vectorDbExists, status: vectorDbExists ? 'OK' : 'NOT CONFIGURED' });

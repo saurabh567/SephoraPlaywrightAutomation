@@ -44,7 +44,6 @@ Playwright OR Appium
   ↓
 Execution
   ↓
-Cucumber + Allure Reports
 ```
 
 ## Platform Selection

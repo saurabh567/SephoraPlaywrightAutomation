@@ -27,10 +27,6 @@ const args = [
   '--glob',
   '!.git/**',
   '--glob',
-  '!allure-report/**',
-  '--glob',
-  '!allure-results/**',
-  '--glob',
   '!utils/validateMigrationReferences.js'
 ];
 

@@ -52,7 +52,6 @@ function collectFailureText() {
   const possiblePaths = [
     'reports',
     'logs',
-    'allure-results'
   ];
 
   let text = '';

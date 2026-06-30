@@ -22,7 +22,6 @@
       "agents": ["Locator Healing Agent", "Page Object Generation Agent", "Self-Healing Automation Agent"]
     },
     "documentation": {
-      "purpose": "Retrieve official Playwright, Cucumber, Jenkins, Allure, and OpenAI-compatible API documentation.",
       "agents": ["API Test Generation Agent", "Playwright Code Review Agent", "Test Case Generation Agent"]
     }
   }

@@ -6,7 +6,7 @@
  * 
  * Sources:
  *   - Playwright / Cucumber (reports/web/cucumber-report.json)
- *   - Allure (allure-results/*.json)
+ *   - Playwright / Cucumber (reports/web/cucumber-report.json)
  *   - Appium / Mobile (reports/android/, reports/ios/)
  *   - API Tests (reports/api/api-summary.json)
  *   - JMeter (reports/jmeter/)
@@ -24,7 +24,6 @@ const DASHBOARD_DIR = path.join(ROOT, 'reports', 'dashboard');
 const WEB_REPORT_DIR = path.join(ROOT, 'reports', 'web');
 const ANDROID_REPORT_DIR = path.join(ROOT, 'reports', 'android');
 const IOS_REPORT_DIR = path.join(ROOT, 'reports', 'ios');
-const ALLURE_RESULTS_DIR = path.join(ROOT, 'allure-results');
 const AI_OUTPUT_DIR = path.join(ROOT, 'ai', 'output');
 const JMETER_DIR = path.join(ROOT, 'reports', 'jmeter');
 const TEST_DATA_DIR = path.join(ROOT, 'test-data');
@@ -168,30 +167,6 @@ function collectCucumberReport() {
     },
     scenarioDetails,
     timeline,
-  };
-}
-
-function collectAllureResults() {
-  if (!fs.existsSync(ALLURE_RESULTS_DIR)) return null;
-  const files = fs.readdirSync(ALLURE_RESULTS_DIR).filter(f => f.endsWith('-result.json'));
-  const results = [];
-  files.forEach(f => {
-    const data = safeReadJSON(path.join(ALLURE_RESULTS_DIR, f));
-    if (data) results.push(data);
-  });
-  return {
-    total: results.length,
-    passed: results.filter(r => r.status === 'passed').length,
-    failed: results.filter(r => r.status === 'failed' || r.status === 'broken').length,
-    skipped: results.filter(r => r.status === 'skipped').length,
-    details: results.slice(0, 50).map(r => ({
-      name: r.name || '',
-      status: r.status || '',
-      fullName: r.fullName || '',
-      start: r.start || 0,
-      stop: r.stop || 0,
-      duration: r.start && r.stop ? r.stop - r.start : 0,
-    })),
   };
 }
 
@@ -549,7 +524,7 @@ function formatDuration(ms) {
 function generateDashboardData() {
   const gitInfo = collectGitInfo();
   const cucumberData = collectCucumberReport();
-  const allureData = collectAllureResults();
+
   const envInfo = collectEnvironmentInfo();
   const jmeterData = collectJMeterData();
   const aiReports = collectAIReports();
