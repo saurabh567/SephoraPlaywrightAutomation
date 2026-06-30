@@ -1,0 +1,24 @@
+{
+  "searchTerm": "laptop",
+  "productName": "Laptop",
+  "brand": "Amazon",
+  "pincode": "560001",
+  "validUser": {
+    "email": "testuser@example.com",
+    "password": "Password@123"
+  },
+  "invalidUser": {
+    "email": "invalid@example.com",
+    "password": "wrongpassword"
+  },
+  "filterOptions": {
+    "category": "Electronics",
+    "brand": "HP",
+    "priceRange": "₹20000 - ₹50000"
+  },
+  "urls": {
+    "home": "/",
+    "cart": "/gp/cart/view.html",
+    "checkout": "/gp/buy/spc/handlers/display"
+  }
+}

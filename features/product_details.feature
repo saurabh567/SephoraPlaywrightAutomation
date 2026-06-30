@@ -2,23 +2,17 @@
 Feature: Amazon India Product Details Page
 
   Background:
-    Given I open the first Amazon product from search results
+    Given I search for "laptop" in the search box
 
   @smoke
-  Scenario: 011 Verify product details page
-    Then the Amazon product details page should be visible
+  Scenario: Verify product details are displayed
+    When I open the first product from search results
+    Then the product details page should be visible
+    And the product title should be displayed
+    And the product price should be displayed if available
 
   @smoke
-  Scenario: 012 Verify product title is visible
-    Then the Amazon product title should be visible
-
-  Scenario: 013 Verify product price or offer information is visible
-    Then the Amazon product price should be visible if available
-
-  Scenario: 014 Verify product rating is visible if available
-    Then the Amazon product rating should be visible if available
-
-  @smoke
-  Scenario: 015 Add product to cart if possible
-    When I add the Amazon product to cart if possible
-    Then the Amazon add to cart flow should complete
+  Scenario: Add product to cart from details page
+    When I open the first product from search results
+    And I add the product to the cart
+    Then the product should be added to the cart successfully

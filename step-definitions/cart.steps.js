@@ -1,43 +1,40 @@
-// Amazon cart page-specific Cucumber steps.
-const { Then } = require('@cucumber/cucumber');
+// Step definitions unique to the Amazon India Cart Page features.
+const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
+const AmazonHomePage = require('../pages/AmazonHomePage');
+const AmazonSearchResultsPage = require('../pages/AmazonSearchResultsPage');
+const AmazonProductDetailsPage = require('../pages/AmazonProductDetailsPage');
 const AmazonCartPage = require('../pages/AmazonCartPage');
-const getAmazonMobilePage = require('../mobile/AmazonMobilePageFactory');
+const testData = require('../test-data/testData.json');
 
-Then('the Amazon cart page should be visible', async function () {
-  const mobilePage = getAmazonMobilePage(this);
-  if (mobilePage) {
-    await mobilePage.verifyCartPageVisible();
-    return;
+Given('a product is added to the cart', async function () {
+  const homePage = new AmazonHomePage(this.page);
+  await homePage.searchProduct(testData.searchTerm);
+
+  const searchResultsPage = new AmazonSearchResultsPage(this.page);
+  const productPage = await searchResultsPage.openFirstProduct();
+  if (productPage !== this.page) {
+    this.page = productPage;
   }
 
-  const cartPage = new AmazonCartPage(this.page);
-  await cartPage.verifyCartPageVisible();
+  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+  this.addedToCart = await productDetailsPage.addToCartIfAvailable();
+  if (!this.addedToCart) {
+    throw new Error('Could not add product to cart for the background step.');
+  }
 });
 
-Then('the Amazon cart title or empty cart message should be visible', async function () {
-  const mobilePage = getAmazonMobilePage(this);
-  if (mobilePage) {
-    await mobilePage.verifyCartTitleOrEmptyMessage();
-    return;
-  }
-
+When('I remove the product from the cart', async function () {
   const cartPage = new AmazonCartPage(this.page);
-  await expect(cartPage.cartTitle.or(cartPage.emptyCartMessage).first()).toBeVisible({ timeout: 60000 });
+  const deleteButton = this.page.locator(
+    'input[value="Delete"], span[data-action="delete"] a, .sc-action-delete input'
+  ).first();
+  await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
+  await deleteButton.click();
+  await this.page.waitForTimeout(3000);
 });
 
-Then('the Amazon proceed to buy button should be visible if cart has items', async function () {
-  const mobilePage = getAmazonMobilePage(this);
-  if (mobilePage) {
-    await mobilePage.verifyProceedToBuyButtonIfCartHasItems();
-    return;
-  }
-
+Then('the cart should show the empty cart message', async function () {
   const cartPage = new AmazonCartPage(this.page);
-  const hasItems = await cartPage.cartItems.first().isVisible({ timeout: 5000 }).catch(() => false);
-  if (hasItems) {
-    await cartPage.verifyVisible(cartPage.proceedToBuyButton);
-  } else {
-    await cartPage.verifyVisible(cartPage.emptyCartMessage);
-  }
+  await cartPage.verifyVisible(cartPage.emptyCartMessage);
 });

@@ -2,15 +2,18 @@
 Feature: Amazon India Cart Page
 
   Background:
-    Given I am on the Amazon cart page
+    Given I am on the Amazon home page
 
   @smoke
-  Scenario: 016 Verify cart page
-    Then the Amazon cart page should be visible
+  Scenario: Add a product to cart
+    When I search for "laptop" in the search box
+    And I open the first product from search results
+    And I add the product to the cart
+    Then the product should be added to the cart successfully
 
-  @smoke
-  Scenario: 017 Verify cart title or empty cart message
-    Then the Amazon cart title or empty cart message should be visible
-
-  Scenario: 018 Verify proceed to buy button if cart has items
-    Then the Amazon proceed to buy button should be visible if cart has items
+  @regression
+  Scenario: Remove a product from cart
+    Given a product is added to the cart
+    When I navigate to the cart page
+    And I remove the product from the cart
+    Then the cart should show the empty cart message
