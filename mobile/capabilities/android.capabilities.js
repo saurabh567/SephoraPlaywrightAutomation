@@ -31,7 +31,13 @@ const FALLBACK_ACTIVITY = 'com.amazon.mShop.home.HomeActivity';
 
 /**
  * Automatically detect the launcher activity for a given Android app package.
- * Uses ADB shell cmd package resolve-activity.
+ * Uses ADB: `adb shell cmd package resolve-activity --brief <appPackage>`
+ *
+ * The ADB output format is:
+ *   priority=0 ... isDefault=false
+ *   com.example.package/com.example.package.MainActivity
+ *
+ * We extract the activity name from the second line after the '/'.
  *
  * @param {string} appPackage - Android app package name
  * @returns {string|null} Fully qualified activity name, or null if detection fails
@@ -45,18 +51,28 @@ function detectLauncherActivity(appPackage) {
       { encoding: 'utf8', timeout: 10000 }
     ).trim();
 
-    if (out && !out.includes('error') && !out.includes('Error') && out.length > 0) {
-      // The output is typically just the activity name, e.g.:
-      //   com.amazon.mShop.home.HomeActivity
-      // Strip any noise (newlines, control chars)
-      const activity = out.split('\n')[0].trim();
-      if (activity && activity.includes('.')) {
-        console.log(`[android.capabilities] Auto-detected launcher activity: ${activity}`);
-        return activity;
+    if (!out || out.length === 0) return null;
+
+    // Split into lines and find the last non-empty line containing '/'
+    const lines = out.split('\n').filter(l => l.trim().length > 0);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      // Look for "package/activity" pattern
+      const slashIdx = line.indexOf('/');
+      if (slashIdx > 0) {
+        const activity = line.substring(slashIdx + 1).trim();
+        if (activity && activity.length > 0) {
+          // If activity starts with '.', prepend the package name
+          const fullActivity = activity.startsWith('.')
+            ? appPackage + activity
+            : activity;
+          console.log(`[android.capabilities] Auto-detected launcher activity: ${fullActivity}`);
+          return fullActivity;
+        }
       }
     }
   } catch (err) {
-    // ADB not available or no device connected
+    // ADB not available or no device connected — non-fatal
     console.warn(`[android.capabilities] ADB detection failed (non-fatal): ${err.message}`);
   }
 
