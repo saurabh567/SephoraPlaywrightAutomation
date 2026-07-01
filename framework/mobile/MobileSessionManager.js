@@ -10,8 +10,9 @@
  * Lifecycle per scenario:
  *   1. Create brand-new Appium driver session with noReset=false
  *   2. Clear app data via ADB (Android) or Appium commands (iOS)
- *   3. Execute test steps
- *   4. Dispose driver session (always, even on failure)
+ *   3. Handle first-launch onboarding (language selection, sign-in skip)
+ *   4. Execute test steps
+ *   5. Dispose driver session (always, even on failure)
  *
  * Thread-safe — no shared mutable state across workers.
  */
@@ -19,6 +20,7 @@
 const logger = require('../../utils/logger');
 const MobileDriverFactory = require('./MobileDriverFactory');
 const { TEST_PLATFORMS } = require('../common/platforms');
+const { handleFirstLaunchIfNeeded } = require('./AmazonFirstLaunchHandler');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -66,6 +68,10 @@ class MobileSessionManager {
   /**
    * Create a brand-new mobile driver session with full isolation guarantees.
    *
+   * After session creation and state clearing, automatically handles the
+   * Amazon app first-launch onboarding flow (language selection, continue,
+   * sign-in skip) so that test scenarios start on the home screen.
+   *
    * @param {object} config - Environment configuration object
    * @param {number} [retries=2] - Number of retries for transient failures
    * @param {number} [delayMs=15000] - Delay between retries in ms
@@ -87,6 +93,13 @@ class MobileSessionManager {
         await MobileSessionManager.clearAppState(driver, platform).catch(err => {
           logger.warn(`[MobileSessionManager] Initial state clear failed (non-fatal): ${err.message}`);
         });
+
+        // Handle first-launch onboarding (Android only — language selection + sign-in skip)
+        if (platform && String(platform).toUpperCase() === TEST_PLATFORMS.ANDROID) {
+          await handleFirstLaunchIfNeeded(driver).catch(err => {
+            logger.warn(`[MobileSessionManager] First-launch onboarding handler failed (non-fatal): ${err.message}`);
+          });
+        }
 
         return driver;
       } catch (err) {
