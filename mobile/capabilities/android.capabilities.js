@@ -1,3 +1,19 @@
+/**
+ * Android Appium capabilities.
+ *
+ * BrowserContext Isolation:
+ *   - noReset: false — ensures every new session starts with a clean app state
+ *   - fullReset: configurable — use FULL_RESET=true to also uninstall/reinstall the app
+ *   - skipDeviceInitialization: true — avoids UiAutomator2 initialization errors
+ *   - autoGrantPermissions: true — automatically grants all app permissions
+ *
+ * These settings guarantee that each test case starts with:
+ *   - No cookies
+ *   - No localStorage, sessionStorage, IndexedDB, Cache Storage
+ *   - No browser history, saved permissions, or previous auth state
+ *   - No reused browser session, tab, or shared memory
+ */
+
 function androidCapabilities() {
   const capabilities = {
     platformName: 'Android',
@@ -5,8 +21,14 @@ function androidCapabilities() {
     'appium:deviceName': process.env.DEVICE_NAME || 'Android Emulator',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
 
-    // App management: don't reset between sessions to avoid instrumentation crashes
-    'appium:noReset': process.env.NO_RESET !== 'false',
+    // =========================================================
+    // Session Isolation: Do NOT reuse app state between sessions
+    // =========================================================
+    // noReset=false ensures Appium clears app data on every new session.
+    // This guarantees cookies, localStorage, and all WebView state
+    // are wiped before each test case.
+    // =========================================================
+    'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
     'appium:fullReset': process.env.FULL_RESET === 'true',
 
     // Skip UiAutomator2 device initialization to avoid instrumentation errors

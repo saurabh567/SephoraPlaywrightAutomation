@@ -1,6 +1,9 @@
 // APIAgent - Generates API test scenarios and validates API endpoints with Playwright request context
+// SECURITY: All generated step definitions use request.newContext() — NEVER this.page.request.
+// API tests MUST NEVER create or interact with any browser (Chromium, Firefox, WebKit).
 const fs = require('fs-extra');
 const path = require('path');
+const { request } = require('@playwright/test');
 
 module.exports = {
   run: async function run(input = {}) {
@@ -82,13 +85,16 @@ module.exports = {
     fs.writeFileSync(outPath, lines.join('\n'), 'utf8');
 
     // Generate step definitions for API tests
+    // IMPORTANT: Uses request.newContext() — NEVER this.page.request.
+    // API tests must NEVER depend on a browser Page instance.
     const stepDefPath = path.join(process.cwd(), 'step-definitions', 'api-steps.js');
     const stepLines = [];
 
     stepLines.push("const { Given, When, Then } = require('@cucumber/cucumber');");
-    stepLines.push("const { expect } = require('@playwright/test');");
-    stepLines.push("const { APIRequestContext } = require('@playwright/test');");
+    stepLines.push("const { expect, request } = require('@playwright/test');");
     stepLines.push('');
+    stepLines.push('// API test context — NO browser, NO Page, NO BrowserContext');
+    stepLines.push('// Uses Playwright APIRequestContext exclusively.');
     stepLines.push('let apiContext;');
     stepLines.push('let response;');
     stepLines.push('let responseBody;');
@@ -98,7 +104,8 @@ module.exports = {
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("Given('I set default request headers', async function () {");
-    stepLines.push('  await this.page.request.newContext({');
+    stepLines.push('  // Create standalone APIRequestContext — no browser required');
+    stepLines.push('  apiContext = await request.newContext({');
     stepLines.push('    baseURL: this.apiBaseUrl,');
     stepLines.push('    extraHTTPHeaders: {');
     stepLines.push("      'Content-Type': 'application/json',");
@@ -108,12 +115,13 @@ module.exports = {
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("When('I send a {word} request to {string}', async function (method, path) {");
-    stepLines.push('  response = await this.page.request.fetch(path, { method: method });');
+    stepLines.push('  // Using apiContext.fetch() — no browser page involved');
+    stepLines.push('  response = await apiContext.fetch(path, { method: method });');
     stepLines.push('  responseBody = await response.json();');
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("When('I send a {word} request to {string} without auth', async function (method, path) {");
-    stepLines.push('  response = await this.page.request.fetch(path, {');
+    stepLines.push('  response = await apiContext.fetch(path, {');
     stepLines.push('    method: method,');
     stepLines.push('    headers: { "Content-Type": "application/json" }');
     stepLines.push('  });');
@@ -121,7 +129,7 @@ module.exports = {
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("When('I send a {word} request to {string} with invalid payload', async function (method, path) {");
-    stepLines.push('  response = await this.page.request.fetch(path, {');
+    stepLines.push('  response = await apiContext.fetch(path, {');
     stepLines.push('    method: method,');
     stepLines.push('    data: { invalid: true, test: "" }');
     stepLines.push('  });');
@@ -137,19 +145,20 @@ module.exports = {
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("When('I send a request with malformed headers', async function () {");
-    stepLines.push('  response = await this.page.request.fetch(this.apiBaseUrl, {');
+    stepLines.push('  response = await apiContext.fetch(this.apiBaseUrl, {');
     stepLines.push('    headers: { "": "" }');
     stepLines.push('  });');
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("When('I send an OPTIONS request to {string}', async function (path) {");
-    stepLines.push('  response = await this.page.request.fetch(path, { method: "OPTIONS" });');
+    stepLines.push('  response = await apiContext.fetch(path, { method: "OPTIONS" });');
     stepLines.push('});');
     stepLines.push('');
     stepLines.push("Then('the response should have CORS headers', async function () {");
     stepLines.push('  const headers = response.headers();');
     stepLines.push("  expect(headers['access-control-allow-origin']).toBeDefined();");
     stepLines.push('});');
+    stepLines.push('');
 
     if (!fs.existsSync(stepDefPath)) {
       fs.writeFileSync(stepDefPath, stepLines.join('\n'), 'utf8');

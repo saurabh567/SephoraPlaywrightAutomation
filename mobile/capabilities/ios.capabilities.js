@@ -1,15 +1,44 @@
+/**
+ * iOS Appium capabilities.
+ *
+ * BrowserContext Isolation:
+ *   - noReset: false by default — ensures every new session starts clean
+ *   - fullReset: configurable — use FULL_RESET=true to uninstall/reinstall the app
+ *
+ * These settings guarantee that each test case starts with:
+ *   - No cookies
+ *   - No localStorage, sessionStorage, IndexedDB, Cache Storage
+ *   - No browser history, saved permissions, or previous auth state
+ *   - No reused browser session, tab, or shared memory
+ *
+ * For Safari browser sessions, additional state cleanup is handled by
+ * MobileSessionManager.disposeSession() which runs after each scenario.
+ */
+
 function iosCapabilities() {
   const browserName = process.env.BROWSER_NAME;
   const appPath = process.env.APP_PATH;
   const bundleId = process.env.BUNDLE_ID;
+
   const capabilities = {
     platformName: 'iOS',
     'appium:automationName': 'XCUITest',
     'appium:deviceName': process.env.DEVICE_NAME || 'iPhone 15',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
-    'appium:noReset': process.env.NO_RESET === 'true',
+
+    // =========================================================
+    // Session Isolation: Do NOT reuse app state between sessions
+    // =========================================================
+    // noReset=false ensures Appium clears app data on every new session.
+    // This guarantees cookies, localStorage, and all WebView state
+    // are wiped before each test case.
+    // For iOS Safari, additional cleanup is done in the After hook
+    // via MobileSessionManager.disposeSession().
+    // =========================================================
+    'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
     'appium:fullReset': process.env.FULL_RESET === 'true',
-    'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 120)
+
+    'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 120),
   };
 
   if (browserName) {

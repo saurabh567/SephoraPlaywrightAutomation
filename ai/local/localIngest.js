@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const LocalVectorStore = require('./localVectorStore');
+const OllamaClient = require('./ollamaClient');
 
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text';
 
 const foldersToIngest = [
@@ -52,23 +52,12 @@ function chunkText(text, size = 3000) {
 }
 
 async function createEmbedding(text) {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/embed`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: text
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Embedding request failed: ${response.status}`);
+  const client = new OllamaClient();
+  const embeddings = await client.requestEmbeddings(EMBEDDING_MODEL, text);
+  if (!Array.isArray(embeddings) || embeddings.length === 0) {
+    throw new Error('Embedding creation returned empty result');
   }
-
-  const data = await response.json();
-  return data.embeddings[0];
+  return embeddings[0];
 }
 
 async function main() {

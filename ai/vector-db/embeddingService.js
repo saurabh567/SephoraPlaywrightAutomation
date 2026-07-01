@@ -38,16 +38,10 @@ class EmbeddingService {
     const normalized = inputs.map((input) => String(input || '').trim());
     if (normalized.some((input) => !input)) throw new Error('Cannot embed empty text.');
 
-    const payload = await this.ollama.request('/api/embed', {
-      method: 'POST',
-      body: JSON.stringify({
-        model: this.model,
-        input: normalized,
-        truncate: true
-      })
-    });
-    const embeddings = payload.embeddings || [];
-    if (embeddings.length !== normalized.length) {
+    // Use the OllamaClient's requestEmbeddings which handles endpoint fallback
+    const embeddings = await this.ollama.requestEmbeddings(this.model, normalized, { truncate: true });
+
+    if (!Array.isArray(embeddings) || embeddings.length !== normalized.length) {
       throw new Error(`Ollama returned ${embeddings.length} vectors for ${normalized.length} inputs.`);
     }
     embeddings.forEach((embedding, index) => this.validateEmbedding(embedding, index));

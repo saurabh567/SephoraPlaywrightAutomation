@@ -51,6 +51,74 @@ class OllamaClient {
     }
   }
 
+  /**
+   * Create embeddings with automatic endpoint fallback.
+   * Ollama v0.1.x-0.2.x uses /api/embeddings (with 's').
+   * Ollama v0.3.x+ uses /api/embed (without 's').
+   * This method tries /api/embed first, then falls back to /api/embeddings.
+   */
+  async requestEmbeddings(model, input, options = {}) {
+    const payload = {
+      model,
+      input,
+      ...(options.truncate !== undefined ? { truncate: options.truncate } : { truncate: true }),
+    };
+
+    // Try /api/embed first (Ollama 0.3.x+), fall back to /api/embeddings (Ollama 0.1.x-0.2.x)
+    const endpoints = ['/api/embed', '/api/embeddings'];
+    let lastError;
+
+    for (const ep of endpoints) {
+      try {
+        const result = await this.request(ep, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        // Handle different response shapes
+        // /api/embed returns { model, embeddings: [[...], ...] }
+        // /api/embeddings returns { embeddings: [{ embedding: [...] }, ...] }
+        if (result.embeddings) {
+          if (Array.isArray(result.embeddings)) {
+            if (result.embeddings.length > 0 && Array.isArray(result.embeddings[0])) {
+              // /api/embed format: { embeddings: [[...], ...] }
+              return result.embeddings;
+            } else if (result.embeddings.length > 0 && result.embeddings[0].embedding) {
+              // /api/embeddings format: { embeddings: [{ embedding: [...] }, ...] }
+              return result.embeddings.map((e) => e.embedding);
+            }
+          }
+          // Single embedding
+          if (Array.isArray(result.embeddings)) {
+            return [result.embeddings];
+          }
+        }
+
+        // If we got here with a 200 but unexpected shape, return as-is
+        if (Array.isArray(result)) {
+          return result;
+        }
+
+        // Shape unknown - try to extract any array of numbers
+        if (result.embedding && Array.isArray(result.embedding)) {
+          return [result.embedding];
+        }
+
+        throw new Error(`Unexpected embedding response shape from ${ep}`);
+      } catch (err) {
+        lastError = err;
+        // If endpoint not found (404) or method not allowed (405), try next
+        if (err.message && (err.message.includes('404') || err.message.includes('405'))) {
+          continue;
+        }
+        // For connection/other errors, try next endpoint
+        continue;
+      }
+    }
+
+    throw lastError || new Error(`All embedding endpoints failed for model ${model}`);
+  }
+
   // healthCheck will try multiple endpoints for compatibility across Ollama versions
   async healthCheck() {
     const endpoints = ['/api/tags', '/api/models', '/api/list', '/'];

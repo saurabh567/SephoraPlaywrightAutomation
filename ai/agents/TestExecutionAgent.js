@@ -88,7 +88,8 @@ class TestExecutionAgent {
       console.error('[TestExecutionAgent] Ingest failed:', err.message);
     }
 
-    // 5b) Canonicalize Cucumber JSON to reports/json/cucumber-report.json so post-exec RAG can find it
+    // 5b) Canonicalize Cucumber JSON to reports/json/cucumber-report.json so post-exec RAG can find it.
+    //     Searches both flat (reports/*/cucumber-report.json) and nested (reports/*/json/cucumber-report.json) structures.
     try {
       const reportsRoot = path.join(process.cwd(), 'reports');
       function findCucumberReport(dir) {
@@ -99,8 +100,13 @@ class TestExecutionAgent {
           let stat;
           try { stat = fs.statSync(full); } catch (ex) { continue; }
           if (stat.isDirectory()) {
-            const candidate = path.join(full, 'json', 'cucumber-report.json');
-            if (fs.existsSync(candidate)) return candidate;
+            // Check flat structure: reports/{platform}/cucumber-report.json
+            const flatCandidate = path.join(full, 'cucumber-report.json');
+            if (fs.existsSync(flatCandidate)) return flatCandidate;
+            // Check nested structure: reports/{platform}/json/cucumber-report.json
+            const nestedCandidate = path.join(full, 'json', 'cucumber-report.json');
+            if (fs.existsSync(nestedCandidate)) return nestedCandidate;
+            // Recurse into subdirectory
             const deeper = findCucumberReport(full);
             if (deeper) return deeper;
           }
@@ -138,7 +144,17 @@ class TestExecutionAgent {
           console.warn('[TestExecutionAgent] Found cucumber JSON but it appears incomplete or invalid after waiting; skipping copy to', dest);
         }
       } else {
-        console.warn('[TestExecutionAgent] No cucumber-report.json found under reports/**/json; post-exec RAG may fail');
+        // Also search the top-level reports directory directly
+        const topLevelFlat = path.join(reportsRoot, 'cucumber-report.json');
+        if (fs.existsSync(topLevelFlat)) {
+          const targetDir = path.join(process.cwd(), 'reports', 'json');
+          fs.ensureDirSync(targetDir);
+          const dest = path.join(targetDir, 'cucumber-report.json');
+          fs.copyFileSync(topLevelFlat, dest);
+          console.log('[TestExecutionAgent] Copied top-level cucumber JSON to', dest);
+        } else {
+          console.warn('[TestExecutionAgent] No cucumber-report.json found anywhere under reports/; post-exec RAG may fail');
+        }
       }
     } catch (e) {
       console.warn('[TestExecutionAgent] Error while canonicalizing cucumber JSON:', e.message);

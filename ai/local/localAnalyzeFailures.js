@@ -1,33 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const LocalVectorStore = require('./localVectorStore');
+const OllamaClient = require('./ollamaClient');
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const LLM_MODEL = process.env.OLLAMA_LLM_MODEL || 'llama3.2:3b';
 const EMBEDDING_MODEL = process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text';
 
 async function createEmbedding(text) {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/embed`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: text
-    })
-  });
-
-  const data = await response.json();
-  return data.embeddings[0];
+  const client = new OllamaClient({ baseUrl: OLLAMA_BASE_URL });
+  const embeddings = await client.requestEmbeddings(EMBEDDING_MODEL, text);
+  if (!Array.isArray(embeddings) || embeddings.length === 0) {
+    throw new Error('Embedding creation returned empty result');
+  }
+  return embeddings[0];
 }
 
 async function askLlm(prompt) {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+  const client = new OllamaClient({ baseUrl: OLLAMA_BASE_URL });
+  const response = await client.request('/api/chat', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({
       model: LLM_MODEL,
       stream: false,
@@ -44,8 +36,7 @@ async function askLlm(prompt) {
     })
   });
 
-  const data = await response.json();
-  return data.message.content;
+  return response.message.content;
 }
 
 function collectFailureText() {
