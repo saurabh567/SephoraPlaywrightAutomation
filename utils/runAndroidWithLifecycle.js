@@ -851,6 +851,8 @@ async function phaseRunRealTests() {
         // This overrides any value that might be loaded from .env.android
         // by dotenv, ensuring the dynamically discovered activity is used.
         APP_ACTIVITY: process.env.APP_ACTIVITY,
+        // App is already running via monkey — tell Appium to connect without launching
+        APPIUM_AUTO_LAUNCH: "false",
       },
     });
 
