@@ -1,6 +1,12 @@
 /**
  * MobileAmazonHomePage — Appium/WebDriverIO page object for Amazon India.
- * Extends MobileBasePage and uses native mobile selectors.
+ * Extends MobileBasePage and uses platform-aware locators.
+ *
+ * Locator strategy: uses `~` (accessibility id) for Android, automatically
+ * resolved to `name:` strategy for iOS via MobileBasePage.resolveLocator().
+ *
+ * Note: For iOS Safari (WebView), AmazonIOSSafariPage is used instead —
+ * see AmazonHomePage constructor dispatch.
  */
 const MobileBasePage = require('../framework/mobile/MobileBasePage');
 
@@ -8,23 +14,30 @@ class MobileAmazonHomePage extends MobileBasePage {
   constructor(driver) {
     super(driver);
 
-    // Native / hybrid Appium selectors
-    this.logo = driver.$('~nav-logo');
-    this.continueShoppingButton = driver.$('~continue-shopping-button');
-    this.searchBox = driver.$('~search-box');
-    this.searchButton = driver.$('~search-button');
-    this.accountLink = driver.$('~nav-account-list');
-    this.cartLink = driver.$('~nav-cart');
-    this.cartBadge = driver.$('~nav-cart-badge');
+    // Use this.createLocator() for platform-aware locator resolution.
+    // On Android: '~nav-logo' stays as-is (accessibility id).
+    // On iOS: '~nav-logo' → 'name:nav-logo' (name strategy).
+    this.logo = driver.$(this.createLocator('~nav-logo'));
+    this.continueShoppingButton = driver.$(this.createLocator('~continue-shopping-button'));
+    this.searchBox = driver.$(this.createLocator('~search-box'));
+    this.searchButton = driver.$(this.createLocator('~search-button'));
+    this.accountLink = driver.$(this.createLocator('~nav-account-list'));
+    this.cartLink = driver.$(this.createLocator('~nav-cart'));
+    this.cartBadge = driver.$(this.createLocator('~nav-cart-badge'));
   }
 
   async openHomePage() {
-    // For hybrid apps, navigate to the home URL if web context is available.
-    // For native apps, the app should already be on the home page.
-    try {
+    // Navigate to the Amazon home page.
+    // For hybrid/web apps, the url() command navigates the browser directly.
+    // For native apps, url() may not be supported — in that case, the app
+    // should already be on the home page after session creation.
+    const canNavigate = await this.driver.getUrl().then(url => {
+      // Native app's getUrl() may throw or return a non-http URL
+      return !url || url.startsWith('http');
+    }).catch(() => false);
+
+    if (canNavigate) {
       await this.driver.url('https://www.amazon.in');
-    } catch (e) {
-      // Native app — may not support url() navigation
     }
     await this.driver.pause(2000);
   }
@@ -36,7 +49,7 @@ class MobileAmazonHomePage extends MobileBasePage {
   async continueShoppingIfPrompted() {
     // Mobile-specific: dismiss any interstitial or continue-shopping prompt
     try {
-      const btn = this.driver.$('~continue-shopping-button');
+      const btn = this.driver.$(this.createLocator('~continue-shopping-button'));
       if (await btn.isDisplayed()) {
         await btn.click();
         await this.driver.pause(2000);
@@ -48,7 +61,7 @@ class MobileAmazonHomePage extends MobileBasePage {
 
   async searchProduct(productName) {
     try {
-      const search = this.driver.$('~search-box');
+      const search = this.driver.$(this.createLocator('~search-box'));
       await search.waitForDisplayed({ timeout: 10000 });
       await search.click();
       await search.setValue(productName);
@@ -57,7 +70,7 @@ class MobileAmazonHomePage extends MobileBasePage {
     } catch (e) {
       // Fallback: use search button
       try {
-        const btn = this.driver.$('~search-button');
+        const btn = this.driver.$(this.createLocator('~search-button'));
         await btn.click();
       } catch (e2) {
         // Ignore — search may already have triggered
@@ -67,7 +80,7 @@ class MobileAmazonHomePage extends MobileBasePage {
 
   async openCart() {
     try {
-      const cart = this.driver.$('~nav-cart');
+      const cart = this.driver.$(this.createLocator('~nav-cart'));
       await cart.waitForDisplayed({ timeout: 5000 });
       await cart.click();
     } catch (e) {
@@ -81,7 +94,7 @@ class MobileAmazonHomePage extends MobileBasePage {
   }
 
   async verifyVisible(locator) {
-    const element = typeof locator === 'string' ? this.driver.$(locator) : locator;
+    const element = typeof locator === 'string' ? this.driver.$(this.resolveLocator(locator)) : locator;
     if (!(await element.isDisplayed())) {
       throw new Error(`Element not visible: ${locator}`);
     }

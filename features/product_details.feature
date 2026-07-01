@@ -1,4 +1,4 @@
-@productDetails @regression
+@productDetails @regression @ios @android @web
 Feature: Amazon India Product Details Page
 
   Background:

@@ -1,16 +1,17 @@
 /**
  * MobileAmazonCartPage — Appium/WebDriverIO page object for Amazon cart.
+ * Uses platform-aware locators via MobileBasePage.
  */
 const MobileBasePage = require('../framework/mobile/MobileBasePage');
 
 class MobileAmazonCartPage extends MobileBasePage {
   constructor(driver) {
     super(driver);
-    this.cartTitle = this.driver.$('~cart-title');
-    this.continueShoppingButton = this.driver.$('~continue-shopping-button');
-    this.emptyCartMessage = this.driver.$('~empty-cart-message');
+    this.cartTitle = this.driver.$(this.createLocator('~cart-title'));
+    this.continueShoppingButton = this.driver.$(this.createLocator('~continue-shopping-button'));
+    this.emptyCartMessage = this.driver.$(this.createLocator('~empty-cart-message'));
     this.cartItems = [];
-    this.proceedToBuyButton = this.driver.$('~proceed-to-checkout-button');
+    this.proceedToBuyButton = this.driver.$(this.createLocator('~proceed-to-checkout-button'));
   }
 
   async openCartPage() {
@@ -35,7 +36,7 @@ class MobileAmazonCartPage extends MobileBasePage {
 
   async continueShoppingIfPrompted() {
     try {
-      const btn = this.driver.$('~continue-shopping-button');
+      const btn = this.driver.$(this.createLocator('~continue-shopping-button'));
       if (await btn.isDisplayed()) {
         await btn.click();
         await this.driver.pause(2000);
@@ -57,7 +58,7 @@ class MobileAmazonCartPage extends MobileBasePage {
   }
 
   async verifyVisible(locator) {
-    const element = typeof locator === 'string' ? this.driver.$(locator) : locator;
+    const element = typeof locator === 'string' ? this.driver.$(this.resolveLocator(locator)) : locator;
     if (!(await element.isDisplayed())) {
       throw new Error(`Element not visible: ${locator}`);
     }

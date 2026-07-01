@@ -1,13 +1,55 @@
 const ConfigReader = require('../common/ConfigReader');
+const { TEST_PLATFORMS } = require('../common/platforms');
 
 class MobileBasePage {
   constructor(driver) {
     this.driver = driver;
     this.timeout = ConfigReader.get('timeout');
+    this._platform = ConfigReader.get('testPlatform');
+  }
+
+  /**
+   * Resolve a locator string to be compatible with the current platform.
+   *
+   * WebDriverIO `~` prefix maps to "accessibility id" strategy.
+   * On iOS, "accessibility id" is unsupported, so we convert `~value` to:
+   *   - `name:value` (iOS XCUITest name strategy — most direct equivalent)
+   *
+   * Supported iOS locator strategies (used directly without `~`):
+   *   - id
+   *   - name
+   *   - xpath
+   *   - -ios predicate string
+   *   - -ios class chain
+   *
+   * @param {string} locator - Raw locator string (e.g. '~search-box')
+   * @returns {string} Platform-compatible locator string
+   */
+  resolveLocator(locator) {
+    if (typeof locator !== 'string') return locator;
+
+    if (this._platform === TEST_PLATFORMS.IOS && locator.startsWith('~')) {
+      // Convert '~value' to 'name:value' for iOS
+      return 'name:' + locator.substring(1);
+    }
+
+    // Android and other platforms keep the original ~ (accessibility id)
+    return locator;
+  }
+
+  /**
+   * Create a platform-aware element reference from a locator string.
+   * Use this in page object constructors instead of driver.$() directly.
+   *
+   * Example:
+   *   this.searchBox = this.createLocator('~search-box');
+   */
+  createLocator(locator) {
+    return this.resolveLocator(locator);
   }
 
   async find(locator) {
-    return this.driver.$(locator);
+    return this.driver.$(this.resolveLocator(locator));
   }
 
   /**

@@ -1,4 +1,4 @@
-@home @regression
+@home @regression @ios @android @web
 Feature: Amazon India Home Page
 
   Background:

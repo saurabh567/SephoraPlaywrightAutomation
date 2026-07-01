@@ -1,5 +1,6 @@
 /**
  * MobileAmazonSearchResultsPage — Appium/WebDriverIO page object for Amazon search results.
+ * Uses platform-aware locators via MobileBasePage.
  */
 const MobileBasePage = require('../framework/mobile/MobileBasePage');
 
@@ -13,7 +14,7 @@ class MobileAmazonSearchResultsPage extends MobileBasePage {
   async verifySearchResultsVisible() {
     await this.driver.pause(2000);
     // Check that search results container is visible
-    const resultsContainer = this.driver.$('~search-results');
+    const resultsContainer = this.driver.$(this.createLocator('~search-results'));
     if (await resultsContainer.isDisplayed()) {
       return;
     }
@@ -26,7 +27,7 @@ class MobileAmazonSearchResultsPage extends MobileBasePage {
 
     // Try tapping the first result link
     try {
-      const firstResult = this.driver.$('~product-title-0');
+      const firstResult = this.driver.$(this.createLocator('~product-title-0'));
       if (await firstResult.isDisplayed()) {
         await firstResult.click();
         await this.driver.pause(3000);

@@ -1,13 +1,38 @@
 // Amazon India search results page locators and actions.
 // Auto-detects Playwright (web) vs WebDriverIO (mobile) driver.
+// For iOS Safari, delegates to AmazonIOSSafariPage which uses WebView CSS selectors.
 const { expect } = require('@playwright/test');
 const BasePage = require('./BasePage');
 const MobileAmazonSearchResultsPage = require('./MobileAmazonSearchResultsPage');
+const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
+const config = require('../config/env.config');
+const { TEST_PLATFORMS } = require('../framework/common/platforms');
 
 class AmazonSearchResultsPage {
   constructor(page) {
-    // Detect mobile driver
+    // Detect mobile driver (WebDriverIO) vs Playwright page
     if (page && typeof page.locator !== 'function') {
+      // ── iOS Safari: delegate to AmazonIOSSafariPage ──
+      const isIOS = config.testPlatform === TEST_PLATFORMS.IOS;
+      const isSafari = String(config.mobile.browserName || '').toLowerCase() === 'safari';
+
+      if (isIOS && isSafari) {
+        this._iosSafari = new AmazonIOSSafariPage(page);
+        this.page = page;
+
+        // Map methods to match MobileAmazonSearchResultsPage interface
+        this.verifySearchResultsVisible = () =>
+          this._iosSafari.waitForSearchResultsRendered(30000);
+
+        this.openFirstProduct = async () => {
+          await this._iosSafari.openFirstProductFromResults();
+          return page; // return driver for consistency
+        };
+
+        return;
+      }
+
+      // ── Android / iOS App: use MobileAmazonSearchResultsPage ──
       this._mobile = new MobileAmazonSearchResultsPage(page);
       this.page = page;
       return;

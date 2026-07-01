@@ -1,15 +1,63 @@
 // Amazon India home page locators and actions.
 // Automatically detects Playwright (web) vs WebDriverIO (mobile) driver
 // and delegates to the appropriate implementation.
+//
+// Platform dispatch:
+//   - Web (Playwright)    → uses BasePage + Playwright locators
+//   - Android (Appium)    → uses MobileAmazonHomePage (accessibility ID locators)
+//   - iOS Safari (Appium) → uses AmazonIOSSafariPage (CSS selectors in WebView)
+//   - iOS App (Appium)    → uses MobileAmazonHomePage (accessibility ID locators)
 const { expect } = require('@playwright/test');
 const BasePage = require('./BasePage');
 const MobileAmazonHomePage = require('./MobileAmazonHomePage');
+const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
+const config = require('../config/env.config');
+const { TEST_PLATFORMS } = require('../framework/common/platforms');
 
 class AmazonHomePage {
   constructor(page) {
     // Detect mobile driver (WebDriverIO) vs Playwright page
     if (page && typeof page.locator !== 'function') {
-      // WebDriverIO driver — delegate to mobile implementation
+      // ── iOS Safari: use AmazonIOSSafariPage (CSS selectors in WebView) ──
+      const isIOS = config.testPlatform === TEST_PLATFORMS.IOS;
+      const isSafari = String(config.mobile.browserName || '').toLowerCase() === 'safari';
+
+      if (isIOS && isSafari) {
+        this._mobile = new AmazonIOSSafariPage(page);
+
+        // Map AmazonIOSSafariPage methods to the MobileAmazonHomePage interface
+        this._mobile.waitForAmazonReady = this._mobile.verifyHomeLoaded.bind(this._mobile);
+        this._mobile.verifyVisible = async (locator) => {
+          // Delegate to AmazonIOSSafariPage.verifyVisible which handles strings and elements
+          return this._mobile.verifyVisible(locator);
+        };
+        this._mobile.continueShoppingIfPrompted = async () => {};
+        this._mobile.openCart = this._mobile.openCartPage.bind(this._mobile);
+        this._mobile.getFooterLinks = async () => [];
+
+        // Copy all methods from AmazonIOSSafariPage to this instance
+        const proto = Object.getOwnPropertyNames(AmazonIOSSafariPage.prototype);
+        for (const key of proto) {
+          if (key !== 'constructor' && typeof this._mobile[key] === 'function') {
+            this[key] = this._mobile[key].bind(this._mobile);
+          }
+        }
+        // Override with our mapped methods
+        this.waitForAmazonReady = this._mobile.waitForAmazonReady;
+        this.verifyVisible = this._mobile.verifyVisible;
+        this.continueShoppingIfPrompted = this._mobile.continueShoppingIfPrompted;
+        this.openCart = this._mobile.openCart;
+        this.getFooterLinks = this._mobile.getFooterLinks;
+
+        // Logo: AmazonIOSSafariPage does not expose a `logo` element reference.
+        // The step "the Amazon logo should be visible" calls verifyVisible(logo).
+        // For iOS Safari we use page-source check via the verifyVisible override above,
+        // which checks for "amazon" text. The logo property itself is a sentinel.
+        this.logo = { __iosSafariSentinel: true };
+        return;
+      }
+
+      // ── Android / iOS App: use MobileAmazonHomePage ──
       this._mobile = new MobileAmazonHomePage(page);
       // Copy MobileAmazonHomePage methods to this instance for transparent dispatch
       const proto = Object.getOwnPropertyNames(MobileAmazonHomePage.prototype);
@@ -35,7 +83,6 @@ class AmazonHomePage {
   /** @private Playwright initialization */
   _initPlaywright(page) {
     this.__base = new BasePage(page);
-    // Copy BasePage methods
     const bp = Object.getOwnPropertyNames(BasePage.prototype);
     for (const key of bp) {
       if (key !== 'constructor' && typeof this.__base[key] === 'function') {
@@ -97,7 +144,7 @@ class AmazonHomePage {
   }
 
   async getFooterLinks() {
-    if (this._mobile) return [];
+    if (this._mobile) return this._mobile.getFooterLinks();
     await this.__base.scrollToBottom();
     await this.footerLinks.first().waitFor({ state: 'attached' });
     return this.footerLinks.evaluateAll((links) =>

@@ -1,4 +1,4 @@
-@e2e @regression
+@e2e @regression @ios @android @web
 Feature: End-to-End Product Purchase Flow
 
   @e2e

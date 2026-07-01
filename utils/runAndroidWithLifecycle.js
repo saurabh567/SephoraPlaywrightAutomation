@@ -18,6 +18,24 @@
  *   7. Run real Android tests (npm run test:android:raw)
  *   8. Cleanup (only in finally, only if owned)
  *
+ * Amazon App Activity:
+ *   The launcher activity is dynamically discovered at runtime via ADB:
+ *     adb shell dumpsys package in.amazon.mShop.android.shopping
+ *   This extracts the correct MAIN/LAUNCHER activity from the installed app.
+ *   The result is set as APP_ACTIVITY in the environment (full format:
+ *   package/activity) so that android.capabilities.js picks it up.
+ *
+ *   Activity discovery order:
+ *     1. Parse dumpsys package output for ComponentInfo{...} in MAIN/LAUNCHER block
+ *     2. Fall back to resolve-activity --brief <package>
+ *     3. Verify the actual launched activity via dumpsys window mCurrentFocus
+ *     4. Fall back to hardcoded: com.amazon.mShop.home.HomeActivity
+ *
+ *   App launch:
+ *     Uses adb shell monkey -p <package> -c android.intent.category.LAUNCHER 1
+ *     which launches by package name only — no activity class needed.
+ *     This is the most reliable launch method across all app versions.
+ *
  * Environment variables:
  *   ANDROID_AVD_NAME          – AVD name (default: Pixel_9_Pro)
  *   APPIUM_HOST               – (default: 127.0.0.1)
@@ -48,6 +66,161 @@ const FORCE_ANDROID_CLEANUP = process.env.FORCE_ANDROID_CLEANUP === 'true';
 const FORCE_APPIUM_CLEANUP = process.env.FORCE_APPIUM_CLEANUP === 'true';
 
 const AMAZON_PACKAGE = 'in.amazon.mShop.android.shopping';
+const AMAZON_FALLBACK_ACTIVITY = "com.amazon.mShop.home.HomeActivity";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Launcher Activity Discovery — resolves the correct activity at runtime
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Discover the correct launcher activity for the Amazon app via ADB.
+ * Uses `adb shell dumpsys package` which reliably returns the full activity
+ * path, unlike `resolve-activity --brief` which may return an incomplete name.
+ *
+ * Parses the "android.intent.action.MAIN" + "android.intent.category.LAUNCHER"
+ * block to extract the fully qualified activity class name (e.g.
+ * "com.amazon.mShop.home.HomeActivity").
+ *
+ * @param {string} pkg - Android app package name
+ * @returns {string|null} Fully qualified activity class name, or null
+ */
+function discoverLauncherActivity(pkg) {
+  if (!pkg) return null;
+
+  try {
+    const out = runCmd(
+      `adb shell dumpsys package ${pkg} 2>/dev/null || true`,
+      { timeout: 15000 }
+    );
+
+    if (!out || out.length < 50) {
+      log(`[activity-discovery] dumpsys output too short or empty`);
+      return null;
+    }
+
+    // Strategy 1: Find the MAIN/LAUNCHER intent filter block
+    // The dumpsys output has sections like:
+    //   android.intent.action.MAIN:
+    //     android.intent.category.LAUNCHER:
+    //       ComponentInfo{...com.amazon.mShop.home.HomeActivity}
+    const lines = out.split("\n");
+    let inMainSection = false;
+    let inLauncherSection = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (trimmed.includes("android.intent.action.MAIN:")) {
+        inMainSection = true;
+        continue;
+      }
+
+      if (inMainSection && trimmed.includes("android.intent.category.LAUNCHER:")) {
+        inLauncherSection = true;
+        continue;
+      }
+
+      if (inLauncherSection) {
+        // Look for ComponentInfo{...} or the activity name
+        // Format: ComponentInfo{package/activity} or just the activity
+        const ciMatch = trimmed.match(/ComponentInfo\{[^}]+\}/);
+        if (ciMatch) {
+          const inner = ciMatch[0];
+          const slashIdx = inner.indexOf("/");
+          if (slashIdx > 0) {
+            let activity = inner.substring(slashIdx + 1, inner.length - 1).trim();
+            if (activity) {
+              log(`[activity-discovery] Found via ComponentInfo: ${activity}`);
+              return activity;
+            }
+          }
+        }
+
+        // Also check for bare activity names on subsequent lines
+        if (trimmed.includes(pkg)) {
+          const match = trimmed.match(/\/([a-zA-Z0-9_.]+)\}/);
+          if (match) {
+            const activity = match[1].trim();
+            if (activity) {
+              log(`[activity-discovery] Found via package regex: ${activity}`);
+              return activity;
+            }
+          }
+        }
+
+        // Break if we hit the next intent filter block
+        if (trimmed.includes("android.intent.action.") && !trimmed.includes("MAIN")) {
+          break;
+        }
+      }
+    }
+
+    // Strategy 2: Fall back to resolve-activity --brief
+    log(`[activity-discovery] dumpsys parsing failed, trying resolve-activity...`);
+    const briefOut = runCmd(
+      `adb shell cmd package resolve-activity --brief ${pkg} 2>/dev/null || true`,
+      { timeout: 10000 }
+    );
+
+    if (briefOut && briefOut.length > 0) {
+      const briefLines = briefOut.split("\n").filter(l => l.trim().length > 0);
+      for (let i = briefLines.length - 1; i >= 0; i--) {
+        const bl = briefLines[i].trim();
+        const slashIdx = bl.indexOf("/");
+        if (slashIdx > 0) {
+          const activity = bl.substring(slashIdx + 1).trim();
+          if (activity && activity.includes(".") && !activity.includes("\$")) {
+            log(`[activity-discovery] Found via resolve-activity: ${activity}`);
+            return activity;
+          }
+        } else if (bl.includes(".") && bl.startsWith("com.") || bl.startsWith("android.")) {
+          log(`[activity-discovery] Found via resolve-activity (bare): ${bl}`);
+          return bl;
+        }
+      }
+    }
+  } catch (err) {
+    log(`[activity-discovery] Failed: ${err.message}`);
+  }
+
+  return null;
+}
+
+/**
+ * Determine the APP_ACTIVITY value to use.
+ * Order:
+ *   1. If APP_ACTIVITY is already set in the environment (from .env or user), use it
+ *   2. Try to discover the launcher activity dynamically via ADB
+ *   3. Fall back to the hardcoded FALLBACK_ACTIVITY
+ *
+ * Returns the FULL format: "package/activity"
+ */
+function resolveAppActivity() {
+  // If already explicitly set by the user/environment, respect it
+  if (process.env.APP_ACTIVITY && process.env.APP_ACTIVITY.trim().length > 0) {
+    const existing = process.env.APP_ACTIVITY.trim();
+    if (existing.includes("/")) {
+      log(`[activity-discovery] Using APP_ACTIVITY from environment: ${existing}`);
+      return existing;
+    }
+  }
+
+  // Try dynamic discovery via ADB
+  const discovered = discoverLauncherActivity(AMAZON_PACKAGE);
+  if (discovered && discovered.includes(".")) {
+    const fullActivity = AMAZON_PACKAGE + "/" + discovered;
+    log(`[activity-discovery] Dynamically resolved activity: ${fullActivity}`);
+    return fullActivity;
+  }
+
+  // Fall back to hardcoded default
+  const fallback = AMAZON_PACKAGE + "/" + AMAZON_FALLBACK_ACTIVITY;
+  log(`[activity-discovery] Using fallback activity: ${fallback}`);
+  return fallback;
+}
+
+
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -75,6 +248,9 @@ const executionState = {
   rawTestStarted: false,
   rawTestExitCode: null,
   scenariosExecuted: null,
+  discoveredActivity: null,
+  resolvedActivity: null,
+
   scenariosPassed: null,
   scenariosFailed: null,
   stepsExecuted: null,
@@ -592,6 +768,15 @@ async function phaseAmazonApp() {
   executionState.amazonInstalled = true;
   log('Amazon app is installed');
 
+  // ── Resolve the app activity dynamically ────────────────────────────────
+  const appActivity = resolveAppActivity();
+  executionState.resolvedActivity = appActivity;
+
+  // Set APP_ACTIVITY in the environment so android.capabilities.js picks it up
+  process.env.APP_ACTIVITY = appActivity;
+  log(`APP_ACTIVITY set to: ${appActivity}`);
+
+  // ── Launch the app via adb monkey (package-only, no activity needed) ───
   log(`launching ${AMAZON_PACKAGE} via adb monkey`);
   try {
     runCmd(
@@ -606,6 +791,27 @@ async function phaseAmazonApp() {
     const fg = getForegroundPackage();
     return fg !== null && fg.includes('in.amazon');
   }, 60000, 2000);
+
+  // ── Verify the launched activity matches our resolved activity ──────────
+  try {
+    const launchedActivity = runCmdOptional(
+      "adb shell dumpsys window 2>/dev/null | grep mCurrentFocus | grep -o 'in\.amazon[^/}]*/[^ }]*' || true"
+    );
+    if (launchedActivity) {
+      executionState.discoveredActivity = launchedActivity;
+      log(`Foreground activity confirmed: ${launchedActivity}`);
+      // Update APP_ACTIVITY to the actual launched activity (more precise)
+      const actualActivity = launchedActivity.split('/').pop();
+      if (actualActivity) {
+        const fullActual = AMAZON_PACKAGE + '/' + actualActivity;
+        process.env.APP_ACTIVITY = fullActual;
+        executionState.resolvedActivity = fullActual;
+        log(`APP_ACTIVITY updated to actual launched activity: ${fullActual}`);
+      }
+    }
+  } catch (_) {
+    log('Could not verify launched activity (non-fatal)');
+  }
 
   executionState.amazonLaunched = true;
   log('Amazon app is in foreground');
@@ -640,7 +846,13 @@ async function phaseRunRealTests() {
       cwd: ROOT,
       stdio: 'inherit',
       shell: true,
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        // Explicitly pass the resolved APP_ACTIVITY to the child process.
+        // This overrides any value that might be loaded from .env.android
+        // by dotenv, ensuring the dynamically discovered activity is used.
+        APP_ACTIVITY: process.env.APP_ACTIVITY,
+      },
     });
 
     child.on('exit', (code) => {
@@ -888,6 +1100,9 @@ function generateLifecycleReport() {
 - Appium PID: ${executionState.appiumPid || 'N/A (pre-existing)'}
 - ADB Device ID: ${executionState.adbDeviceId || 'N/A'}
 - Amazon Package: \`${AMAZON_PACKAGE}\`
+- Amazon App Activity: \`\${executionState.resolvedActivity || "N/A (not resolved)"}\`
+- Actual Launched Activity: \`\${executionState.discoveredActivity || "N/A (not verified)"}\`
+
 - Raw Test Command: \`${executionState.rawTestCommand}\`
 
 ## Lifecycle Stages

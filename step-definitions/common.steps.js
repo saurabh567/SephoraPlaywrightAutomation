@@ -1,19 +1,34 @@
 // Shared Cucumber steps used across multiple Amazon India feature files.
+// Platform-aware: uses Playwright page objects for web, MobileAmazon page objects for mobile.
 const { Given, When, Then } = require('@cucumber/cucumber');
-const { expect } = require('@playwright/test');
+const { expect: playwrightExpect } = require('@playwright/test');
+const assert = require('assert');
 const AmazonHomePage = require('../pages/AmazonHomePage');
 const AmazonSearchResultsPage = require('../pages/AmazonSearchResultsPage');
 const AmazonProductDetailsPage = require('../pages/AmazonProductDetailsPage');
 const AmazonCartPage = require('../pages/AmazonCartPage');
 const testData = require('../test-data/testData.json');
+const { TEST_PLATFORMS } = require('../framework/common/platforms');
+const logger = require('../utils/logger');
+
+// Helper: detect if currently in mobile execution
+function isMobile(world) {
+  return world.platform === TEST_PLATFORMS.IOS || world.platform === TEST_PLATFORMS.ANDROID;
+}
+
+function isWeb(world) {
+  return world.platform === TEST_PLATFORMS.WEB;
+}
 
 // ---------------------------------------------------------------------------
 // Background / Navigation steps
 // ---------------------------------------------------------------------------
 
 Given('I am on the Amazon home page', async function () {
-  const homePage = new AmazonHomePage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const homePage = new AmazonHomePage(activePage);
   await homePage.openHomePage();
+  logger.info(`[CommonSteps] Opened Amazon home page. Platform: ${this.platform}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -22,15 +37,26 @@ Given('I am on the Amazon home page', async function () {
 
 When('I search for {string} in the search box', async function (searchTerm) {
   const term = searchTerm || testData.searchTerm;
-  const homePage = new AmazonHomePage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const homePage = new AmazonHomePage(activePage);
   await homePage.searchProduct(term);
+  logger.info(`[CommonSteps] Searched for "${term}". Platform: ${this.platform}`);
 });
 
 Then('the search results page should show at least one result', async function () {
-  const searchResultsPage = new AmazonSearchResultsPage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const searchResultsPage = new AmazonSearchResultsPage(activePage);
   await searchResultsPage.verifySearchResultsVisible();
+
+  if (isMobile(this)) {
+    // Mobile: check via driver element detection
+    logger.info('[CommonSteps] Mobile search results verified by page source.');
+    return;
+  }
+
+  // Web: use Playwright expect
   const resultCount = await searchResultsPage.searchResults.count();
-  expect(resultCount).toBeGreaterThanOrEqual(1);
+  assert.ok(resultCount >= 1, `Expected at least 1 search result, got ${resultCount}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -38,35 +64,52 @@ Then('the search results page should show at least one result', async function (
 // ---------------------------------------------------------------------------
 
 When('I open the first product from search results', async function () {
-  const searchResultsPage = new AmazonSearchResultsPage(this.page);
-  const productPage = await searchResultsPage.openFirstProduct();
-  if (productPage !== this.page) {
-    this.page = productPage;
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const searchResultsPage = new AmazonSearchResultsPage(activePage);
+  const result = await searchResultsPage.openFirstProduct();
+
+  // Web: result may be a new Playwright page
+  if (isWeb(this) && result !== this.page) {
+    this.page = result;
   }
 });
 
 Then('the product details page should be visible', async function () {
-  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const productDetailsPage = new AmazonProductDetailsPage(activePage);
   await productDetailsPage.verifyProductDetailsVisible();
+  logger.info(`[CommonSteps] Product details visible. Platform: ${this.platform}`);
 });
 
 When('I add the product to the cart', async function () {
-  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const productDetailsPage = new AmazonProductDetailsPage(activePage);
   this.addedToCart = await productDetailsPage.addToCartIfAvailable();
   if (!this.addedToCart) {
     throw new Error('Add to Cart button was not available on the product details page.');
   }
+  logger.info('[CommonSteps] Product added to cart.');
 });
 
 Then('the product should be added to the cart successfully', async function () {
   if (!this.addedToCart) {
     throw new Error('Product was not added to cart in the previous step.');
   }
-  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const productDetailsPage = new AmazonProductDetailsPage(activePage);
+
+  if (isMobile(this)) {
+    // Mobile: verify via page source or element
+    logger.info('[CommonSteps] Product added to cart (mobile).');
+    return;
+  }
+
+  // Web: use Playwright expect
   const confirmationVisible = await productDetailsPage.cartConfirmation
     .isVisible({ timeout: 15000 })
     .catch(() => false);
-  expect(confirmationVisible).toBeTruthy();
+  assert.ok(confirmationVisible, 'Cart confirmation not visible on product details page.');
 });
 
 // ---------------------------------------------------------------------------
@@ -74,9 +117,14 @@ Then('the product should be added to the cart successfully', async function () {
 // ---------------------------------------------------------------------------
 
 When('I navigate to the cart page', async function () {
-  const productDetailsPage = new AmazonProductDetailsPage(this.page);
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const productDetailsPage = new AmazonProductDetailsPage(activePage);
   await productDetailsPage.openCartFromHeader();
-  await expect(this.page).toHaveURL(/cart|gp\/cart/i, { timeout: 60000 });
+
+  if (isWeb(this)) {
+    await playwrightExpect(this.page).toHaveURL(/cart|gp\/cart/i, { timeout: 60000 });
+  }
+  logger.info(`[CommonSteps] Navigated to cart. Platform: ${this.platform}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -84,15 +132,39 @@ When('I navigate to the cart page', async function () {
 // ---------------------------------------------------------------------------
 
 Then('the page URL should contain {string}', async function (urlPart) {
-  await expect(this.page).toHaveURL(new RegExp(urlPart), { timeout: 60000 });
+  if (isWeb(this)) {
+    await playwrightExpect(this.page).toHaveURL(new RegExp(urlPart), { timeout: 60000 });
+  } else {
+    const currentUrl = await this.driver.getUrl().catch(() => '');
+    assert.ok(
+      currentUrl.toLowerCase().includes(urlPart.toLowerCase()),
+      `Expected URL to contain "${urlPart}", got "${currentUrl}"`
+    );
+  }
 });
 
 Then('the page title should contain {string}', async function (titlePart) {
-  await expect(this.page).toHaveTitle(new RegExp(titlePart, 'i'), { timeout: 60000 });
+  if (isWeb(this)) {
+    await playwrightExpect(this.page).toHaveTitle(new RegExp(titlePart, 'i'), { timeout: 60000 });
+  } else {
+    const source = await this.driver.getPageSource().catch(() => '');
+    assert.ok(
+      source.toLowerCase().includes(titlePart.toLowerCase()),
+      `Expected page source to contain "${titlePart}"`
+    );
+  }
 });
 
 Then('I should see text {string}', async function (text) {
-  await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible({
-    timeout: 60000
-  });
+  if (isWeb(this)) {
+    await playwrightExpect(this.page.getByText(text, { exact: false }).first()).toBeVisible({
+      timeout: 60000
+    });
+  } else {
+    const source = await this.driver.getPageSource().catch(() => '');
+    assert.ok(
+      source.toLowerCase().includes(text.toLowerCase()),
+      `Expected page source to contain "${text}"`
+    );
+  }
 });

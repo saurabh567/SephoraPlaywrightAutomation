@@ -1,4 +1,4 @@
-@searchResults @regression
+@searchResults @regression @ios @android @web
 Feature: Amazon India Search Results Page
 
   Background:

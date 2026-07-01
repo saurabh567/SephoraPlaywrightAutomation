@@ -1,4 +1,4 @@
-@cart @regression
+@cart @regression @ios @android @web
 Feature: Amazon India Cart Page
 
   Background:

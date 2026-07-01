@@ -1,13 +1,94 @@
 // Amazon India product details page locators and actions.
 // Auto-detects Playwright (web) vs WebDriverIO (mobile) driver.
+// For iOS Safari, delegates to AmazonIOSSafariPage which uses WebView CSS selectors.
 const { expect } = require('@playwright/test');
 const BasePage = require('./BasePage');
 const MobileAmazonProductDetailsPage = require('./MobileAmazonProductDetailsPage');
+const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
+const config = require('../config/env.config');
+const logger = require("../utils/logger");
+const { TEST_PLATFORMS } = require('../framework/common/platforms');
 
 class AmazonProductDetailsPage {
   constructor(page) {
-    // Detect mobile driver
+    // Detect mobile driver (WebDriverIO) vs Playwright page
     if (page && typeof page.locator !== 'function') {
+      // ── iOS Safari: delegate to AmazonIOSSafariPage ──
+      const isIOS = config.testPlatform === TEST_PLATFORMS.IOS;
+      const isSafari = String(config.mobile.browserName || '').toLowerCase() === 'safari';
+
+      if (isIOS && isSafari) {
+        this._iosSafari = new AmazonIOSSafariPage(page);
+        this.page = page;
+
+        // Map methods to match MobileAmazonProductDetailsPage interface
+        this.openProductPage = async (productUrl) => {
+          await this._iosSafari.openUrlAndWaitForAmazon(
+            productUrl || config.baseUrl,
+            'product page'
+          );
+        };
+
+        this.selectQuantity = async (quantity) => {
+          // Amazon mobile web quantity dropdown selector
+          const qtySelectors = [
+            '#quantity',
+            'select[name="quantity"]',
+            'select[id*="quantity"]',
+            '.a-button-dropdown[aria-label*="Quantity"]',
+            'span[data-action="a-dropdown-button"]',
+          ];
+          let qtyFound = false;
+          for (const sel of qtySelectors) {
+            try {
+              const els = await page.$$(sel);
+              for (const el of els) {
+                if (await el.isDisplayed().catch(() => false)) {
+                  await el.click();
+                  await page.pause(500);
+                  // Try selecting option by value
+                  const optValue = await page.$(sel + ' option[value="' + quantity + '"]');
+                  if (optValue && await optValue.isDisplayed().catch(() => false)) {
+                    await optValue.click();
+                    await page.pause(500);
+                    qtyFound = true;
+                    break;
+                  }
+                  // Fallback: try all options and find by text
+                  const allOpts = await page.$$(sel + ' option');
+                  for (const opt of allOpts) {
+                    const text = await opt.getText().catch(() => '');
+                    if (text.includes(String(quantity))) {
+                      await opt.click();
+                      await page.pause(500);
+                      qtyFound = true;
+                      break;
+                    }
+                  }
+                  if (qtyFound) break;
+                }
+              }
+            } catch (_) {}
+            if (qtyFound) break;
+          }
+          if (!qtyFound) {
+            logger.warn('[AmazonProductDetailsPage] iOS Safari: Quantity selector not found for value ' + quantity);
+          }
+        };
+
+        this.addToCartIfAvailable = () =>
+          this._iosSafari.addToCartIfAvailable();
+
+        this.openCartFromHeader = () =>
+          this._iosSafari.openCartPage();
+
+        this.verifyProductDetailsVisible = () =>
+          this._iosSafari.verifyProductDetailsVisible();
+
+        return;
+      }
+
+      // ── Android / iOS App: use MobileAmazonProductDetailsPage ──
       this._mobile = new MobileAmazonProductDetailsPage(page);
       this.page = page;
       return;
