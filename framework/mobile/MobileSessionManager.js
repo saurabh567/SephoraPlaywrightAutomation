@@ -83,15 +83,22 @@ class MobileSessionManager {
    */
   static async createSession(config, retries = 2, delayMs = 15000) {
     const platform = config.testPlatform;
+    const isAndroid = platform && String(platform).toUpperCase() === TEST_PLATFORMS.ANDROID;
+    const isIOS = platform && String(platform).toUpperCase() === TEST_PLATFORMS.IOS;
+
     let lastError;
 
     for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
       try {
-        logger.info(`[MobileSessionManager] Creating new ${platform} session (attempt ${attempt}/${retries + 1})`);
+        if (isAndroid) {
+          logger.info('[MobileSessionManager] Creating fresh Android session...');
+        } else if (isIOS) {
+          logger.info('[MobileSessionManager] Creating fresh iOS session...');
+        } else {
+          logger.info(`[MobileSessionManager] Creating new ${platform} session (attempt ${attempt}/${retries + 1})`);
+        }
 
         const driver = await MobileDriverFactory.createDriver(config);
-
-        logger.info(`[MobileSessionManager] ${platform} session created successfully`);
 
         // Clear any residual app state immediately after session creation
         await MobileSessionManager.clearAppState(driver, platform).catch(err => {
@@ -99,10 +106,16 @@ class MobileSessionManager {
         });
 
         // Handle first-launch onboarding (Android only — language selection + sign-in skip)
-        if (platform && String(platform).toUpperCase() === TEST_PLATFORMS.ANDROID) {
+        if (isAndroid) {
           await handleFirstLaunchIfNeeded(driver).catch(err => {
             logger.warn(`[MobileSessionManager] First-launch onboarding handler failed (non-fatal): ${err.message}`);
           });
+          logger.info('[MobileSessionManager] Android ready.');
+        }
+
+        // For iOS, log readiness after state clear
+        if (isIOS) {
+          logger.info('[iOS] Session ready.');
         }
 
         return driver;
@@ -169,9 +182,8 @@ class MobileSessionManager {
     if (platform === TEST_PLATFORMS.IOS && appId) {
       try {
         await driver.execute('mobile: removeApp', { bundleId: appId });
-        logger.info(`[MobileSessionManager] iOS: Removed app ${appId}`);
+        logger.info('[iOS] Fresh installation completed.');
       } catch (err) {
-        // removeApp may fail for Safari (cannot remove system apps) — that's fine
         logger.warn(`[MobileSessionManager] iOS: removeApp skipped (non-fatal): ${err.message.substring(0, 120)}`);
       }
     }
@@ -251,7 +263,6 @@ class MobileSessionManager {
     // 2. Appium mobile:clearCookies command
     try {
       await driver.execute('mobile: clearCookies');
-      logger.info('[MobileSessionManager] Android: Cleared cookies via mobile:clearCookies');
     } catch (err) {
       logger.warn(`[MobileSessionManager] Android: mobile:clearCookies failed: ${err.message}`);
     }
@@ -263,7 +274,6 @@ class MobileSessionManager {
       if (webviewContext) {
         await driver.switchContext(webviewContext);
         await driver.execute(JS_CLEAR_ALL_STORAGE);
-        logger.info('[MobileSessionManager] Android: Cleared WebView storage via JS');
         // Switch back to native
         if (contexts.includes('NATIVE_APP')) {
           await driver.switchContext('NATIVE_APP');
@@ -286,7 +296,6 @@ class MobileSessionManager {
    *   - noReset=false in capabilities ensures clean state on next session
    */
   static async _clearIOSAppState(driver) {
-    // 1. JS WebView storage cleanup — only if a WebView context exists
     let previousContext = null;
     try {
       previousContext = await driver.getContext();
@@ -296,7 +305,6 @@ class MobileSessionManager {
       const contexts = await driver.getContexts();
       const hasWebView = contexts.some(ctx => String(ctx).toLowerCase().includes('webview'));
       if (!hasWebView) {
-        logger.info('[MobileSessionManager] iOS: No WebView context — skipping WebView storage cleanup');
         return;
       }
 
@@ -305,7 +313,7 @@ class MobileSessionManager {
           try {
             await driver.switchContext(ctx);
             await driver.execute(JS_CLEAR_ALL_STORAGE);
-            logger.info(`[MobileSessionManager] iOS: Cleared WebView storage in context: ${ctx}`);
+            logger.info('[iOS] WebView storage cleared.');
           } catch (err) {
             logger.warn(`[MobileSessionManager] iOS: JS clear failed in context ${ctx}: ${err.message}`);
           }

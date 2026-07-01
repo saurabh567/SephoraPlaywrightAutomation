@@ -14,6 +14,9 @@
  * Locator strategies use multiple fallbacks to support different Amazon
  * app versions. Each step uses explicit waits. Never fails if onboarding
  * is absent.
+ *
+ * Log tags: [Android] — all log messages use this tag for clarity in the
+ * execution pipeline.
  */
 
 const logger = require('../../utils/logger');
@@ -140,7 +143,6 @@ async function tapSafely(driver, element, label) {
   if (!element) return false;
   try {
     await element.click();
-    logger.info(`[AmazonFirstLaunch] Tapped: ${label}`);
     return true;
   } catch (err) {
     logger.warn(`[AmazonFirstLaunch] Tap failed for "${label}": ${err.message}`);
@@ -185,7 +187,6 @@ async function isSignInScreen(driver) {
     'android=new UiSelector().textContains("Email")',
     'android=new UiSelector().textContains("phone number")',
     'xpath=//android.widget.EditText[contains(@text, "Email") or contains(@text, "phone")]',
-    // Also check for "Skip" which is usually on the sign-in screen
   ];
   const found = await waitForAnyLocator(driver, signInLocators, SHORT_WAIT_MS);
   return found !== null;
@@ -199,7 +200,6 @@ async function isSignInScreen(driver) {
  * Step 1: Select English language on the language selection screen.
  */
 async function selectEnglish(driver) {
-  logger.info('[AmazonFirstLaunch] Selecting English language...');
   const englishOption = await findFirstVisible(driver, ENGLISH_OPTION_LOCATORS);
   if (englishOption) {
     await tapSafely(driver, englishOption, 'English language option');
@@ -218,8 +218,6 @@ async function selectEnglish(driver) {
  * Step 2: Tap the "Continue in English" button.
  */
 async function tapContinueButton(driver) {
-  logger.info('[AmazonFirstLaunch] Tapping Continue button...');
-
   // Wait briefly for the continue button to appear after language selection
   await driver.pause(1500);
 
@@ -241,16 +239,12 @@ async function tapContinueButton(driver) {
  * Step 3: Skip the sign-in screen if it appears.
  */
 async function skipSignIn(driver) {
-  logger.info('[AmazonFirstLaunch] Checking for Sign-In screen...');
   await driver.pause(2000);
 
   // Check if sign-in screen is showing
   if (!(await isSignInScreen(driver))) {
-    logger.info('[AmazonFirstLaunch] No sign-in screen detected — continuing');
     return true;
   }
-
-  logger.info('[AmazonFirstLaunch] Sign-In screen detected — looking for skip/dismiss option...');
 
   // Try explicit skip buttons first
   const skipBtn = await findFirstVisible(driver, SKIP_SIGNIN_LOCATORS);
@@ -261,7 +255,6 @@ async function skipSignIn(driver) {
   }
 
   // Fallback: try pressing back button (common dismiss on older versions)
-  logger.warn('[AmazonFirstLaunch] Skip button not found — trying back button');
   try {
     await driver.back();
     await driver.pause(1500);
@@ -270,7 +263,6 @@ async function skipSignIn(driver) {
   }
 
   // Last resort: coordinate tap in bottom area where skip/dismiss typically is
-  logger.warn('[AmazonFirstLaunch] Trying coordinate tap to dismiss sign-in');
   await tapByCoordinates(driver, 540, 1900);
   await driver.pause(1000);
 
@@ -296,6 +288,8 @@ async function skipSignIn(driver) {
  * Multiple fallback locators support different Amazon app versions.
  * All steps use explicit waits and degrade gracefully to coordinate taps.
  *
+ * Log messages use [Android] tags for clarity in the execution pipeline.
+ *
  * @param {object} driver - WebDriverIO driver instance
  * @returns {Promise<boolean>} true if onboarding was handled, false if no onboarding detected
  */
@@ -304,8 +298,6 @@ async function handleFirstLaunchIfNeeded(driver) {
     logger.warn('[AmazonFirstLaunch] No driver provided — skipping');
     return false;
   }
-
-  logger.info('[AmazonFirstLaunch] Checking for first-launch onboarding...');
 
   try {
     // Step 0: Wait briefly for the screen to settle after app launch
@@ -318,32 +310,33 @@ async function handleFirstLaunchIfNeeded(driver) {
       // No language screen — check if we're on sign-in directly (some versions skip language)
       const onSignIn = await isSignInScreen(driver);
       if (onSignIn) {
-        logger.info('[AmazonFirstLaunch] On sign-in screen directly — skipping sign-in');
+        logger.info('[Android] Sign-in skipped.');
         await skipSignIn(driver);
         return true;
       }
 
-      logger.info('[AmazonFirstLaunch] No onboarding detected — continuing normally');
       return false;
     }
 
-    logger.info('[AmazonFirstLaunch] Onboarding detected — handling first launch...');
+    logger.info('[Android] First launch detected.');
 
     // Step 1: Select English
     await selectEnglish(driver);
+    logger.info('[Android] Language selected.');
     await driver.pause(1500);
 
     // Step 2: Tap Continue
     await tapContinueButton(driver);
+    logger.info('[Android] Continue in English clicked.');
     await driver.pause(2000);
 
     // Step 3: Skip sign-in
     await skipSignIn(driver);
+    logger.info('[Android] Sign-in skipped.');
 
     // Final settle
     await driver.pause(2000);
 
-    logger.info('[AmazonFirstLaunch] First-launch onboarding handled successfully');
     return true;
   } catch (err) {
     // Never fail if onboarding handling encounters an error
