@@ -76,6 +76,9 @@ class MobileSessionManager {
    * Amazon app first-launch onboarding flow (language selection, continue,
    * sign-in skip) so that test scenarios start on the home screen.
    *
+   * NOTE: Onboarding failures propagate upward — they are NOT silently caught.
+   * If the language screen is present and cannot be handled, the test stops.
+   *
    * @param {object} config - Environment configuration object
    * @param {number} [retries=2] - Number of retries for transient failures
    * @param {number} [delayMs=15000] - Delay between retries in ms
@@ -105,11 +108,10 @@ class MobileSessionManager {
           logger.warn(`[MobileSessionManager] Initial state clear failed (non-fatal): ${err.message}`);
         });
 
-        // Handle first-launch onboarding (Android only — language selection + sign-in skip)
+        // Handle first-launch onboarding (Android only)
+        // Errors propagate — the handler captures screenshots and throws
         if (isAndroid) {
-          await handleFirstLaunchIfNeeded(driver).catch(err => {
-            logger.warn(`[MobileSessionManager] First-launch onboarding handler failed (non-fatal): ${err.message}`);
-          });
+          await handleFirstLaunchIfNeeded(driver);
           logger.info('[MobileSessionManager] Android ready.');
         }
 
