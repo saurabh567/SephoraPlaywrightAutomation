@@ -12,7 +12,60 @@
  *   - No localStorage, sessionStorage, IndexedDB, Cache Storage
  *   - No browser history, saved permissions, or previous auth state
  *   - No reused browser session, tab, or shared memory
+ *
+ * Launcher Activity Auto-Detection:
+ *   When APP_ACTIVITY is not explicitly set (empty/undefined), this module
+ *   automatically detects the correct launcher activity via ADB:
+ *     adb shell cmd package resolve-activity --brief <appPackage>
+ *   If detection fails, it falls back to:
+ *     com.amazon.mShop.home.HomeActivity
  */
+
+const { execSync } = require('child_process');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Launcher Activity Auto-Detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FALLBACK_ACTIVITY = 'com.amazon.mShop.home.HomeActivity';
+
+/**
+ * Automatically detect the launcher activity for a given Android app package.
+ * Uses ADB shell cmd package resolve-activity.
+ *
+ * @param {string} appPackage - Android app package name
+ * @returns {string|null} Fully qualified activity name, or null if detection fails
+ */
+function detectLauncherActivity(appPackage) {
+  if (!appPackage) return null;
+
+  try {
+    const out = execSync(
+      `adb shell cmd package resolve-activity --brief ${appPackage} 2>/dev/null || true`,
+      { encoding: 'utf8', timeout: 10000 }
+    ).trim();
+
+    if (out && !out.includes('error') && !out.includes('Error') && out.length > 0) {
+      // The output is typically just the activity name, e.g.:
+      //   com.amazon.mShop.home.HomeActivity
+      // Strip any noise (newlines, control chars)
+      const activity = out.split('\n')[0].trim();
+      if (activity && activity.includes('.')) {
+        console.log(`[android.capabilities] Auto-detected launcher activity: ${activity}`);
+        return activity;
+      }
+    }
+  } catch (err) {
+    // ADB not available or no device connected
+    console.warn(`[android.capabilities] ADB detection failed (non-fatal): ${err.message}`);
+  }
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capabilities builder
+// ─────────────────────────────────────────────────────────────────────────────
 
 function androidCapabilities() {
   const capabilities = {
@@ -50,14 +103,27 @@ function androidCapabilities() {
   // App package configuration
   if (process.env.APP_PACKAGE) {
     capabilities['appium:appPackage'] = process.env.APP_PACKAGE;
-
-    // Wait for the app package to appear (not just the main activity)
     capabilities['appium:appWaitPackage'] = process.env.APP_PACKAGE;
 
-    // App activity: use provided value or let adb determine it
-    if (process.env.APP_ACTIVITY) {
-      capabilities['appium:appActivity'] = process.env.APP_ACTIVITY;
-      capabilities['appium:appWaitActivity'] = process.env.APP_ACTIVITY;
+    // Determine the app activity: prefer explicit env var, auto-detect otherwise
+    let appActivity = process.env.APP_ACTIVITY;
+
+    // If APP_ACTIVITY is empty or whitespace-only, auto-detect
+    if (!appActivity || appActivity.trim().length === 0) {
+      console.log('[android.capabilities] APP_ACTIVITY not set — auto-detecting launcher activity via ADB...');
+      const detected = detectLauncherActivity(process.env.APP_PACKAGE);
+      if (detected) {
+        appActivity = detected;
+        console.log(`[android.capabilities] Using auto-detected activity: ${appActivity}`);
+      } else {
+        appActivity = FALLBACK_ACTIVITY;
+        console.log(`[android.capabilities] ADB detection failed — using fallback activity: ${appActivity}`);
+      }
+    }
+
+    if (appActivity) {
+      capabilities['appium:appActivity'] = appActivity;
+      capabilities['appium:appWaitActivity'] = appActivity;
     }
 
     // App launch timeout
