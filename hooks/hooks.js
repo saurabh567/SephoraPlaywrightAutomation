@@ -120,14 +120,23 @@ BeforeAll(async function () {
     logger.info(`Mobile platform: ${config.testPlatform}. Driver created per-scenario.`);
 
     if (isAndroidExecution) {
-      // Pre-clear app data via ADB before any test runs (supplemental safety net)
-      try {
-        const { execSync } = require('child_process');
-        execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_AMAZON_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
-        execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_CHROME_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
-        logger.info('[Hooks] Android pre-session app data cleared via ADB');
-      } catch (err) {
-        logger.warn(`[Hooks] Android pre-session ADB cleanup failed: ${err.message}`);
+      // NOTE: Do NOT clear app data here when running through the lifecycle
+      // (runAndroidWithLifecycle.js). The lifecycle already cleared app data
+      // and launched the app via adb monkey. Running adb shell pm clear here
+      // would KILL the app that the lifecycle just launched, causing:
+      //   Cannot start the application. '...HomeActivity' never started.
+      // The lifecycle signals this by setting APPIUM_AUTO_LAUNCH=false.
+      if (process.env.APPIUM_AUTO_LAUNCH !== 'false') {
+        try {
+          const { execSync } = require('child_process');
+          execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_AMAZON_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
+          execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_CHROME_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
+          logger.info('[Hooks] Android pre-session app data cleared via ADB');
+        } catch (err) {
+          logger.warn(`[Hooks] Android pre-session ADB cleanup failed: ${err.message}`);
+        }
+      } else {
+        logger.info('[Hooks] Skipping ADB pm clear — lifecycle already launched the app');
       }
     }
   }
