@@ -10,15 +10,13 @@
  * Lifecycle per scenario:
  *   1. Create brand-new Appium driver session with noReset=false
  *   2. Clear app data via ADB (Android) or removeApp + WebView cleanup (iOS)
- *   3. Handle first-launch onboarding (language selection, sign-in skip)
- *   4. Execute test steps
- *   5. Dispose driver session (always, even on failure)
+ *   3. Execute test steps
+ *   4. Dispose driver session (always, even on failure)
  *
- * iOS isolation (no unsupported mobile: commands):
- *   - No mobile:clearSafariData, mobile:clearCookies, or mobile:clearPasteboard
- *   - Instead: removeApp via Appium (supported), then deleteSession
- *   - WebView JS storage cleared only if a WebView context exists
- *   - noReset=false in capabilities ensures next session starts clean
+ * NOTE: Mobile first-launch language popup handling is done in hooks.js
+ * AFTER createSession() returns and BEFORE any Cucumber step executes.
+ * This separation keeps concerns clear: createSession() creates the
+ * session, hooks.js handles the popup.
  *
  * Thread-safe — no shared mutable state across workers.
  */
@@ -26,7 +24,6 @@
 const logger = require('../../utils/logger');
 const MobileDriverFactory = require('./MobileDriverFactory');
 const { TEST_PLATFORMS } = require('../common/platforms');
-const { handleFirstLaunchIfNeeded } = require('./AmazonFirstLaunchHandler');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -72,12 +69,9 @@ class MobileSessionManager {
   /**
    * Create a brand-new mobile driver session with full isolation guarantees.
    *
-   * After session creation and state clearing, automatically handles the
-   * Amazon app first-launch onboarding flow (language selection, continue,
-   * sign-in skip) so that test scenarios start on the home screen.
-   *
-   * NOTE: Onboarding failures propagate upward — they are NOT silently caught.
-   * If the language screen is present and cannot be handled, the test stops.
+   * Returns the driver immediately after session creation and state clearing.
+   * Mobile popup handling (language selection, sign-in skip) is done in
+   * hooks.js after this method returns — NOT inside createSession().
    *
    * @param {object} config - Environment configuration object
    * @param {number} [retries=2] - Number of retries for transient failures
@@ -107,18 +101,6 @@ class MobileSessionManager {
         await MobileSessionManager.clearAppState(driver, platform).catch(err => {
           logger.warn(`[MobileSessionManager] Initial state clear failed (non-fatal): ${err.message}`);
         });
-
-        // Handle first-launch onboarding (Android only)
-        // Errors propagate — the handler captures screenshots and throws
-        if (isAndroid) {
-          await handleFirstLaunchIfNeeded(driver);
-          logger.info('[MobileSessionManager] Android ready.');
-        }
-
-        // For iOS, log readiness after state clear
-        if (isIOS) {
-          logger.info('[iOS] Session ready.');
-        }
 
         return driver;
       } catch (err) {
@@ -179,8 +161,6 @@ class MobileSessionManager {
     }
 
     // Step 2: For iOS, remove the app entirely so the next session gets a clean install.
-    // This is the supported alternative to unsupported mobile:clear* commands.
-    // The next session's noReset=false + reinstall guarantees zero stale state.
     if (platform === TEST_PLATFORMS.IOS && appId) {
       try {
         await driver.execute('mobile: removeApp', { bundleId: appId });
@@ -227,10 +207,6 @@ class MobileSessionManager {
 
   /**
    * Clear app state (cookies, storage, cache) immediately after session creation.
-   * This ensures no residual state from previous sessions leaks into the new one.
-   *
-   * @param {object} driver - WebDriverIO driver instance
-   * @param {string} platform - 'ANDROID' or 'IOS'
    */
   static async clearAppState(driver, platform) {
     if (!driver || !platform) return;
@@ -246,10 +222,8 @@ class MobileSessionManager {
 
   /**
    * Android-specific app state cleanup.
-   * Uses ADB pm clear + mobile:clearCookies + JS WebView cleanup.
    */
   static async _clearAndroidAppState(driver) {
-    // 1. ADB pm clear — most thorough (removes everything)
     try {
       const { execSync } = require('child_process');
       for (const pkg of ANDROID_WEBVIEW_PACKAGES) {
@@ -262,21 +236,18 @@ class MobileSessionManager {
       }
     } catch (_) { /* ADB not available */ }
 
-    // 2. Appium mobile:clearCookies command
     try {
       await driver.execute('mobile: clearCookies');
     } catch (err) {
       logger.warn(`[MobileSessionManager] Android: mobile:clearCookies failed: ${err.message}`);
     }
 
-    // 3. JS WebView storage cleanup
     try {
       const contexts = await driver.getContexts();
       const webviewContext = contexts.find(ctx => String(ctx).toLowerCase().includes('webview'));
       if (webviewContext) {
         await driver.switchContext(webviewContext);
         await driver.execute(JS_CLEAR_ALL_STORAGE);
-        // Switch back to native
         if (contexts.includes('NATIVE_APP')) {
           await driver.switchContext('NATIVE_APP');
         }
@@ -288,14 +259,7 @@ class MobileSessionManager {
 
   /**
    * iOS-specific app state cleanup.
-   *
-   * Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
-   * or mobile:clearPasteboard commands.
-   *
-   * Instead:
-   *   - Clears WebView storage via JavaScript only if a WebView context exists
-   *   - App is removed via mobile:removeApp during disposeSession (not here)
-   *   - noReset=false in capabilities ensures clean state on next session
+   * No unsupported mobile: commands used.
    */
   static async _clearIOSAppState(driver) {
     let previousContext = null;
@@ -306,9 +270,7 @@ class MobileSessionManager {
     try {
       const contexts = await driver.getContexts();
       const hasWebView = contexts.some(ctx => String(ctx).toLowerCase().includes('webview'));
-      if (!hasWebView) {
-        return;
-      }
+      if (!hasWebView) return;
 
       for (const ctx of contexts) {
         if (String(ctx).toLowerCase().includes('webview')) {
@@ -325,7 +287,6 @@ class MobileSessionManager {
       logger.warn(`[MobileSessionManager] iOS: WebView context listing failed: ${err.message}`);
     }
 
-    // Restore previous context
     if (previousContext) {
       try {
         await driver.switchContext(previousContext);

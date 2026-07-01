@@ -9,6 +9,13 @@
 //   Each test case gets a brand-new Appium driver session via MobileSessionManager.
 //   Sessions are always disposed in After hook — even on failure.
 //   No browser state is ever shared between test cases.
+//
+// Mobile Language Popup Handling:
+//   The Amazon app shows a language selection popup IMMEDIATELY after launch on mobile.
+//   This popup appears BEFORE any Cucumber step can execute.
+//   Therefore, popup handling is done DIRECTLY in this Before hook — NOT in step definitions.
+//   After createSession() returns, Android-specific popup handling runs immediately.
+//   This ensures the app is ready for interaction when the first step executes.
 // ============================================================================
 // API ISOLATION GUARD — Do NOT remove.
 // Three independent defense layers:
@@ -25,6 +32,7 @@ const WebDriverFactory = require('../framework/web/WebDriverFactory');
 const ScreenshotUtility = require('../framework/common/ScreenshotUtility');
 const BrowserCacheCleanup = require('../framework/common/BrowserCacheCleanup');
 const MobileSessionManager = require('../framework/mobile/MobileSessionManager');
+const { handleFirstLaunchIfNeeded } = require('../framework/mobile/AmazonFirstLaunchHandler');
 const { TEST_PLATFORMS } = require('../framework/common/platforms');
 const AppiumAgent = require('../ai/agents/AppiumAgent');
 
@@ -143,15 +151,16 @@ Before(async function (scenario) {
   logger.info(`Scenario started: ${scenario.pickle.name}`);
   this.platform = config.testPlatform;
 
+  // ===================================================================
+  // WEB: Create fresh Playwright context + page per scenario
+  // ===================================================================
   if (isWebExecution) {
-    // Create fresh Playwright context + page per scenario (no state leakage)
     this.context = await WebDriverFactory.newContext(browser, config);
     await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     this.page = await this.context.newPage();
     this.page.setDefaultTimeout(config.timeout);
     this.page.setDefaultNavigationTimeout(config.timeout);
 
-    // Clear any residual browser state (cookies, localStorage, IndexedDB, etc.)
     await BrowserCacheCleanup.clearWeb({ page: this.page }).catch(function(err) {
       logger.warn('Pre-scenario web cache cleanup failed (non-fatal): ' + err.message);
     });
@@ -162,22 +171,44 @@ Before(async function (scenario) {
   // MOBILE: Create brand-new isolated driver session per scenario
   // ===================================================================
   // MobileSessionManager.createSession() guarantees:
-  //   - New Appium session with noReset=false (Android) / fullReset behavior
-  //   - App data cleared via ADB + Appium commands + JS WebView cleanup
+  //   - New Appium session with noReset=false
+  //   - App data cleared via ADB + JS WebView cleanup
   //   - No cookies, storage, cache, or state from previous sessions
   // ===================================================================
 
   logger.info(`[Hooks] Creating new mobile session for scenario: ${scenario.pickle.name}`);
 
+  let driver;
   try {
-    this.driver = await MobileSessionManager.createSession(config);
+    driver = await MobileSessionManager.createSession(config);
   } catch (err) {
     logger.error(`[Hooks] Failed to create mobile session: ${err.message}`);
     throw err;
   }
 
-  // Map driver to page for compatibility with page objects that use this.page
-  this.page = this.driver;
+  this.driver = driver;
+  this.page = driver; // Map driver to page for page object compatibility
+
+  // ===================================================================
+  // MOBILE: Handle language popup BEFORE any step executes
+  // ===================================================================
+  // The Amazon app shows a language selection popup IMMEDIATELY after launch.
+  // This runs BEFORE any Cucumber step — step definitions CANNOT handle this.
+  // Only Android needs this; iOS has no language popup.
+  // ===================================================================
+  if (isAndroidExecution) {
+    try {
+      await handleFirstLaunchIfNeeded(driver);
+      logger.info('[MobileSessionManager] Android ready.');
+    } catch (err) {
+      logger.error(`[Hooks] Android first-launch popup handling failed: ${err.message}`);
+      throw err;
+    }
+  }
+
+  if (isIOSExecution) {
+    logger.info('[iOS] Session ready.');
+  }
 
   logger.info(`[Hooks] New mobile session created for ${config.testPlatform}, scenario: ${scenario.pickle.name}`);
 });
@@ -236,7 +267,7 @@ After(async function (scenario) {
   //   - App is terminated
   //   - Appium session is deleted (with retry)
   //   - ADB pm clear runs as safety net (Android)
-  //   - Safari data cleared (iOS)
+  //   - removeApp runs as safety net (iOS)
   //   - All resources released
   // ===================================================================
   if (this.driver) {
