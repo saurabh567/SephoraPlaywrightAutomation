@@ -43,137 +43,99 @@ const SIGNIN_WAIT_MS = 5000;
 const REPORT_DIR = 'reports';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Robust locator groups (multiple strategies per target)
-//
-// Each array is ordered from most-specific to most-generic.
-// UiScrollable locators are included for items inside scrollable lists.
+// Locator groups
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LANGUAGE_SCREEN_TITLE = [
-  // Accessibility / content-desc
   '~Choose your language',
   '~Select your language',
   '~Language selection',
-  // UiSelector — exact text
   'android=new UiSelector().text("Choose your language")',
   'android=new UiSelector().text("Select your language")',
-  // UiSelector — text contains
   'android=new UiSelector().textContains("Choose your language")',
   'android=new UiSelector().textContains("Select your language")',
   'android=new UiSelector().textContains("language")',
-  // UiScrollable — scrollable container text
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("language"))',
-  // XPath — contains text, any depth
   'xpath=//android.widget.TextView[contains(@text, "Choose your language")]',
   'xpath=//android.widget.TextView[contains(@text, "Select your language")]',
   'xpath=//*[contains(@text, "language")]',
-  // resource-id
   'id:in.amazon.mShop.android.shopping:id/language_title',
 ];
 
 const ENGLISH_TILE = [
-  // Accessibility / content-desc
   '~English',
   '~English (India)',
   '~English – English',
-  // UiSelector — exact text
   'android=new UiSelector().text("English")',
   'android=new UiSelector().text("English – English")',
   'android=new UiSelector().text("English (India)")',
-  // UiSelector — text contains
   'android=new UiSelector().textContains("English")',
-  // UiSelector — className + text
   'android=new UiSelector().className("android.widget.TextView").text("English")',
   'android=new UiSelector().className("android.widget.RadioButton").text("English")',
   'android=new UiSelector().className("android.widget.CheckedTextView").text("English")',
-  // UiScrollable — scroll to English in any scrollable list
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().text("English"))',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("English"))',
-  // XPath — RadioButton with text
   'xpath=//android.widget.RadioButton[@text="English"]',
-  'xpath=//android.widget.RadioButton[@text="English – English"]',
   'xpath=//android.widget.CheckedTextView[@text="English"]',
   'xpath=//android.widget.TextView[@text="English"]',
-  // XPath — any element with exact text "English"
   'xpath=//*[@text="English"]',
   'xpath=//*[@text="English – English"]',
-  // XPath — any element whose text contains English at any depth
-  'xpath=//*[contains(@text(), "English")]',
-  // XPath — descendant text matching English inside any container
   'xpath=//*[@clickable="true"]//*[contains(@text, "English")]',
-  'xpath=//*[contains(@content-desc, "English")]',
-  // resource-id
+  'xpath=//*[contains(@text, "English")]',
   'id:in.amazon.mShop.android.shopping:id/language_english',
   'id:in.amazon.mShop.android.shopping:id/english_radio',
   'id:in.amazon.mShop.android.shopping:id/english_option',
+  'id:in.amazon.mShop.android.shopping:id/english_language',
 ];
 
 const ENGLISH_SELECTED_INDICATOR = [
-  // Checked state on radio button
   'android=new UiSelector().className("android.widget.RadioButton").text("English").selected(true)',
   'android=new UiSelector().className("android.widget.RadioButton").text("English").checked(true)',
   'android=new UiSelector().className("android.widget.CheckedTextView").text("English").checked(true)',
-  // XPath — checked radio button with English text
   'xpath=//android.widget.RadioButton[@text="English" and (@checked="true" or @selected="true")]',
   'xpath=//android.widget.CheckedTextView[@text="English" and @checked="true"]',
-  // Checkmark icon visible (various resource IDs)
   'id:in.amazon.mShop.android.shopping:id/selected_indicator',
   'id:in.amazon.mShop.android.shopping:id/checkmark',
   'id:in.amazon.mShop.android.shopping:id/selection_marker',
-  // Accessibility selected state
   '~English (selected)',
   '~English, selected',
 ];
 
 const CONTINUE_BUTTON = [
-  // Accessibility / content-desc
   '~Continue',
   '~Continue in English',
-  // UiSelector — exact text
   'android=new UiSelector().text("Continue")',
   'android=new UiSelector().text("Continue in English")',
   'android=new UiSelector().textContains("Continue")',
-  // UiScrollable — scroll into view
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().text("Continue"))',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Continue"))',
-  // XPath — Button with text
   'xpath=//android.widget.Button[@text="Continue"]',
-  'xpath=//android.widget.Button[@text="Continue in English"]',
   'xpath=//android.widget.Button[contains(@text, "Continue")]',
-  // XPath — any clickable with text
   'xpath=//*[@clickable="true" and contains(@text, "Continue")]',
   'xpath=//*[contains(@text, "Continue")]',
-  // resource-id
   'id:in.amazon.mShop.android.shopping:id/continue_button',
   'id:in.amazon.mShop.android.shopping:id/continue_btn',
   'id:in.amazon.mShop.android.shopping:id/continue_english_btn',
 ];
 
 const SKIP_SIGNIN_BUTTON = [
-  // Accessibility / content-desc
   '~Skip sign in',
   '~Skip',
   '~Not now',
   '~Continue without signing in',
-  // UiSelector — exact text
   'android=new UiSelector().text("Skip sign in")',
   'android=new UiSelector().text("Skip")',
   'android=new UiSelector().text("Not now")',
   'android=new UiSelector().text("Continue without signing in")',
-  // UiSelector — text contains
   'android=new UiSelector().textContains("Skip")',
   'android=new UiSelector().textContains("Not now")',
   'android=new UiSelector().textContains("Continue without signing")',
-  // UiScrollable
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Skip"))',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Not now"))',
-  // XPath — Button containing text
   'xpath=//android.widget.Button[contains(@text, "Skip")]',
   'xpath=//android.widget.Button[contains(@text, "Not now")]',
   'xpath=//android.widget.Button[contains(@text, "Continue without")]',
-  // XPath — any view containing text
   'xpath=//*[contains(@text, "Skip")]',
-  // resource-id
   'id:in.amazon.mShop.android.shopping:id/skip_sign_in_button',
   'id:in.amazon.mShop.android.shopping:id/skip_btn',
 ];
@@ -189,7 +151,7 @@ const SIGNIN_SCREEN_INDICATORS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Debug helper — dumps page source when a step fails
+// Debug helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function dumpPageSourceSync(driver, label) {
@@ -199,7 +161,6 @@ function dumpPageSourceSync(driver, label) {
     const timestamp = Date.now();
     const filePath = path.join(dir, `page-source-${label}-${timestamp}.xml`);
 
-    // WebDriverIO getPageSource returns a Promise
     if (typeof driver.getPageSource === 'function') {
       driver.getPageSource().then(source => {
         fs.writeFileSync(filePath, source, 'utf8');
@@ -210,10 +171,6 @@ function dumpPageSourceSync(driver, label) {
     logger.warn(`[Android] Page source dump failed: ${err.message}`);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Screenshot helper
-// ─────────────────────────────────────────────────────────────────────────────
 
 function captureScreenshotSync(driver, label) {
   try {
@@ -243,7 +200,6 @@ function captureScreenshotSync(driver, label) {
 
 /**
  * Find a visible element using ANY of the given locator strategies.
- * Returns the first matching visible element, or null if none found.
  */
 async function findAny(driver, locators, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
@@ -265,8 +221,53 @@ async function findAny(driver, locators, timeoutMs = 5000) {
 }
 
 /**
- * Wait until a locator set is NO LONGER visible on the screen.
- * Polls until none of the locators match a displayed element.
+ * Find ANY element on the screen whose rendered text attribute contains
+ * the given substring. Uses getPageSource() XML parsing to discover
+ * elements that standard locators might miss (e.g. due to custom views,
+ * nested layouts, or unexpected class names).
+ *
+ * This is a last-resort fallback when findAny() fails.
+ */
+async function findElementByTextContains(driver, text, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const source = await driver.getPageSource();
+
+      // Escape special regex characters in the search text
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`text="${escaped}[^"]*"`, 'i');
+
+      // Try XPath with text() function (works across all element types)
+      const xpathLocators = [
+        `xpath=//*[contains(text(), "${text}")]`,
+        `xpath=//*[@text="${text}"]`,
+        `xpath=//*[contains(@text, "${text}")]`,
+      ];
+
+      for (const loc of xpathLocators) {
+        try {
+          const elements = await driver.$$(loc);
+          if (elements && elements.length > 0) {
+            for (const el of elements) {
+              const displayed = await el.isDisplayed().catch(() => false);
+              if (displayed) return el;
+            }
+          }
+        } catch {
+          // try next XPath variant
+        }
+      }
+    } catch {
+      // page source fetch failed — wait and retry
+    }
+    await driver.pause(500);
+  }
+  return null;
+}
+
+/**
+ * Wait until a locator set is NO LONGER visible.
  */
 async function waitForAbsence(driver, locators, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
@@ -277,14 +278,9 @@ async function waitForAbsence(driver, locators, timeoutMs = 8000) {
         const elements = await driver.$$(locator);
         if (elements && elements.length > 0) {
           const displayed = await elements[0].isDisplayed().catch(() => false);
-          if (displayed) {
-            found = true;
-            break;
-          }
+          if (displayed) { found = true; break; }
         }
-      } catch {
-        // element gone — that's good
-      }
+      } catch { /* element gone */ }
     }
     if (!found) return true;
     await driver.pause(400);
@@ -311,32 +307,38 @@ async function tapElement(driver, element, label) {
 // Screen detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Check whether the "Choose your language" screen is currently displayed.
- */
 async function isLanguageScreen(driver) {
   const title = await findAny(driver, LANGUAGE_SCREEN_TITLE, 10000);
   return title !== null;
 }
 
-/**
- * Check whether the sign-in screen is currently displayed.
- */
 async function isSignInScreen(driver) {
   const indicator = await findAny(driver, SIGNIN_SCREEN_INDICATORS, 2000);
   return indicator !== null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Onboarding steps — each step throws on failure
+// Onboarding steps
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Step 1: Select the English language tile.
- * Throws if English tile cannot be found or tapped.
+ *
+ * Uses standard locators first (findAny). If those fail, falls back to
+ * page-source parsing (findElementByTextContains) as a last resort.
+ * Throws if English tile cannot be found by any strategy.
  */
 async function stepSelectEnglish(driver) {
-  const english = await findAny(driver, ENGLISH_TILE, 8000);
+  // Strategy A: standard locators
+  let english = await findAny(driver, ENGLISH_TILE, 5000);
+
+  // Strategy B: page-source text search (catches elements with unusual
+  // class names, custom views, or nested structures)
+  if (!english) {
+    logger.info('[Android] Standard locators did not find English tile — trying page-source text search...');
+    english = await findElementByTextContains(driver, 'English', 3000);
+  }
+
   if (!english) {
     dumpPageSourceSync(driver, 'english-tile-not-found');
     captureScreenshotSync(driver, 'english-tile-not-found');
@@ -348,21 +350,25 @@ async function stepSelectEnglish(driver) {
 }
 
 /**
- * Step 2: Verify that English is selected (checkmark / highlight visible).
+ * Step 2: Verify that English is selected.
  */
 async function stepVerifyEnglishSelected(driver) {
   const indicator = await findAny(driver, ENGLISH_SELECTED_INDICATOR, 3000);
   if (!indicator) {
-    logger.warn('[Android] English selection indicator not visible (non-fatal — continuing)');
+    logger.warn('[Android] English selection indicator not visible (non-fatal)');
   }
 }
 
 /**
  * Step 3: Tap the "Continue in English" button.
- * Throws if the button cannot be found or tapped.
  */
 async function stepTapContinue(driver) {
-  const btn = await findAny(driver, CONTINUE_BUTTON, 8000);
+  let btn = await findAny(driver, CONTINUE_BUTTON, 5000);
+
+  if (!btn) {
+    btn = await findElementByTextContains(driver, 'Continue', 3000);
+  }
+
   if (!btn) {
     dumpPageSourceSync(driver, 'continue-button-not-found');
     captureScreenshotSync(driver, 'continue-button-not-found');
@@ -374,8 +380,7 @@ async function stepTapContinue(driver) {
 }
 
 /**
- * Step 4: Wait for the language screen to dismiss completely.
- * Throws if the screen does not disappear within the timeout.
+ * Step 4: Wait for the language screen to dismiss.
  */
 async function stepWaitLanguageScreenDismissed(driver) {
   const gone = await waitForAbsence(driver, LANGUAGE_SCREEN_TITLE, LANG_DISMISS_WAIT_MS);
@@ -391,9 +396,6 @@ async function stepWaitLanguageScreenDismissed(driver) {
 
 /**
  * Step 5: Skip the sign-in screen.
- * Detects whether sign-in is displayed. If yes, finds and taps the
- * Skip / Not now / Continue without signing in button.
- * Throws if sign-in is detected but a dismiss button cannot be found.
  */
 async function stepSkipSignIn(driver) {
   const signInVisible = await isSignInScreen(driver);
@@ -404,7 +406,12 @@ async function stepSkipSignIn(driver) {
 
   logger.info('[Android] Sign-in screen detected — looking for dismiss option...');
 
-  const skipBtn = await findAny(driver, SKIP_SIGNIN_BUTTON, SIGNIN_WAIT_MS);
+  let skipBtn = await findAny(driver, SKIP_SIGNIN_BUTTON, SIGNIN_WAIT_MS);
+
+  if (!skipBtn) {
+    skipBtn = await findElementByTextContains(driver, 'Skip', 3000);
+  }
+
   if (!skipBtn) {
     dumpPageSourceSync(driver, 'skip-signin-button-not-found');
     captureScreenshotSync(driver, 'skip-signin-button-not-found');
@@ -422,19 +429,6 @@ async function stepSkipSignIn(driver) {
 /**
  * Handle the Amazon first-launch onboarding flow if it is displayed.
  *
- * STRICT ORDERING (never skip language to reach sign-in):
- *   1. Detect "Choose your language" screen
- *   2. Select "English" tile
- *   3. Verify English is selected
- *   4. Tap "Continue in English"
- *   5. Wait for language screen to dismiss
- *   6. THEN look for and click "Skip Sign In"
- *
- * If ANY step fails, a screenshot + page source dump are captured and
- * an error is thrown to stop the test immediately.
- *
- * If the onboarding screen is NOT displayed, returns false immediately.
- *
  * @param {object} driver - WebDriverIO driver instance
  * @returns {Promise<boolean>} true if onboarding was handled, false if not displayed
  * @throws {Error} if any onboarding step fails
@@ -445,32 +439,17 @@ async function handleFirstLaunchIfNeeded(driver) {
     return false;
   }
 
-  // Allow the app screen to settle after launch
   await driver.pause(3000);
 
-  // ── STEP 0: Detect language screen ─────────────────────────────────
   const languageVisible = await isLanguageScreen(driver);
-
-  if (!languageVisible) {
-    // No onboarding at all — return immediately
-    return false;
-  }
+  if (!languageVisible) return false;
 
   logger.info('[Android] First launch detected.');
 
-  // ── STEP 1: Select English ─────────────────────────────────────────
   await stepSelectEnglish(driver);
-
-  // ── STEP 2: Verify selection ────────────────────────────────────────
   await stepVerifyEnglishSelected(driver);
-
-  // ── STEP 3: Tap Continue ────────────────────────────────────────────
   await stepTapContinue(driver);
-
-  // ── STEP 4: Wait for language screen to dismiss ────────────────────
   await stepWaitLanguageScreenDismissed(driver);
-
-  // ── STEP 5: Skip sign-in (only now, after language is done) ────────
   await stepSkipSignIn(driver);
 
   logger.info('[Android] First-launch onboarding completed successfully.');
