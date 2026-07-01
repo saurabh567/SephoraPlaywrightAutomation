@@ -16,6 +16,23 @@
 //   Therefore, popup handling is done DIRECTLY in this Before hook — NOT in step definitions.
 //   After createSession() returns, Android-specific popup handling runs immediately.
 //   This ensures the app is ready for interaction when the first step executes.
+//
+// ══════════════════════════════════════════════════════════════════════════════
+// PLATFORM ISOLATION — CRITICAL
+// ══════════════════════════════════════════════════════════════════════════════
+//   Web execution:  this.page   = Playwright page object (has .locator(), .screenshot())
+//   iOS execution:  this.driver = Appium/WebDriverIO driver (has .$(), .saveScreenshot())
+//   Android exec.:  this.driver = Appium/WebDriverIO driver (has .$(), .saveScreenshot())
+//
+//   For backward compatibility with step definitions that reference this.page,
+//   this.page is also set to the driver for mobile execution.  However, the
+//   page objects in pages/ (AmazonHomePage, etc.) detect non-Playwright objects
+//   and delegate to MobileAmazon* implementations automatically.
+//
+//   Screenshots: The After hook ALWAYS passes driver to ScreenshotUtility first
+//   for mobile, avoiding "page.screenshot is not a function".
+// ══════════════════════════════════════════════════════════════════════════════
+//
 // ============================================================================
 // API ISOLATION GUARD — Do NOT remove.
 // Three independent defense layers:
@@ -170,31 +187,54 @@ Before(async function (scenario) {
   // ===================================================================
   // MOBILE: Create brand-new isolated driver session per scenario
   // ===================================================================
-  // MobileSessionManager.createSession() guarantees:
-  //   - New Appium session with noReset=false
-  //   - App data cleared via ADB + JS WebView cleanup
-  //   - No cookies, storage, cache, or state from previous sessions
-  // ===================================================================
-
   logger.info(`[Hooks] Creating new mobile session for scenario: ${scenario.pickle.name}`);
 
   let driver;
   try {
-    driver = await MobileSessionManager.createSession(config);
+    if (isIOSExecution && String(config.mobile.browserName || '').toLowerCase() === 'safari') {
+      // ══════════════════════════════════════════════════════════════════
+      // iOS Safari: Use createSafariSession which provides a clean,
+      // linear lifecycle:
+      //   1. Terminate Safari
+      //   2. Create fresh Safari session
+      //   3. Switch WEBVIEW
+      //   4. Navigate to BASE_URL
+      //   5. Wait for visible homepage elements
+      //   6. Return ready driver
+      //
+      // No URL contamination detection.
+      // No about:blank.
+      // No recursive recreation.
+      // No retry loops.
+      // ══════════════════════════════════════════════════════════════════
+      driver = await MobileSessionManager.createSafariSession(config);
+    } else {
+      // Standard session creation for Android or iOS native app
+      driver = await MobileSessionManager.createSession(config);
+    }
   } catch (err) {
     logger.error(`[Hooks] Failed to create mobile session: ${err.message}`);
     throw err;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // MOBILE: Set both this.driver AND this.page
+  //
+  // this.driver — canonical reference for mobile step definitions
+  // this.page   — set to same driver for backward compatibility with
+  //               step definitions that reference this.page.  The page
+  //               objects in pages/ (AmazonHomePage, etc.) detect that
+  //               a non-Playwright object was passed and delegate to
+  //               MobileAmazon* implementations.
+  //
+  // Screenshots ALWAYS prefer this.driver over this.page (see After hook)
+  // to avoid "page.screenshot is not a function" errors.
+  // ══════════════════════════════════════════════════════════════════
   this.driver = driver;
-  this.page = driver; // Map driver to page for page object compatibility
+  this.page = driver;
 
   // ===================================================================
-  // MOBILE: Handle language popup BEFORE any step executes
-  // ===================================================================
-  // The Amazon app shows a language selection popup IMMEDIATELY after launch.
-  // This runs BEFORE any Cucumber step — step definitions CANNOT handle this.
-  // Only Android needs this; iOS has no language popup.
+  // MOBILE: Handle language popup BEFORE any step executes (Android)
   // ===================================================================
   if (isAndroidExecution) {
     try {
@@ -207,7 +247,7 @@ Before(async function (scenario) {
   }
 
   if (isIOSExecution) {
-    logger.info('[iOS] Session ready.');
+    logger.info(`[Hooks] iOS session ready for scenario: ${scenario.pickle.name}`);
   }
 
   logger.info(`[Hooks] New mobile session created for ${config.testPlatform}, scenario: ${scenario.pickle.name}`);
@@ -228,74 +268,118 @@ After(async function (scenario) {
   }
 
   const safeName = this.artifactName;
-  const tracePath = path.join(config.reportDir, 'traces', `${safeName}.zip`);
 
   if (scenario.result.status === Status.FAILED) {
     const screenshotPath = path.join(config.reportDir, 'screenshots', `${safeName}.png`);
     logger.error(`Scenario failed: ${scenario.pickle.name}`);
 
-    if (this.page || this.driver) {
+    // ══════════════════════════════════════════════════════════════════
+    // Screenshot capture: ALWAYS prefer driver over page.
+    // For mobile, this.driver is an Appium driver with saveScreenshot().
+    // For web, this.page is a Playwright page with screenshot().
+    //
+    // NEVER call page.screenshot() on an Appium driver.
+    // ══════════════════════════════════════════════════════════════════
+    if (this.driver) {
       try {
-        const screenshot = await ScreenshotUtility.capture({ page: this.page, driver: this.driver, filePath: screenshotPath });
+        const screenshot = await ScreenshotUtility.capture({ driver: this.driver, filePath: screenshotPath });
         await this.attach(screenshot, 'image/png');
-        logger.error(`Screenshot captured: ${screenshotPath}`);
+        logger.info(`[Hooks] Mobile screenshot captured (via driver): ${screenshotPath}`);
       } catch (err) {
-        logger.warn(`Screenshot capture failed (session may be dead): ${err.message}`);
+        logger.warn(`[Hooks] Mobile screenshot via driver failed: ${err.message}`);
+        // Fallback: try with page (legacy)
+        try {
+          if (this.page && typeof this.page.screenshot === 'function') {
+            const screenshot = await ScreenshotUtility.capture({ page: this.page, filePath: screenshotPath });
+            await this.attach(screenshot, 'image/png');
+            logger.info(`[Hooks] Mobile screenshot captured (via page): ${screenshotPath}`);
+          }
+        } catch (e2) {
+          logger.warn(`[Hooks] All screenshot attempts failed: ${e2.message}`);
+        }
+      }
+    } else if (this.page && typeof this.page.screenshot === 'function') {
+      try {
+        const screenshot = await ScreenshotUtility.capture({ page: this.page, filePath: screenshotPath });
+        await this.attach(screenshot, 'image/png');
+        logger.info(`[Hooks] Web screenshot captured: ${screenshotPath}`);
+      } catch (err) {
+        logger.warn(`[Hooks] Web screenshot capture failed: ${err.message}`);
       }
     } else {
-      logger.warn(`Screenshot skipped because no browser page or mobile driver was created: ${scenario.pickle.name}`);
+      logger.warn(`[Hooks] Screenshot skipped — no usable page/driver available: ${scenario.pickle.name}`);
     }
   } else {
     logger.info(`Scenario passed: ${scenario.pickle.name}`);
   }
 
   // Post-scenario cache cleanup to prevent state leakage (Web only)
-  if (isWebExecution && this.page) {
-    await BrowserCacheCleanup.clearPostScenario({ page: this.page, platform: 'WEB' }).catch(() => {});
+  if (isWebExecution && this.page && typeof this.page.locator === 'function') {
+    try {
+      await BrowserCacheCleanup.clearPostScenario({ page: this.page, platform: 'WEB' });
+    } catch (err) {
+      logger.warn(`[Hooks] Post-scenario cleanup warning: ${err.message}`);
+    }
   }
 
-  // Close web context (clears all state for the next scenario)
-  if (this.context) {
-    await this.context.tracing.stop({ path: tracePath });
-    await this.context.close();
-  }
-
-  // ===================================================================
-  // MOBILE: Always dispose the driver session, even on failure
-  // ===================================================================
-  // MobileSessionManager.disposeSession() guarantees:
-  //   - App is terminated
-  //   - Appium session is deleted (with retry)
-  //   - ADB pm clear runs as safety net (Android)
-  //   - removeApp runs as safety net (iOS)
-  //   - All resources released
-  // ===================================================================
-  if (this.driver) {
-    const appId = getMobileAppId();
-    logger.info(`[Hooks] Disposing mobile session for scenario: ${scenario.pickle.name}`);
-    await MobileSessionManager.disposeSession(this.driver, {
-      platform: config.testPlatform,
-      appId
-    });
+  // ══════════════════════════════════════════════════════════════════════════
+  // MOBILE: Dispose the driver session (always, even on failure)
+  //
+  // Cleanup is simple:
+  //   - delete WebDriver session
+  //   - terminate Safari (iOS)
+  //   - remove app (iOS)
+  //   - no recursive recovery
+  //   - no URL verification
+  //   - no about:blank verification
+  // ══════════════════════════════════════════════════════════════════════════
+  if (isMobileExecution && this.driver) {
+    try {
+      await MobileSessionManager.disposeSession(this.driver, {
+        platform: config.testPlatform,
+        appId: getMobileAppId()
+      });
+      logger.info('[Hooks] Mobile session disposed successfully');
+    } catch (err) {
+      logger.warn(`[Hooks] Mobile session dispose failed: ${err.message}`);
+    }
     this.driver = null;
     this.page = null;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WEB: Close context and page
+  // ══════════════════════════════════════════════════════════════════════════
+  if (isWebExecution) {
+    // Close context (which also closes the page inside it)
+    if (this.context) {
+      try {
+        await this.context.close();
+        logger.info(`[Hooks] Browser context closed for: ${scenario.pickle.name}`);
+      } catch (err) {
+        logger.warn(`[Hooks] Context close failed: ${err.message}`);
+      }
+      this.context = null;
+      this.page = null;
+    }
   }
 });
 
 // ── AfterAll: runs once per worker ─────────────────────────────────────────
 
 AfterAll(async function () {
-  // API ISOLATION: Never close browser for API-only execution
   if (isApiOnlyExecution) {
     logger.info('[Hooks] API-only AfterAll: browser close skipped');
     return;
   }
 
   if (isWebExecution && browser) {
-    await browser.close();
-    logger.info(`Browser closed successfully for worker: ${workerId}`);
-  }
-  if (isIOSExecution) {
-    await AppiumAgent.stopServerIfStartedByFramework();
+    try {
+      await browser.close();
+      logger.info('[Hooks] Browser closed successfully.');
+    } catch (err) {
+      logger.warn(`[Hooks] Browser close failed: ${err.message}`);
+    }
+    browser = null;
   }
 });

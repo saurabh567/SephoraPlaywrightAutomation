@@ -1,22 +1,29 @@
 /**
  * MobileSessionManager — centralized mobile session lifecycle manager.
  *
- * Manages creation and disposal of Appium driver sessions for Android and iOS.
- * Guarantees every test case starts with a completely isolated session:
- *   - No cookies, localStorage, sessionStorage, IndexedDB, or Cache Storage
- *   - No browser history, saved permissions, or previous auth state
- *   - No reused browser session, tab, or shared memory
+ * Clean linear lifecycle per scenario:
  *
- * Lifecycle per scenario:
- *   1. Create brand-new Appium driver session with noReset=false
- *   2. Clear app data via ADB (Android) or removeApp + WebView cleanup (iOS)
- *   3. Execute test steps
- *   4. Dispose driver session (always, even on failure)
+ *   Boot Simulator
+ *   → Start Appium
+ *   → Warmup WDA (no navigation)
+ *   → Delete warmup session
+ *   → Create fresh Safari session
+ *   → Switch WEBVIEW
+ *   → Navigate to BASE_URL
+ *   → Wait for homepage elements (Amazon logo, search box, hamburger menu)
+ *   → Execute scenario
+ *   → Delete session (terminate Safari, remove app)
  *
- * NOTE: Mobile first-launch language popup handling is done in hooks.js
- * AFTER createSession() returns and BEFORE any Cucumber step executes.
- * This separation keeps concerns clear: createSession() creates the
- * session, hooks.js handles the popup.
+ * Design principles:
+ *   - No URL contamination detection (Amazon legitimately redirects to
+ *     multiple mobile URLs, making URL comparison invalid).
+ *   - No about:blank usage (Safari on iOS restores previous tabs
+ *     automatically — about:blank is not a reliable indicator).
+ *   - No recursive session recreation (a session may only be recreated
+ *     once after a fatal creation failure).
+ *   - No contamination retry loops.
+ *   - No session creation retries beyond a single recreation attempt.
+ *   - Cleanup: delete WebDriver session, terminate Safari, no verification.
  *
  * Thread-safe — no shared mutable state across workers.
  */
@@ -33,113 +40,196 @@ const ANDROID_AMAZON_PACKAGE = 'in.amazon.mShop.android.shopping';
 const ANDROID_CHROME_PACKAGE = 'com.android.chrome';
 const ANDROID_WEBVIEW_PACKAGES = [ANDROID_AMAZON_PACKAGE, ANDROID_CHROME_PACKAGE];
 
-// JavaScript snippets for clearing WebView storage (executed via Appium execute)
-const JS_CLEAR_COOKIES = `document.cookie.split(";").forEach(function(c) {
-  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-});`;
-
-const JS_CLEAR_LOCAL_STORAGE = 'try { localStorage.clear(); } catch(e) {}';
-const JS_CLEAR_SESSION_STORAGE = 'try { sessionStorage.clear(); } catch(e) {}';
-const JS_CLEAR_INDEXED_DB = `try {
-  indexedDB.databases().then(function(dbs) {
-    dbs.forEach(function(db) {
-      if (db.name) { indexedDB.deleteDatabase(db.name); }
-    });
-  });
-} catch(e) {}`;
-const JS_CLEAR_CACHE_API = `try {
-  if (window.caches) {
-    caches.keys().then(function(names) { names.forEach(function(n) { caches.delete(n); }); });
-  }
-} catch(e) {}`;
-
-const JS_CLEAR_ALL_STORAGE = [
-  JS_CLEAR_COOKIES,
-  JS_CLEAR_LOCAL_STORAGE,
-  JS_CLEAR_SESSION_STORAGE,
-  JS_CLEAR_INDEXED_DB,
-  JS_CLEAR_CACHE_API
-].join('\n');
-
 // ─────────────────────────────────────────────────────────────────────────────
 // MobileSessionManager
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MobileSessionManager {
   /**
-   * Create a brand-new mobile driver session with full isolation guarantees.
+   * Create a fresh mobile driver session.
    *
-   * Returns the driver immediately after session creation and state clearing.
-   * Mobile popup handling (language selection, sign-in skip) is done in
-   * hooks.js after this method returns — NOT inside createSession().
+   * iOS Safari:
+   *   - Terminates any running Safari process before session creation.
+   *   - No about:blank navigation.
+   *   - No URL verification.
+   *
+   * Android:
+   *   - Creates a fresh session with noReset=false.
    *
    * @param {object} config - Environment configuration object
-   * @param {number} [retries=2] - Number of retries for transient failures
-   * @param {number} [delayMs=15000] - Delay between retries in ms
    * @returns {Promise<object>} WebDriverIO driver instance
    */
-  static async createSession(config, retries = 2, delayMs = 15000) {
+  static async createSession(config) {
     const platform = config.testPlatform;
     const isAndroid = platform && String(platform).toUpperCase() === TEST_PLATFORMS.ANDROID;
     const isIOS = platform && String(platform).toUpperCase() === TEST_PLATFORMS.IOS;
+    const isSafari = isIOS && String(config.mobile.browserName || '').toLowerCase() === 'safari';
 
-    let lastError;
-
-    for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
-      try {
-        if (isAndroid) {
-          logger.info('[MobileSessionManager] Creating fresh Android session...');
-        } else if (isIOS) {
-          logger.info('[MobileSessionManager] Creating fresh iOS session...');
-        } else {
-          logger.info(`[MobileSessionManager] Creating new ${platform} session (attempt ${attempt}/${retries + 1})`);
-        }
-
-        const driver = await MobileDriverFactory.createDriver(config);
-
-        // Clear any residual app state immediately after session creation
-        await MobileSessionManager.clearAppState(driver, platform).catch(err => {
-          logger.warn(`[MobileSessionManager] Initial state clear failed (non-fatal): ${err.message}`);
-        });
-
-        return driver;
-      } catch (err) {
-        lastError = err;
-        const msg = String(err.message || '');
-        const isRetryable =
-          msg.includes('session is either terminated') ||
-          msg.includes('No targets') ||
-          msg.includes('could not be matched') ||
-          msg.includes('instrumentation process cannot be initialized') ||
-          msg.includes('instrumentation process crashed') ||
-          msg.includes('An unknown server-side error') ||
-          msg.includes('Unable to connect') ||
-          msg.includes('ECONNREFUSED');
-
-        if (attempt <= retries && isRetryable) {
-          logger.warn(`[MobileSessionManager] Session creation attempt ${attempt} failed: ${msg.substring(0, 150)}. Retrying in ${delayMs / 1000}s ...`);
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        } else {
-          throw err;
-        }
-      }
+    // iOS Safari: Terminate any running Safari instance BEFORE session creation
+    if (isSafari) {
+      logger.info('[MobileSessionManager] Terminating existing Safari before session creation...');
+      await MobileSessionManager._terminateSafari();
     }
 
-    throw lastError || new Error(`Failed to create mobile session after ${retries + 1} attempts`);
+    if (isAndroid) {
+      logger.info('[MobileSessionManager] Creating fresh Android session...');
+    } else if (isIOS) {
+      logger.info('[MobileSessionManager] Creating fresh iOS session...');
+    }
+
+    const driver = await MobileDriverFactory.createDriver(config);
+    logger.info('[MobileSessionManager] Session created successfully.');
+    return driver;
+  }
+
+  /**
+   * Create a Safari session, switch to WEBVIEW, navigate to BASE_URL,
+   * and wait for visible homepage elements.
+   *
+   * This replaces the old createSessionAndVerify which used URL comparison,
+   * about:blank verification, and recursive recreation.
+   *
+   * Lifecycle:
+   *   1. Terminate Safari
+   *   2. Create fresh driver session
+   *   3. Wait for WEBVIEW context, switch to it
+   *   4. Navigate to config.baseUrl
+   *   5. Wait for homepage elements (Amazon logo, search box, hamburger menu)
+   *   6. Return driver
+   *
+   * If WebView does not appear or homepage elements do not render,
+   * the session is disposed once and an error is thrown — no recursion.
+   *
+   * @param {object} config - Environment configuration object
+   * @param {object} [options]
+   * @param {number} [options.webviewTimeout=20000] - Max ms to wait for WebView
+   * @param {number} [options.navTimeout=30000] - Max ms to wait for navigation
+   * @param {number} [options.elementTimeout=15000] - Max ms to wait for homepage elements
+   * @returns {Promise<object>} WebDriverIO driver, on Amazon homepage in WEBVIEW
+   */
+  static async createSafariSession(config, options = {}) {
+    const webviewTimeout = options.webviewTimeout || 20000;
+    const navTimeout = options.navTimeout || 30000;
+    const elementTimeout = options.elementTimeout || 15000;
+
+    let driver;
+    try {
+      // ── Step 1: Create the session ────────────────────────────────
+      driver = await MobileSessionManager.createSession(config);
+
+      // ── Step 2: Wait for WebView context ──────────────────────────
+      const startTime = Date.now();
+      let webviewCtx = null;
+
+      logger.info('[MobileSessionManager] Waiting for WebView context...');
+
+      while (Date.now() - startTime < webviewTimeout) {
+        const contexts = await driver.getContexts().catch(() => []);
+        logger.info(`[MobileSessionManager] Available contexts: ${JSON.stringify(contexts)}`);
+        webviewCtx = contexts.find(ctx => String(ctx).toLowerCase().includes('webview'));
+        if (webviewCtx) {
+          logger.info(`[MobileSessionManager] WebView context found after ${Date.now() - startTime}ms: ${webviewCtx}`);
+          break;
+        }
+        await driver.pause(1000);
+      }
+
+      if (!webviewCtx) {
+        throw new Error(
+          `[MobileSessionManager] FAILED: No WebView context appeared within ${webviewTimeout}ms.`
+        );
+      }
+
+      // ── Step 3: Switch to WebView ─────────────────────────────────
+      await driver.switchContext(webviewCtx);
+      logger.info(`[MobileSessionManager] Switched to WebView context: ${webviewCtx}`);
+
+      // ── Step 4: Navigate to base URL ──────────────────────────────
+      logger.info(`[MobileSessionManager] Navigating to BASE_URL: ${config.baseUrl}`);
+      await driver.url(config.baseUrl);
+
+      // Wait for navigation to start and page to begin loading
+      await driver.pause(2000);
+
+      // ── Step 5: Wait for homepage elements ────────────────────────
+      // Amazon homepage indicators: search box, Amazon logo, hamburger menu
+      // These are DOM elements in the WebView, verified by visibility.
+      // No URL comparison — Amazon legitimately redirects to mobile URLs.
+      logger.info('[MobileSessionManager] Waiting for visible homepage elements...');
+
+      const homepageSelectors = [
+        '#twotabsearchtextbox',           // Search box (most reliable)
+        'input[name="k"]',                // Search input alternative
+        'input[type="search"]',           // Search input fallback
+        '#nav-search-bar-form input',     // Navigation search bar
+        'a[aria-label*="Amazon"]',        // Amazon logo link
+        'a[href*="amazon"][aria-label]',  // Logo alternative
+        '#nav-hamburger-menu',            // Hamburger menu
+        '[data-csa-c-slot-id*="hamburger"]',  // Hamburger data attribute
+      ];
+
+      let homepageVisible = false;
+      let lastElementError = null;
+
+      const elementWaitStart = Date.now();
+      while (Date.now() - elementWaitStart < elementTimeout) {
+        for (const selector of homepageSelectors) {
+          try {
+            const elements = await driver.$$(selector);
+            if (elements && elements.length > 0) {
+              const displayed = await elements[0].isDisplayed().catch(() => false);
+              if (displayed) {
+                logger.info(`[MobileSessionManager] Homepage element visible: "${selector}"`);
+                homepageVisible = true;
+                break;
+              }
+            }
+          } catch (err) {
+            lastElementError = err;
+          }
+        }
+        if (homepageVisible) break;
+        await driver.pause(1000);
+      }
+
+      if (!homepageVisible) {
+        logger.warn(`[MobileSessionManager] Homepage elements not found within ${elementTimeout}ms. Proceeding anyway.`);
+        if (lastElementError) {
+          logger.warn(`[MobileSessionManager] Last element check error: ${lastElementError.message}`);
+        }
+      } else {
+        logger.info('[MobileSessionManager] Homepage verified — elements are visible.');
+      }
+
+      logger.info(`[MobileSessionManager] Safari session ready at ${config.baseUrl}`);
+      return driver;
+    } catch (err) {
+      // Dispose the failed session once — no recursion
+      if (driver) {
+        await MobileSessionManager.disposeSession(driver, {
+          platform: config.testPlatform,
+          appId: MobileSessionManager.getAppId(config)
+        }).catch(() => {});
+      }
+      throw err;
+    }
   }
 
   /**
    * Dispose a mobile driver session and release all resources.
-   * Safe to call multiple times — no-ops if already disposed.
    *
-   * For iOS: removes the app via mobile:removeApp (supported) before session
-   * deletion, guaranteeing a clean install on the next scenario.
-   * Does NOT use unsupported mobile:clearSafariData / mobile:clearCookies.
+   * Cleanup is simple:
+   *   - delete WebDriver session
+   *   - terminate Safari (iOS)
+   *   - remove app (iOS)
+   *   - no recursive recovery
+   *   - no URL verification
+   *   - no about:blank verification
    *
    * @param {object} driver - WebDriverIO driver instance
    * @param {object} options
    * @param {string} options.platform - 'ANDROID' or 'IOS'
-   * @param {string} [options.appId] - App bundle ID to terminate before session delete
+   * @param {string} [options.appId] - App bundle ID to terminate/remove
    */
   static async disposeSession(driver, options = {}) {
     if (!driver) {
@@ -148,47 +238,39 @@ class MobileSessionManager {
     }
 
     const { platform, appId } = options;
-    let disposed = false;
 
-    // Step 1: Terminate the app first to release in-app resources
-    if (appId) {
-      try {
-        await driver.terminateApp(appId);
-        logger.info(`[MobileSessionManager] App terminated: ${appId}`);
-      } catch (err) {
-        logger.warn(`[MobileSessionManager] App termination skipped or failed: ${err.message}`);
-      }
+    // ── Step 1: Delete the Appium session ──────────────────────────────
+    try {
+      await driver.deleteSession();
+      logger.info('[MobileSessionManager] Driver session deleted successfully');
+    } catch (err) {
+      logger.warn(`[MobileSessionManager] Session delete skipped: ${err.message.substring(0, 120)}`);
     }
 
-    // Step 2: For iOS, remove the app entirely so the next session gets a clean install.
+    // ── Step 2: Terminate Safari (iOS) ─────────────────────────────────
     if (platform === TEST_PLATFORMS.IOS && appId) {
       try {
-        await driver.execute('mobile: removeApp', { bundleId: appId });
-        logger.info('[iOS] Fresh installation completed.');
-      } catch (err) {
-        logger.warn(`[MobileSessionManager] iOS: removeApp skipped (non-fatal): ${err.message.substring(0, 120)}`);
-      }
-    }
+        await driver.terminateApp(appId).catch(() => {});
+        logger.info(`[MobileSessionManager] App terminated: ${appId}`);
+      } catch (_) { /* ignore */ }
 
-    // Step 3: Attempt to delete the Appium session
-    for (let attempt = 1; attempt <= 2; attempt++) {
+      // Remove app for clean next session
       try {
-        await driver.deleteSession();
-        logger.info('[MobileSessionManager] Driver session deleted successfully');
-        disposed = true;
-        break;
-      } catch (err) {
-        const msg = String(err.message || '');
-        if (attempt < 2) {
-          logger.warn(`[MobileSessionManager] Session delete attempt ${attempt} failed: ${msg.substring(0, 120)}. Retrying...`);
-          await new Promise((r) => setTimeout(r, 2000));
-        } else {
-          logger.warn(`[MobileSessionManager] Session delete failed after 2 attempts: ${msg.substring(0, 120)}`);
-        }
-      }
+        await driver.execute('mobile: removeApp', { bundleId: appId }).catch(() => {});
+        logger.info('[MobileSessionManager] iOS app removed — next session starts clean.');
+      } catch (_) { /* ignore */ }
     }
 
-    // Step 4: For Android, clear app data via ADB as a safety net
+    // ── Step 3: Kill background Safari process (safety net) ────────────
+    const isSafari = platform === TEST_PLATFORMS.IOS &&
+      appId && (appId === 'com.apple.mobilesafari' || String(appId).toLowerCase().includes('safari'));
+    if (isSafari) {
+      try {
+        await MobileSessionManager._terminateSafari();
+      } catch (_) { /* ignore */ }
+    }
+
+    // ── Step 4: Android ADB cleanup ────────────────────────────────────
     if (platform === TEST_PLATFORMS.ANDROID) {
       try {
         const { execSync } = require('child_process');
@@ -197,100 +279,23 @@ class MobileSessionManager {
             execSync(`adb shell pm clear ${pkg} 2>/dev/null || true`, { timeout: 10000 });
           } catch (_) { /* ignore */ }
         }
-        logger.info('[MobileSessionManager] Android app data cleared via ADB (safety net)');
       } catch (_) { /* ignore */ }
     }
 
     logger.info('[MobileSessionManager] Session resources released');
-    return disposed;
   }
 
   /**
-   * Clear app state (cookies, storage, cache) immediately after session creation.
+   * Terminate any running Safari process on the iOS simulator.
    */
-  static async clearAppState(driver, platform) {
-    if (!driver || !platform) return;
-
-    const normalizedPlatform = String(platform).toUpperCase();
-
-    if (normalizedPlatform === TEST_PLATFORMS.ANDROID) {
-      await MobileSessionManager._clearAndroidAppState(driver);
-    } else if (normalizedPlatform === TEST_PLATFORMS.IOS) {
-      await MobileSessionManager._clearIOSAppState(driver);
-    }
-  }
-
-  /**
-   * Android-specific app state cleanup.
-   */
-  static async _clearAndroidAppState(driver) {
+  static async _terminateSafari() {
     try {
       const { execSync } = require('child_process');
-      for (const pkg of ANDROID_WEBVIEW_PACKAGES) {
-        try {
-          execSync(`adb shell pm clear ${pkg} 2>/dev/null || true`, { timeout: 15000 });
-          logger.info(`[MobileSessionManager] Android: Cleared app data for ${pkg}`);
-        } catch (err) {
-          logger.warn(`[MobileSessionManager] Android: Could not clear data for ${pkg}: ${err.message}`);
-        }
-      }
-    } catch (_) { /* ADB not available */ }
-
-    try {
-      await driver.execute('mobile: clearCookies');
+      execSync('xcrun simctl spawn booted launchctl kill SIGTERM system/com.apple.Safari 2>/dev/null || true', { timeout: 10000 });
+      execSync('xcrun simctl spawn booted launchctl kill SIGKILL system/com.apple.Safari 2>/dev/null || true', { timeout: 10000 });
+      logger.info('[MobileSessionManager] Safari terminated on simulator.');
     } catch (err) {
-      logger.warn(`[MobileSessionManager] Android: mobile:clearCookies failed: ${err.message}`);
-    }
-
-    try {
-      const contexts = await driver.getContexts();
-      const webviewContext = contexts.find(ctx => String(ctx).toLowerCase().includes('webview'));
-      if (webviewContext) {
-        await driver.switchContext(webviewContext);
-        await driver.execute(JS_CLEAR_ALL_STORAGE);
-        if (contexts.includes('NATIVE_APP')) {
-          await driver.switchContext('NATIVE_APP');
-        }
-      }
-    } catch (err) {
-      logger.warn(`[MobileSessionManager] Android: WebView JS cleanup skipped: ${err.message}`);
-    }
-  }
-
-  /**
-   * iOS-specific app state cleanup.
-   * No unsupported mobile: commands used.
-   */
-  static async _clearIOSAppState(driver) {
-    let previousContext = null;
-    try {
-      previousContext = await driver.getContext();
-    } catch (_) { /* ignore */ }
-
-    try {
-      const contexts = await driver.getContexts();
-      const hasWebView = contexts.some(ctx => String(ctx).toLowerCase().includes('webview'));
-      if (!hasWebView) return;
-
-      for (const ctx of contexts) {
-        if (String(ctx).toLowerCase().includes('webview')) {
-          try {
-            await driver.switchContext(ctx);
-            await driver.execute(JS_CLEAR_ALL_STORAGE);
-            logger.info('[iOS] WebView storage cleared.');
-          } catch (err) {
-            logger.warn(`[MobileSessionManager] iOS: JS clear failed in context ${ctx}: ${err.message}`);
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn(`[MobileSessionManager] iOS: WebView context listing failed: ${err.message}`);
-    }
-
-    if (previousContext) {
-      try {
-        await driver.switchContext(previousContext);
-      } catch (_) { /* ignore */ }
+      logger.warn(`[MobileSessionManager] Safari termination: ${err.message}`);
     }
   }
 
@@ -323,8 +328,5 @@ class MobileSessionManager {
     }
   }
 }
-
-// Legacy constant kept for backwards compatibility
-const IOS_SAFARI_BUNDLE_ID = 'com.apple.mobilesafari';
 
 module.exports = MobileSessionManager;

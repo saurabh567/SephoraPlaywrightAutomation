@@ -14,6 +14,13 @@
  * 8. Stop simulator after execution unless KEEP_IOS_SIMULATOR=true
  * 9. Stop Appium after execution unless KEEP_APPIUM_SERVER=true
  * 10. Generate lifecycle report under reports/ai/ios-execution-lifecycle-summary.md
+ *
+ * Warmup:
+ *   The warmup session ONLY verifies that Appium and WDA can create a Safari
+ *   session. It MUST never visit amazon.in, never create cookies, and never
+ *   modify Safari state. Navigation is omitted entirely — the session is
+ *   created, contexts are listed (to confirm WDA is operational), and then
+ *   the session is deleted immediately.
  */
 
 const { spawn, execSync } = require('child_process');
@@ -304,14 +311,12 @@ async function startAppium() {
   pass('appiumAutoStart');
 }
 
-// --- WDA warmup with retry logic --------------------------------------------
+// --- WDA warmup — no navigation, no state modification -----------------------
 
 async function warmupWDA() {
-  console.log('[lifecycle] Warming up WebDriverAgent (WDA) with a test session ...');
+  console.log('[lifecycle] Warming up WebDriverAgent (WDA) with a minimal Safari session ...');
 
   // ── Pre-check: verify Appium is truly ready ─────────────────────────
-  // Do NOT rely solely on /status — also verify the root endpoint responds.
-  // Run this check for up to 60s before attempting any session.
   console.log('[lifecycle] Running pre-warmup Appium readiness check ...');
   let appiumReady = false;
   const preCheckStart = Date.now();
@@ -340,119 +345,103 @@ async function warmupWDA() {
     console.log('[lifecycle] Pre-check passed — Appium is ready for sessions.');
   }
 
-  // ── Session creation with retry ─────────────────────────────────────
-  const maxRetries = 4;
-  // Base paths to try: Appium 2.x uses '/', Appium 1.x uses '/wd/hub'
+  // ── Session creation (one attempt, no retry loop for warmup) ────────
   const basePaths = ['/', '/wd/hub'];
   let lastError;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // Try each base path
-    for (const basePath of basePaths) {
+  for (const basePath of basePaths) {
+    try {
+      console.log(`[lifecycle] Warmup: creating Safari session via path="${basePath}" ...`);
+
+      const { remote } = require('webdriverio');
+
+      const warmupCaps = {
+        platformName: 'iOS',
+        'appium:automationName': 'XCUITest',
+        'appium:deviceName': process.env.DEVICE_NAME || SIMULATOR_NAME,
+        'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
+        'appium:browserName': 'Safari',
+        browserName: 'Safari',
+        'safari:useSimulator': true,
+        'appium:udid': process.env.UDID || undefined,
+        'appium:noReset': true,
+        'appium:fullReset': false,
+        'appium:newCommandTimeout': 180,
+        'appium:wdaLaunchTimeout': 300000,
+        'appium:wdaConnectionTimeout': 300000,
+        'appium:useNewWDA': false,
+        'appium:autoAcceptAlerts': true,
+        'appium:autoDismissAlerts': false,
+        // Intentionally omit appium:appIdKey — it is only for native apps,
+        // not Safari. Setting it for Safari causes 'Missing parameter: appIdKey'.
+      };
+
+      if (process.env.UDID) warmupCaps['appium:udid'] = process.env.UDID;
+
+      const warmupDriver = await remote({
+        protocol: 'http',
+        hostname: APPIUM_HOST,
+        port: APPIUM_PORT,
+        path: basePath,
+        logLevel: 'error',
+        connectionRetryTimeout: 180000,
+        connectionRetryCount: 2,
+        capabilities: warmupCaps,
+      });
+
+      console.log('[lifecycle] WDA warmup session created successfully.');
+
+      // Get contexts to confirm Safari/WDA is fully operational
+      // No navigation to amazon.in — this warmup must never modify Safari state.
       try {
-        if (attempt > 1 || basePath !== basePaths[0]) {
-          const delay = basePath === basePaths[0] && attempt > 1
-            ? Math.min(5000 * Math.pow(2, attempt - 2), 30_000)
-            : 1000;
-          console.log(`[lifecycle] Warmup attempt ${attempt}/${maxRetries} path="${basePath}" in ${delay}ms ...`);
-          await new Promise((r) => setTimeout(r, delay));
-        } else {
-          console.log(`[lifecycle] Warmup attempt ${attempt}/${maxRetries} path="${basePath}" ...`);
-        }
+        const contexts = await warmupDriver.getContexts();
+        console.log(`[lifecycle] Available contexts: ${contexts.join(', ')}`);
+      } catch (e) {
+        console.log(`[lifecycle] Context check: ${e.message}`);
+      }
 
-        const { remote } = require('webdriverio');
+      // Close warmup session immediately — no navigation, no cookies, no state.
+      await warmupDriver.deleteSession();
+      console.log('[lifecycle] WDA warmup session closed cleanly.');
 
-        const warmupCaps = {
-          platformName: 'iOS',
-          'appium:automationName': 'XCUITest',
-          'appium:deviceName': process.env.DEVICE_NAME || SIMULATOR_NAME,
-          'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
-          'appium:browserName': 'Safari',
-          'appium:udid': process.env.UDID || undefined,
-          'appium:noReset': true,
-          'appium:fullReset': false,
-          'appium:newCommandTimeout': 180,
-          'appium:wdaLaunchTimeout': 300000,
-          'appium:wdaConnectionTimeout': 300000,
-          'appium:useNewWDA': false,
-          'appium:autoAcceptAlerts': true,
-          'appium:autoDismissAlerts': false,
-        };
+      pass('wdaWarmup');
+      return;
+    } catch (err) {
+      lastError = err;
+      const msg = String(err.message || '');
+      console.warn(
+        `[lifecycle] Warmup path="${basePath}" failed: ${msg.substring(0, 150)}`
+      );
 
-        if (process.env.UDID) warmupCaps['appium:udid'] = process.env.UDID;
-
-        const warmupDriver = await remote({
-          protocol: 'http',
-          hostname: APPIUM_HOST,
-          port: APPIUM_PORT,
-          path: basePath,
-          logLevel: 'error',
-          connectionRetryTimeout: 180000,
-          connectionRetryCount: 2,
-          capabilities: warmupCaps,
-        });
-
-        console.log('[lifecycle] WDA warmup session created successfully.');
-
-        // Get a context to confirm Safari/WDA is fully ready
-        try {
-          const contexts = await warmupDriver.getContexts();
-          console.log(`[lifecycle] Available contexts: ${contexts.join(', ')}`);
-        } catch (e) {
-          console.log(`[lifecycle] Context check: ${e.message}`);
-        }
-
-        // Navigate to a simple page to fully load Safari
-        try {
-          await warmupDriver.url('https://www.amazon.in');
-          console.log('[lifecycle] Warmup navigation completed.');
-        } catch (e) {
-          console.log(`[lifecycle] Warmup navigation: ${e.message}`);
-        }
-
-        // Close warmup session
-        await warmupDriver.deleteSession();
-        console.log('[lifecycle] WDA warmup session closed cleanly.');
-
-        pass('wdaWarmup');
-        return;
-      } catch (err) {
-        lastError = err;
-        const msg = String(err.message || '');
-        console.warn(
-          `[lifecycle] Warmup attempt ${attempt}/${maxRetries} path="${basePath}" failed: ${msg.substring(0, 150)}`
-        );
-
-        // If connection-level error, verify Appium is still up
-        if (msg.includes('Unable to connect') || msg.includes('ECONNREFUSED') || msg.includes('socket hang up')) {
-          console.log('[lifecycle] Connection issue — checking Appium health ...');
-          const h = await checkAppiumHealth();
-          if (!h.running) {
-            console.warn('[lifecycle] Appium appears down. Attempting restart ...');
-            try {
-              execSync("pkill -f 'node.*appium' || true", { stdio: 'pipe' });
-            } catch (_) {}
-            await new Promise((r) => setTimeout(r, 2000));
-            const appium = spawn('npx', ['appium'], {
-              detached: true,
-              stdio: 'ignore',
-              env: { ...process.env, APPIUM_HOST, APPIUM_PORT },
-            });
-            appium.unref();
-            try {
-              await waitFor(`Appium listening on ${APPIUM_HOST}:${APPIUM_PORT}`,
-                () => isPortListening(APPIUM_HOST, APPIUM_PORT), 60_000, 2000);
-              await waitForAppiumHealthy(30_000);
-            } catch (restartErr) {
-              console.warn(`[lifecycle] Appium restart failed: ${restartErr.message}`);
-            }
+      // If connection-level error, verify Appium is still up
+      if (msg.includes('Unable to connect') || msg.includes('ECONNREFUSED') || msg.includes('socket hang up')) {
+        console.log('[lifecycle] Connection issue — checking Appium health ...');
+        const h = await checkAppiumHealth();
+        if (!h.running) {
+          console.warn('[lifecycle] Appium appears down. Attempting restart ...');
+          try {
+            execSync("pkill -f 'node.*appium' || true", { stdio: 'pipe' });
+          } catch (_) {}
+          await new Promise((r) => setTimeout(r, 2000));
+          const appium = spawn('npx', ['appium'], {
+            detached: true,
+            stdio: 'ignore',
+            env: { ...process.env, APPIUM_HOST, APPIUM_PORT },
+          });
+          appium.unref();
+          try {
+            await waitFor(`Appium listening on ${APPIUM_HOST}:${APPIUM_PORT}`,
+              () => isPortListening(APPIUM_HOST, APPIUM_PORT), 60_000, 2000);
+            await waitForAppiumHealthy(30_000);
+          } catch (restartErr) {
+            console.warn(`[lifecycle] Appium restart failed: ${restartErr.message}`);
           }
         }
       }
     }
   }
 
-  console.warn(`[lifecycle] WDA warmup failed after ${maxRetries} attempts across all base paths: ${lastError ? lastError.message : 'unknown error'}`);
+  console.warn(`[lifecycle] WDA warmup failed: ${lastError ? lastError.message : 'unknown error'}`);
   fail('wdaWarmup');
 }
 
@@ -498,28 +487,28 @@ async function runIOSTests() {
 
 async function stopSimulator(udid) {
   if (KEEP_SIMULATOR) {
-    console.log('[lifecycle] KEEP_IOS_SIMULATOR=true — skipping simulator shutdown.');
+    console.log('[lifecycle] KEEP_IOS_SIMULATOR=true — simulator left running.');
     pass('simulatorAutoStop');
-    return;
-  }
-
-  if (!udid) {
-    console.warn('[lifecycle] No UDID available — cannot stop simulator.');
-    fail('simulatorAutoStop');
     return;
   }
 
   console.log('[lifecycle] Shutting down simulator ...');
+  const state = getSimulatorState(udid);
+
+  if (state === 'Shutdown') {
+    console.log('[lifecycle] Simulator already shut down.');
+    pass('simulatorAutoStop');
+    return;
+  }
+
+  shutdownSimulator(udid);
+
   try {
-    shutdownSimulator(udid);
-    await waitFor('simulator to shut down', () => {
-      const s = getSimulatorState(udid);
-      return s === 'Shutdown';
-    }, 30_000, 2000);
+    await waitFor('simulator shutdown', () => getSimulatorState(udid) === 'Shutdown', 60_000, 2000);
     console.log('[lifecycle] Simulator shut down successfully.');
     pass('simulatorAutoStop');
   } catch (e) {
-    console.warn('[lifecycle] Could not shut down simulator:', e.message);
+    console.warn(`[lifecycle] Simulator did not shut down cleanly: ${e.message}`);
     fail('simulatorAutoStop');
   }
 }
@@ -528,180 +517,124 @@ async function stopSimulator(udid) {
 
 async function stopAppium() {
   if (KEEP_APPIUM) {
-    console.log('[lifecycle] KEEP_APPIUM_SERVER=true — skipping Appium shutdown.');
+    console.log('[lifecycle] KEEP_APPIUM_SERVER=true — Appium left running.');
     pass('appiumAutoStop');
     return;
   }
 
-  console.log('[lifecycle] Stopping Appium ...');
+  console.log('[lifecycle] Stopping Appium server ...');
   try {
     execSync("pkill -f 'node.*appium' || true", { stdio: 'pipe' });
-    await waitFor(
-      'Appium port to free',
-      async () => !(await isPortListening(APPIUM_HOST, APPIUM_PORT)),
-      15_000,
-      1000
-    );
-    console.log('[lifecycle] Appium stopped.');
-    pass('appiumAutoStop');
+    await new Promise((r) => setTimeout(r, 2000));
+    const portOpen = await isPortListening(APPIUM_HOST, APPIUM_PORT);
+    if (!portOpen) {
+      console.log('[lifecycle] Appium server stopped.');
+      pass('appiumAutoStop');
+    } else {
+      console.warn('[lifecycle] Appium server may still be running.');
+      fail('appiumAutoStop');
+    }
   } catch (e) {
-    console.warn('[lifecycle] Could not stop Appium:', e.message);
+    console.warn(`[lifecycle] Appium stop warning: ${e.message}`);
     fail('appiumAutoStop');
   }
 }
 
 // --- Generate lifecycle report ----------------------------------------------
 
-function generateLifecycleReport(exitCode) {
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  const succeeded = exitCode === 0;
+function generateLifecycleReport() {
+  const lines = [
+    '# iOS Execution Lifecycle Summary',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    `Simulator: ${SIMULATOR_NAME}`,
+    `Appium: ${APPIUM_HOST}:${APPIUM_PORT}`,
+    '',
+    '## Lifecycle Steps',
+    '',
+    '| Step | Result |',
+    '|------|--------|',
+  ];
 
-  var cucumberJsonPath = path.join(ROOT, 'reports', 'ios', 'cucumber-report.json');
-  var cucumberReportFound = fs.existsSync(cucumberJsonPath);
-  var cucumberReportStatus = cucumberReportFound ? 'Found' : 'Not found';
+  for (const [key, value] of Object.entries(results)) {
+    const label = key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (s) => s.toUpperCase())
+      .trim();
+    lines.push(`| ${label} | ${value} |`);
+  }
 
-  const report = `# iOS Execution Lifecycle Summary
+  const allPassed = Object.values(results).every((r) => r === 'PASS');
+  lines.push('');
+  lines.push('**Overall: ' + (allPassed ? 'PASS' : 'FAIL') + '**');
+  lines.push('');
 
-**Generated:** ${timestamp}
-**Simulator:** ${SIMULATOR_NAME}
-**Appium:** ${APPIUM_HOST}:${APPIUM_PORT}
-**Keep Simulator:** ${KEEP_SIMULATOR}
-**Keep Appium:** ${KEEP_APPIUM}
-**WDA Warmup:** ${results.wdaWarmup}
-**Cucumber Report:** ${cucumberReportStatus}
-
-## Results
-
-| Step | Status |
-|------|--------|
-| iOS Simulator Auto-Start | ${results.simulatorAutoStart} |
-| Appium Auto-Start | ${results.appiumAutoStart} |
-| WDA Warmup Session | ${results.wdaWarmup} |
-| iOS Scenarios Executed | ${results.iosTestExecuted} |
-| iOS Simulator Auto-Stop | ${results.simulatorAutoStop} |
-| Appium Auto-Stop | ${results.appiumAutoStop} |
-
-## Report Files
-
-| Report | Status |
-|--------|--------|
-| Cucumber JSON | ${cucumberReportStatus} |
-
-## Overall
-
-**Lifecycle Status:** ${succeeded ? 'PASS' : 'FAIL'}
-
----
-
-*Report auto-generated by runIOSWithLifecycle.js*
-`;
+  if (allPassed) {
+    lines.push('All lifecycle steps completed successfully.');
+  } else {
+    lines.push('Some lifecycle steps failed. Review the table above for details.');
+  }
 
   fs.mkdirSync(LIFECYCLE_REPORT_DIR, { recursive: true });
-  fs.writeFileSync(LIFECYCLE_REPORT_PATH, report, 'utf8');
-  console.log(`[lifecycle] Report saved to ${LIFECYCLE_REPORT_PATH}`);
-}
-
-// --- Print summary ----------------------------------------------------------
-
-function printSummary(exitCode) {
-  console.log('\n========================================');
-  console.log('      IOS LIFECYCLE REPORT');
-  console.log('========================================');
-  console.log(`  Simulator auto-start:                 ${results.simulatorAutoStart}`);
-  console.log(`  Appium auto-start:                    ${results.appiumAutoStart}`);
-  console.log(`  WDA warmup:                           ${results.wdaWarmup}`);
-  console.log(`  iOS scenarios executed:               ${results.iosTestExecuted}`);
-  console.log(`  Simulator auto-stop:                  ${results.simulatorAutoStop}`);
-  console.log(`  Appium auto-stop:                     ${results.appiumAutoStop}`);
-  console.log('========================================\n');
+  fs.writeFileSync(LIFECYCLE_REPORT_PATH, lines.join('\n'), 'utf8');
+  console.log(`[lifecycle] Report generated: ${LIFECYCLE_REPORT_PATH}`);
 }
 
 // --- Main -------------------------------------------------------------------
 
 async function main() {
-  console.log('========================================');
-  console.log('  iOS Lifecycle Manager');
+  const lifecycleStart = Date.now();
+  console.log('════════════════════════════════════════════════════════════════');
+  console.log('  iOS Execution Lifecycle');
   console.log(`  Simulator: ${SIMULATOR_NAME}`);
   console.log(`  Appium: ${APPIUM_HOST}:${APPIUM_PORT}`);
-  console.log(`  KEEP_SIMULATOR=${KEEP_SIMULATOR}, KEEP_APPIUM=${KEEP_APPIUM}`);
-  console.log('========================================\n');
+  console.log('════════════════════════════════════════════════════════════════\n');
 
-  let exitCode = 0;
-  let simUdid = null;
+  let udid;
+  let testsPassed = false;
+  let fatalError = null;
 
-  // 1. Start simulator
   try {
+    // Step 1 — Boot Simulator
     const simInfo = await startSimulator();
-    simUdid = simInfo.udid;
-  } catch (e) {
-    console.error('[lifecycle] Simulator start failed:', e.message);
-    fail('simulatorAutoStart');
-    exitCode = 1;
-  }
+    udid = simInfo.udid;
 
-  // 2. Start Appium
-  try {
+    // Step 2 — Start Appium
     await startAppium();
-  } catch (e) {
-    console.error('[lifecycle] Appium start failed:', e.message);
-    fail('appiumAutoStart');
-    exitCode = 1;
+
+    // Step 3 — WDA warmup (no navigation, no cookies, no state)
+    await warmupWDA();
+
+    // Step 4 — Execute iOS tests
+    testsPassed = await runIOSTests();
+  } catch (err) {
+    fatalError = err;
+    console.error(`\n[lifecycle] FATAL: ${err.message}`);
   }
 
-  // 3. Warm up WDA (pre-compile, pre-build) before real tests
-  if (exitCode === 0) {
-    try {
-      await warmupWDA();
-    } catch (e) {
-      console.warn('[lifecycle] WDA warmup error (non-fatal):', e.message);
-      fail('wdaWarmup');
-    }
-  } else {
-    console.log('[lifecycle] Skipping WDA warmup due to setup failure.');
-    fail('wdaWarmup');
-  }
-
-  // 4. Run tests (only if setup succeeded)
-  if (exitCode === 0) {
-    const testOk = await runIOSTests();
-    if (!testOk) exitCode = 1;
-
-    // Check if cucumber JSON report was generated
-    const iosJsonPath = path.join(ROOT, 'reports', 'ios', 'cucumber-report.json');
-    var iosReportGenerated = fs.existsSync(iosJsonPath);
-    if (iosReportGenerated) {
-      console.log('[lifecycle] iOS Cucumber JSON report found.');
-    } else {
-      console.warn('[lifecycle] iOS Cucumber JSON report NOT found.');
+  // Step 5 — Stop simulator
+  if (udid) {
+    try { await stopSimulator(udid); } catch (e) {
+      console.warn(`[lifecycle] Simulator stop error: ${e.message}`);
     }
   }
 
-  // 5. Stop simulator
-  try {
-    await stopSimulator(simUdid);
-  } catch (e) {
-    console.warn('[lifecycle] Simulator stop error:', e.message);
-    fail('simulatorAutoStop');
+  // Step 6 — Stop Appium
+  try { await stopAppium(); } catch (e) {
+    console.warn(`[lifecycle] Appium stop error: ${e.message}`);
   }
 
-  // 6. Stop Appium
-  try {
-    await stopAppium();
-  } catch (e) {
-    console.warn('[lifecycle] Appium stop error:', e.message);
-    fail('appiumAutoStop');
-  }
+  // Step 7 — Generate report
+  generateLifecycleReport();
 
-  // 7. Generate report
-  generateLifecycleReport(exitCode);
-  printSummary(exitCode);
+  const durationSec = ((Date.now() - lifecycleStart) / 1000).toFixed(1);
+  console.log(`\n════════════════════════════════════════════════════════════════`);
+  console.log(`  Lifecycle complete in ${durationSec}s`);
+  console.log(`  Tests: ${testsPassed ? 'PASSED' : 'FAILED'}`);
+  if (fatalError) console.log(`  Fatal: ${fatalError.message}`);
+  console.log('════════════════════════════════════════════════════════════════\n');
 
-  process.exit(exitCode);
+  process.exit(testsPassed ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error('[lifecycle] Unhandled error in main:', err.message);
-  generateLifecycleReport(1);
-  printSummary(1);
-  process.exit(1);
-});
+main();

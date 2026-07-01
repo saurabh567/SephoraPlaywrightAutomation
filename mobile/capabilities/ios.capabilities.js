@@ -1,18 +1,19 @@
 /**
  * iOS Appium capabilities.
  *
- * BrowserContext Isolation:
- *   - noReset: false by default — ensures every new session starts clean
- *   - fullReset: configurable — use FULL_RESET=true to uninstall/reinstall the app
+ * Safari Browser Automation (Appium 2.x):
+ *   Requires BOTH top-level browserName AND appium:browserName for reliable
+ *   session creation on Appium 2.x. The appium: prefix is the canonical
+ *   Appium 2.x capability format. safari:useSimulator is required for
+ *   simulator-based Safari testing.
  *
- * These settings guarantee that each test case starts with:
- *   - No cookies
- *   - No localStorage, sessionStorage, IndexedDB, Cache Storage
- *   - No browser history, saved permissions, or previous auth state
- *   - No reused browser session, tab, or shared memory
- *
- * For Safari browser sessions, additional state cleanup is handled by
- * MobileSessionManager.disposeSession() which runs after each scenario.
+ * ══════════════════════════════════════════════════════════════════════════════
+ * Important: appium:appIdKey
+ *   Must NOT be set for Safari browser sessions. The 'Missing parameter:
+ *   appIdKey' error occurs when url() is called during session startup with
+ *   an appIdKey that doesn't match a Safari bundle. Safari sessions use
+ *   browserName — not appIdKey. Only native app sessions need appIdKey.
+ * ══════════════════════════════════════════════════════════════════════════════
  */
 
 function iosCapabilities() {
@@ -26,15 +27,7 @@ function iosCapabilities() {
     'appium:deviceName': process.env.DEVICE_NAME || 'iPhone 15',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
 
-    // =========================================================
-    // Session Isolation: Do NOT reuse app state between sessions
-    // =========================================================
-    // noReset=false ensures Appium clears app data on every new session.
-    // This guarantees cookies, localStorage, and all WebView state
-    // are wiped before each test case.
-    // For iOS Safari, additional cleanup is done in the After hook
-    // via MobileSessionManager.disposeSession().
-    // =========================================================
+    // Session Isolation: every new session starts clean
     'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
     'appium:fullReset': process.env.FULL_RESET === 'true',
 
@@ -42,10 +35,18 @@ function iosCapabilities() {
   };
 
   if (browserName) {
+    // Canonical Appium 2.x browser capabilities
     capabilities.browserName = browserName;
+    capabilities['appium:browserName'] = browserName;
+
+    // Required for Safari on iOS Simulator
+    capabilities['safari:useSimulator'] = true;
   } else {
+    // Native app capabilities
     if (appPath) capabilities['appium:app'] = appPath;
     if (bundleId) capabilities['appium:bundleId'] = bundleId;
+    // appIdKey is only valid for native app sessions, NOT Safari
+    if (process.env.APP_ID_KEY) capabilities['appium:appIdKey'] = process.env.APP_ID_KEY;
   }
 
   if (process.env.UDID) capabilities['appium:udid'] = process.env.UDID;
