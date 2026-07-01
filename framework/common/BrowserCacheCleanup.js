@@ -16,8 +16,14 @@
  * Supports:
  *   - Web (Playwright) — cookies, localStorage, sessionStorage, IndexedDB
  *   - Android native apps with WebView (Amazon app)
- *   - iOS Safari browser
+ *   - iOS Safari browser (JS-based WebView cleanup only — no unsupported mobile: commands)
  *   - iOS native apps with WebView
+ *
+ * iOS Note:
+ *   Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
+ *   or mobile:clearPasteboard commands. iOS WebView state is cleared via
+ *   JavaScript execution only when a WebView context exists. App removal
+ *   is handled by MobileSessionManager.disposeSession() via mobile:removeApp.
  *
  * Thread-safe (no shared mutable state) — safe for parallel Cucumber execution.
  */
@@ -54,8 +60,6 @@ const JS_CLEAR_ALL_STORAGE = [
   JS_CLEAR_INDEXED_DB,
   JS_CLEAR_CACHE
 ].join('\n');
-
-const JS_RELOAD = 'window.location.reload(true)';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web (Playwright) cleanup
@@ -200,41 +204,23 @@ async function clearAndroid(driver, skipAdb = false) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // iOS cleanup strategies
+//
+// IMPORTANT: Does NOT use unsupported commands:
+//   - mobile:clearSafariData  ✗ (not supported)
+//   - mobile:clearCookies      ✗ (not supported)
+//   - mobile:clearPasteboard   ✗ (not supported)
+//
+// Instead:
+//   - WebView storage is cleared via JavaScript if a WebView context exists
+//   - App removal is handled by MobileSessionManager.disposeSession() via mobile:removeApp
+//   - noReset=false in capabilities ensures clean state on next session
 // ─────────────────────────────────────────────────────────────────────────────
 
 const IOS_SAFARI_BUNDLE_ID = 'com.apple.mobilesafari';
 
 /**
- * Clear iOS Safari browser data via Appium mobile: commands.
- * These commands work on real devices and simulators running iOS 9+.
- */
-async function iosClearSafariData(driver) {
-  try {
-    await driver.execute('mobile: clearPasteboard');
-    logger.info('[CacheCleanup] iOS: Cleared pasteboard');
-  } catch (err) {
-    logger.warn(`[CacheCleanup] iOS: clearPasteboard failed: ${err.message}`);
-  }
-
-  // Clear Safari cookies via mobile command
-  try {
-    await driver.execute('mobile: clearSafariData');
-    logger.info('[CacheCleanup] iOS: Cleared Safari data via mobile:clearSafariData');
-  } catch (err) {
-    logger.warn(`[CacheCleanup] iOS: mobile:clearSafariData failed: ${err.message}`);
-  }
-
-  // Delete Safari app data via terminate + remove
-  try {
-    await driver.terminateApp(IOS_SAFARI_BUNDLE_ID);
-    logger.info('[CacheCleanup] iOS: Terminated Safari');
-  } catch (err) {
-    logger.warn(`[CacheCleanup] iOS: Terminate Safari failed: ${err.message}`);
-  }
-}
-
-/**
  * Clear iOS WebView state via JavaScript execution.
+ * Only runs if a WebView context actually exists — never attempts on native context alone.
  */
 async function iosClearWebViewViaJS(driver) {
   let previousContext = null;
@@ -255,6 +241,11 @@ async function iosClearWebViewViaJS(driver) {
     });
   } catch (err) {
     logger.warn(`[CacheCleanup] iOS: Could not list contexts: ${err.message}`);
+  }
+
+  if (webviewContexts.length === 0) {
+    logger.info('[CacheCleanup] iOS: No WebView context found — skipping WebView JS cleanup');
+    return;
   }
 
   for (const ctx of webviewContexts) {
@@ -307,26 +298,21 @@ async function iosClearSafariCookiesViaJS(driver) {
 
 /**
  * Primary iOS cache cleanup.
+ *
+ * Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
+ * or mobile:clearPasteboard commands. WebView state is cleared via JS.
+ * App removal is handled by MobileSessionManager.disposeSession().
  */
 async function clearIOS(driver, isSafari = false) {
-  if (isSafari) {
-    // For full Safari browser automation, use Appium mobile: commands
-    await iosClearSafariData(driver);
-  }
-
   // Clear WebView storage via JavaScript (works for both native apps and Safari)
   await iosClearWebViewViaJS(driver);
-  await iosClearSafariCookiesViaJS(driver);
 
-  // Try to clear cookies via native Appium command
-  try {
-    await driver.execute('mobile: clearCookies');
-    logger.info('[CacheCleanup] iOS: Cleared cookies via mobile:clearCookies');
-  } catch (err) {
-    logger.warn(`[CacheCleanup] iOS: mobile:clearCookies failed: ${err.message}`);
+  // Clear Safari cookies via JavaScript if running in Safari mode
+  if (isSafari) {
+    await iosClearSafariCookiesViaJS(driver);
   }
 
-  logger.info('[CacheCleanup] iOS: Cache cleanup completed');
+  logger.info('[CacheCleanup] iOS: Cache cleanup completed (no unsupported mobile: commands used)');
 }
 
 /**

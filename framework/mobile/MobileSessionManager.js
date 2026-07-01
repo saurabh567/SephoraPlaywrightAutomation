@@ -9,10 +9,16 @@
  *
  * Lifecycle per scenario:
  *   1. Create brand-new Appium driver session with noReset=false
- *   2. Clear app data via ADB (Android) or Appium commands (iOS)
+ *   2. Clear app data via ADB (Android) or removeApp + WebView cleanup (iOS)
  *   3. Handle first-launch onboarding (language selection, sign-in skip)
  *   4. Execute test steps
  *   5. Dispose driver session (always, even on failure)
+ *
+ * iOS isolation (no unsupported mobile: commands):
+ *   - No mobile:clearSafariData, mobile:clearCookies, or mobile:clearPasteboard
+ *   - Instead: removeApp via Appium (supported), then deleteSession
+ *   - WebView JS storage cleared only if a WebView context exists
+ *   - noReset=false in capabilities ensures next session starts clean
  *
  * Thread-safe — no shared mutable state across workers.
  */
@@ -30,9 +36,7 @@ const ANDROID_AMAZON_PACKAGE = 'in.amazon.mShop.android.shopping';
 const ANDROID_CHROME_PACKAGE = 'com.android.chrome';
 const ANDROID_WEBVIEW_PACKAGES = [ANDROID_AMAZON_PACKAGE, ANDROID_CHROME_PACKAGE];
 
-const IOS_SAFARI_BUNDLE_ID = 'com.apple.mobilesafari';
-
-// JavaScript snippets for clearing WebView storage (executed via Appium)
+// JavaScript snippets for clearing WebView storage (executed via Appium execute)
 const JS_CLEAR_COOKIES = `document.cookie.split(";").forEach(function(c) {
   document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
 });`;
@@ -131,6 +135,10 @@ class MobileSessionManager {
    * Dispose a mobile driver session and release all resources.
    * Safe to call multiple times — no-ops if already disposed.
    *
+   * For iOS: removes the app via mobile:removeApp (supported) before session
+   * deletion, guaranteeing a clean install on the next scenario.
+   * Does NOT use unsupported mobile:clearSafariData / mobile:clearCookies.
+   *
    * @param {object} driver - WebDriverIO driver instance
    * @param {object} options
    * @param {string} options.platform - 'ANDROID' or 'IOS'
@@ -155,7 +163,20 @@ class MobileSessionManager {
       }
     }
 
-    // Step 2: Attempt to delete the Appium session
+    // Step 2: For iOS, remove the app entirely so the next session gets a clean install.
+    // This is the supported alternative to unsupported mobile:clear* commands.
+    // The next session's noReset=false + reinstall guarantees zero stale state.
+    if (platform === TEST_PLATFORMS.IOS && appId) {
+      try {
+        await driver.execute('mobile: removeApp', { bundleId: appId });
+        logger.info(`[MobileSessionManager] iOS: Removed app ${appId}`);
+      } catch (err) {
+        // removeApp may fail for Safari (cannot remove system apps) — that's fine
+        logger.warn(`[MobileSessionManager] iOS: removeApp skipped (non-fatal): ${err.message.substring(0, 120)}`);
+      }
+    }
+
+    // Step 3: Attempt to delete the Appium session
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         await driver.deleteSession();
@@ -173,7 +194,7 @@ class MobileSessionManager {
       }
     }
 
-    // Step 3: For Android, clear app data via ADB as a safety net
+    // Step 4: For Android, clear app data via ADB as a safety net
     if (platform === TEST_PLATFORMS.ANDROID) {
       try {
         const { execSync } = require('child_process');
@@ -183,14 +204,6 @@ class MobileSessionManager {
           } catch (_) { /* ignore */ }
         }
         logger.info('[MobileSessionManager] Android app data cleared via ADB (safety net)');
-      } catch (_) { /* ignore */ }
-    }
-
-    // Step 4: For iOS Safari, clear Safari data via Appium command
-    if (platform === TEST_PLATFORMS.IOS) {
-      try {
-        await driver.execute('mobile: clearSafariData').catch(() => {});
-        await driver.execute('mobile: clearCookies').catch(() => {});
       } catch (_) { /* ignore */ }
     }
 
@@ -219,7 +232,7 @@ class MobileSessionManager {
 
   /**
    * Android-specific app state cleanup.
-   * Uses ADB pm clear + Appium mobile:clearCookies + JS WebView cleanup.
+   * Uses ADB pm clear + mobile:clearCookies + JS WebView cleanup.
    */
   static async _clearAndroidAppState(driver) {
     // 1. ADB pm clear — most thorough (removes everything)
@@ -263,34 +276,17 @@ class MobileSessionManager {
 
   /**
    * iOS-specific app state cleanup.
-   * Uses Appium mobile commands + JS WebView cleanup.
+   *
+   * Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
+   * or mobile:clearPasteboard commands.
+   *
+   * Instead:
+   *   - Clears WebView storage via JavaScript only if a WebView context exists
+   *   - App is removed via mobile:removeApp during disposeSession (not here)
+   *   - noReset=false in capabilities ensures clean state on next session
    */
   static async _clearIOSAppState(driver) {
-    // 1. Clear Safari data (if available)
-    try {
-      await driver.execute('mobile: clearSafariData');
-      logger.info('[MobileSessionManager] iOS: Cleared Safari data');
-    } catch (err) {
-      logger.warn(`[MobileSessionManager] iOS: mobile:clearSafariData failed: ${err.message}`);
-    }
-
-    // 2. Clear cookies via Appium command
-    try {
-      await driver.execute('mobile: clearCookies');
-      logger.info('[MobileSessionManager] iOS: Cleared cookies via mobile:clearCookies');
-    } catch (err) {
-      logger.warn(`[MobileSessionManager] iOS: mobile:clearCookies failed: ${err.message}`);
-    }
-
-    // 3. Clear pasteboard
-    try {
-      await driver.execute('mobile: clearPasteboard');
-      logger.info('[MobileSessionManager] iOS: Cleared pasteboard');
-    } catch (err) {
-      logger.warn(`[MobileSessionManager] iOS: clearPasteboard failed: ${err.message}`);
-    }
-
-    // 4. JS WebView storage cleanup
+    // 1. JS WebView storage cleanup — only if a WebView context exists
     let previousContext = null;
     try {
       previousContext = await driver.getContext();
@@ -298,6 +294,12 @@ class MobileSessionManager {
 
     try {
       const contexts = await driver.getContexts();
+      const hasWebView = contexts.some(ctx => String(ctx).toLowerCase().includes('webview'));
+      if (!hasWebView) {
+        logger.info('[MobileSessionManager] iOS: No WebView context — skipping WebView storage cleanup');
+        return;
+      }
+
       for (const ctx of contexts) {
         if (String(ctx).toLowerCase().includes('webview')) {
           try {
@@ -330,7 +332,7 @@ class MobileSessionManager {
     }
     if (config.testPlatform === TEST_PLATFORMS.IOS) {
       if (config.mobile.browserName && config.mobile.browserName.toLowerCase() === 'safari') {
-        return process.env.IOS_SAFARI_BUNDLE_ID || IOS_SAFARI_BUNDLE_ID;
+        return process.env.IOS_SAFARI_BUNDLE_ID || 'com.apple.mobilesafari';
       }
       return config.mobile.bundleId || '';
     }
@@ -350,5 +352,8 @@ class MobileSessionManager {
     }
   }
 }
+
+// Legacy constant kept for backwards compatibility
+const IOS_SAFARI_BUNDLE_ID = 'com.apple.mobilesafari';
 
 module.exports = MobileSessionManager;
