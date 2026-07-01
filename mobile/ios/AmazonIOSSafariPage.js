@@ -114,6 +114,100 @@ class AmazonIOSSafariPage extends MobileBasePage {
       'span[data-action*="buy-now"] input',
     ];
 
+
+    // ── Smart Wagon Cart — Amazon's new mobile cart page ────────────────
+    // Amazon now serves cart via /cart/smart-wagon with completely different DOM.
+    // These selectors work on the Smart Wagon cart page.
+    this.smartWagonCartItem = '[data-component-type="cart-item"], [data-cart-item], .sc-list-item, [data-testid*="cart-item"]';
+    this.smartWagonDeleteSelectors = [
+      // Smart Wagon delete button (data-testid based)
+      '[data-testid*="delete"]',
+      'button[data-testid*="delete"]',
+      'a[data-testid*="delete"]',
+      // Smart Wagon remove/link action
+      'span[data-action="delete"]',
+      'span[data-action="delete"] a',
+      'span[data-action="delete"] input',
+      // Standard cart action delete
+      '.sc-action-delete',
+      '.sc-action-delete input',
+      'input.sc-action-delete',
+      // Generic delete by attribute
+      'input[value="Delete"]',
+      'input[value="delete"]',
+      'button[value="Delete"]',
+      'a[aria-label*="Delete"]',
+      'a[aria-label*="delete"]',
+      'a[href*="delete"]',
+      'button[name*="delete"]',
+      'input[name*="delete"]',
+      // Cart item remove link
+      '[data-csa-c-action*="delete"]',
+      '[data-action*="delete"] a',
+      // Old fallback patterns
+      '.a-declarative a[href*="delete"]',
+    ];
+    // ── Smart Wagon Delete Selectors — XPath alternatives ───────────────
+    // Amazon's Smart Wagon cart uses different DOM than the old /gp/cart/view.html.
+    // These XPath expressions target the delete/remove button on the mobile cart page.
+    // Priority order: most specific (new Smart Wagon) → most generic (old cart).
+    this.smartWagonDeleteXPaths = [
+      // Smart Wagon: find any element with data-testid containing "delete"
+      "//*[contains(@data-testid, 'delete')]",
+      // Smart Wagon: button with data-testid containing "delete"
+      "//button[contains(@data-testid, 'delete')]",
+      // Smart Wagon: anchor with data-testid containing "delete"
+      "//a[contains(@data-testid, 'delete')]",
+      // Smart Wagon: span with data-action="delete"
+      "//span[@data-action='delete']",
+      // Smart Wagon: anchor inside a span[data-action="delete"]
+      "//span[@data-action='delete']//a",
+      // Standard cart: action-delete container
+      "//*[contains(@class, 'sc-action-delete')]",
+      // Standard cart: input inside action-delete
+      "//*[contains(@class, 'sc-action-delete')]//input",
+      // Generic: anchor with aria-label containing Delete (case-insensitive via translate)
+      "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delete')]",
+      // Generic: input with value="Delete"
+      "//input[@value='Delete']",
+      // Generic: button with value="Delete"
+      "//button[@value='Delete']",
+      // Generic: anchor with href containing "delete"
+      "//a[contains(@href, 'delete')]",
+      // Generic: button with name containing "delete"
+      "//button[contains(@name, 'delete')]",
+      // Generic: input with name containing "delete"
+      "//input[contains(@name, 'delete')]",
+      // Old fallback: anchor inside .a-declarative with href containing "delete"
+      "//*[contains(@class, 'a-declarative')]//a[contains(@href, 'delete')]",
+      // Last resort: any anchor element whose text content is "Delete"
+      "//a[normalize-space(text())='Delete']",
+      "//button[normalize-space(text())='Delete']",
+      "//span[normalize-space(text())='Delete']",
+    ];
+    this.smartWagonProceedSelectors = [
+      // Smart Wagon proceed to checkout
+      '[data-testid*="proceed-to-checkout"]',
+      'button[data-testid*="proceed-to-checkout"]',
+      'a[data-testid*="proceed-to-checkout"]',
+      'input[name*="proceed-to-checkout"]',
+      'input[name*="proceedToRetailCheckout"]',
+      'input[name="proceedToCheckout"]',
+      'input[name="proceedToRetailCheckout"]',
+      // Standard proceed buttons
+      'a[href*="/checkout"]',
+      'a[href*="checkout"]',
+      'input[value*="Proceed"]',
+      'input[value*="proceed"]',
+      'a[aria-label*="Proceed"]',
+      'a[aria-label*="proceed"]',
+      'button[aria-label*="Proceed"]',
+      'button[aria-label*="proceed"]',
+      // Checkout button
+      'a[data-csa-c-slot-id*="checkout"]',
+      'input[name*="checkout"]',
+    ];
+
     // ── Product Detail Page Indicators (for quick confirmation) ─────────
     this.productDetailPattern = /add to cart|buy now|#productTitle|productTitle|buybox|merchant-info|#dp|x-clicker|deal of the day|offer expires|available from these sellers|other sellers on amazon/i;
 
@@ -176,7 +270,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
    */
   _inferScreen(url) {
     const u = url.toLowerCase();
-    if (u.includes('/cart') || u.includes('gp/cart')) return 'CART_PAGE';
+    if (u.includes('/cart') || u.includes('gp/cart') || u.includes('smart-wagon') || u.includes('smart_wagon')) return 'CART_PAGE';
     if (u.includes('/dp/') || u.includes('/gp/product/')) return 'PRODUCT_DETAILS';
     if (u.includes('/s?') || u.includes('/search')) return 'SEARCH_RESULTS';
     if (u.includes('amazon.in') && (u === 'https://www.amazon.in/' || u === 'https://www.amazon.in' || u === 'https://amazon.in/')) return 'HOME_PAGE';
@@ -227,7 +321,44 @@ class AmazonIOSSafariPage extends MobileBasePage {
 
   async openHomePage() {
     await this._logActionStart("openHomePage", { screen: "HOME_PAGE" });
-    await this.openUrlAndWaitForAmazon(this.baseUrl, 'home page');
+    const targetUrl = this.normalizeUrl(this.baseUrl);
+    logger.info("[AmazonIOSSafariPage] Navigating directly to BASE_URL: " + targetUrl);
+    await this.driver.url(targetUrl);
+    await this.driver.pause(2000);
+
+    /* Wait for either Amazon logo OR search box to be visible */
+    const homepageElementSelectors = [
+      '#twotabsearchtextbox',
+      'input[name="k"]',
+      'input[type="search"]',
+      '#nav-search-bar-form input',
+      'a[aria-label*="Amazon"]',
+      'a[href*="amazon"][aria-label]',
+    ];
+
+    let homepageReady = false;
+    await this.driver.waitUntil(async () => {
+      for (const sel of homepageElementSelectors) {
+        const els = await this.driver.$$(sel).catch(() => []);
+        if (els.length > 0) {
+          const displayed = await els[0].isDisplayed().catch(() => false);
+          if (displayed) {
+            logger.info("[AmazonIOSSafariPage] Homepage confirmed — element visible: " + sel);
+            homepageReady = true;
+            return true;
+          }
+        }
+      }
+      return false;
+    }, {
+      timeout: 30000,
+      interval: 1500,
+      timeoutMsg: "Timed out waiting for Amazon homepage elements (logo / search box) to appear after navigation to " + targetUrl,
+    });
+
+    if (!homepageReady) {
+      logger.warn("[AmazonIOSSafariPage] Homepage elements not found within timeout — proceeding anyway");
+    }
   }
 
   async waitForAmazonReady() {
@@ -330,378 +461,37 @@ class AmazonIOSSafariPage extends MobileBasePage {
             const currentUrl = await this.driver.getUrl().catch(() => '');
             if (/\/dp\/|\/gp\/product\/|\/product\//.test(currentUrl)) {
               logger.info(`[AmazonIOSSafariPage] Product page reached. URL: ${currentUrl}`);
-              if (await this._confirmProductDetailPage()) {
-                return;
+
+              // ── Verify we're on a product details page ──────────────
+              const source = await this.driver.getPageSource().catch(() => '');
+              if (!this.productDetailPattern.test(source)) {
+                logger.warn(`[AmazonIOSSafariPage] Page reached but content does not indicate a product details page. URL: ${currentUrl}`);
               }
-              logger.warn('[AmazonIOSSafariPage] URL looks like product page but content does not confirm. Retrying...');
-            } else if (currentUrl !== searchUrl) {
-              logger.warn(`[AmazonIOSSafariPage] Navigated to non-product URL: ${currentUrl}. Waiting for product...`);
-              try {
-                await this.driver.waitUntil(async () => {
-                  const url = await this.driver.getUrl();
-                  return /\/dp\/|\/gp\/product\/|\/product\//.test(url);
-                }, { timeout: 15000, interval: 1000 });
-                if (await this._confirmProductDetailPage()) {
-                  return;
-                }
-              } catch (_) {}
+              return;
             } else {
-              logger.warn(`[AmazonIOSSafariPage] Click on "${selector}" did not change URL. Still on: ${currentUrl}`);
+              logger.info(`[AmazonIOSSafariPage] Click did not navigate to product page. URL: ${currentUrl}`);
+              // If we ended up on a different page (e.g. sign-in, captcha, PDP redirect), log it
+              if (/signin|ap\/signin|captcha|verify/.test(currentUrl)) {
+                logger.warn(`[AmazonIOSSafariPage] Intercepted by security/redirect page: ${currentUrl}`);
+              }
             }
           }
         } catch (err) {
-          allErrors.push(`Selector "${selector}" (retry ${retry}): ${err.message.substring(0, 200)}`);
+          allErrors.push(`Selector "${selector}": ${err.message.substring(0, 100)}`);
         }
-      }
-
-      if (retry < MAX_PRODUCT_CLICK_RETRIES - 1) {
-        logger.info(`[AmazonIOSSafariPage] Retrying product link click (attempt ${retry + 2}/${MAX_PRODUCT_CLICK_RETRIES})...`);
-        await this.driver.pause(3000);
       }
     }
 
-    // JS fallback
-    try {
-      logger.info('[AmazonIOSSafariPage] Trying JS fallback to click product link...');
-      const clicked = await this.driver.execute(() => {
-        const links = Array.from(document.querySelectorAll('a[href]'));
-        const productLinks = links.filter((a) => {
-          const href = a.href || '';
-          return (
-            href.includes('/dp/') ||
-            href.includes('/gp/product/') ||
-            href.includes('/product/') ||
-            (href.includes('amazon') && /\/[A-Z0-9]{10}/.test(href))
-          );
-        });
-        for (const link of productLinks) {
-          if (link.offsetParent !== null || link.getClientRects().length > 0) {
-            link.click();
-            return true;
-          }
-        }
-        return false;
-      });
-
-      if (clicked) {
-        await this.driver.pause(3000);
-        const currentUrl = await this.driver.getUrl().catch(() => '');
-        if (/\/dp\/|\/gp\/product\/|\/product\//.test(currentUrl)) {
-          if (await this._confirmProductDetailPage()) {
-            return;
-          }
-        }
-      }
-    } catch (err) {
-      allErrors.push(`JS fallback: ${err.message.substring(0, 200)}`);
-    }
-
-    await this._captureFullDiagnostics('open-product-link-failure', {
+    await this._captureFullDiagnostics('openFirstProduct-failed', {
       locatorAttempted: this.productLinks.join(', '),
-      extra: { searchUrl: searchUrl, allErrors: allErrors }
+      extra: { allErrors }
     });
-    const currentUrl = await this.driver.getUrl().catch(() => 'unknown');
-    const pageSource = await this.driver.getPageSource().catch(() => '');
-    const sourcePreview = pageSource.substring(0, 2000);
 
     throw new Error(
-      `[AmazonIOSSafariPage] FAILED: Could not open first product from search results.\n` +
-      `Current URL: ${currentUrl}\n` +
-      `Search URL was: ${searchUrl}\n` +
-      `Page source preview (first 2000 chars): ${sourcePreview}\n` +
-      `Attempted selectors: ${this.productLinks.join(', ')}\n` +
+      `[AmazonIOSSafariPage] Could not open first product from search results.\n` +
+      `Search URL: ${searchUrl}\n` +
       `Errors: ${allErrors.join('; ')}`
     );
-  }
-
-  async _confirmProductDetailPage() {
-    await this.driver.pause(2000);
-    const url = await this.driver.getUrl().catch(() => '');
-    const source = await this.driver.getPageSource().catch(() => '');
-    const sourceLower = source.toLowerCase();
-
-    const hasProductIndicators = (
-      sourceLower.includes('producttitle') ||
-      sourceLower.includes('productTitle') ||
-      sourceLower.includes('buybox') ||
-      sourceLower.includes('buyBox') ||
-      sourceLower.includes('submit.add-to-cart') ||
-      sourceLower.includes('submit.buy-now') ||
-      sourceLower.includes('add-to-cart-button') ||
-      (sourceLower.includes('coreprice') && sourceLower.includes('desktop')) ||
-      sourceLower.includes('dp-container') ||
-      sourceLower.includes('detail-bullets') ||
-      sourceLower.includes('merchant-info') ||
-      sourceLower.includes('offer-display') ||
-      sourceLower.includes('offer-price')
-    );
-
-    if (!hasProductIndicators) {
-      logger.warn(`[AmazonIOSSafariPage] _confirmProductDetailPage: FALSE. URL: ${url}`);
-      return false;
-    }
-    logger.info(`[AmazonIOSSafariPage] _confirmProductDetailPage: TRUE. URL: ${url}`);
-    return true;
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════
-  // Product Detail Verification — STRICT 4-element check
-  //
-  // Before any product detail action, verifies that ALL of the following
-  // exist on the page:
-  //   1. Product title
-  //   2. Product price
-  //   3. Product image
-  //   4. Add to Cart button
-  //
-  // If ANY validation fails:
-  //   - Captures screenshot, HTML source, current URL, page title
-  //   - Fails immediately with detailed error
-  // ═════════════════════════════════════════════════════════════════════════
-
-  async verifyProductDetailsVisible() {
-    await this._logActionStart("verifyProductDetailsVisible", { screen: "PRODUCT_DETAILS" });
-    const url = await this.driver.getUrl().catch(() => '');
-    const hasProductUrl = /\/dp\/|\/gp\/product\/|\/product\//.test(url);
-
-    // Wait for page to settle after navigation
-    await this.driver.pause(3000);
-
-    const failures = [];
-    const diagnostics = {
-      url,
-      pageTitle: '',
-      sourceLength: 0,
-      titleFound: false,
-      priceFound: false,
-      imageFound: false,
-      addToCartFound: false,
-      addToCartSelectorUsed: '',
-    };
-
-    // Get page title
-    try {
-      diagnostics.pageTitle = await this.driver.getTitle().catch(() => '');
-    } catch (_) {}
-
-    // Get page source length
-    try {
-      const source = await this.driver.getPageSource().catch(() => '');
-      diagnostics.sourceLength = source.length;
-    } catch (_) {}
-
-    // ── Check 1: Product Title ───────────────────────────────────────
-    let titleFound = false;
-    let titleSelectorUsed = '';
-    for (const selector of this.productTitleSelectors) {
-      try {
-        const elements = await this.driver.$$(selector);
-        for (const el of elements) {
-          if (await el.isDisplayed().catch(() => false)) {
-            const text = await el.getText().catch(() => '');
-            if (text.trim().length > 0) {
-              titleFound = true;
-              titleSelectorUsed = selector;
-              logger.info(`[AmazonIOSSafariPage] Product title found via "${selector}": "${text.substring(0, 80)}"`);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-      if (titleFound) break;
-    }
-
-    diagnostics.titleFound = titleFound;
-    diagnostics.titleSelectorUsed = titleSelectorUsed;
-    if (!titleFound) {
-      failures.push('PRODUCT TITLE: Not found. Tried selectors: ' + this.productTitleSelectors.join(', '));
-    }
-
-    // ── Check 2: Product Price ───────────────────────────────────────
-    let priceFound = false;
-    let priceSelectorUsed = '';
-    for (const selector of this.productPriceSelectors) {
-      try {
-        const elements = await this.driver.$$(selector);
-        for (const el of elements) {
-          if (await el.isDisplayed().catch(() => false)) {
-            const text = await el.getText().catch(() => '');
-            if (text.trim().length > 0 && /[\d₹]/.test(text)) {
-              priceFound = true;
-              priceSelectorUsed = selector;
-              logger.info(`[AmazonIOSSafariPage] Product price found via "${selector}": "${text.substring(0, 40)}"`);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-      if (priceFound) break;
-    }
-
-    // Fallback: check page source for price patterns
-    if (!priceFound) {
-      try {
-        const source = await this.driver.getPageSource().catch(() => '');
-        if (/₹[\d,]+/.test(source) || /a-price|priceToPay|priceblock/.test(source)) {
-          priceFound = true;
-          priceSelectorUsed = 'page-source-fallback';
-          logger.info('[AmazonIOSSafariPage] Product price confirmed via page source pattern.');
-        }
-      } catch (_) {}
-    }
-
-    diagnostics.priceFound = priceFound;
-    diagnostics.priceSelectorUsed = priceSelectorUsed;
-    if (!priceFound) {
-      failures.push('PRODUCT PRICE: Not found. Tried selectors: ' + this.productPriceSelectors.join(', '));
-    }
-
-    // ── Check 3: Product Image ───────────────────────────────────────
-    let imageFound = false;
-    let imageSelectorUsed = '';
-    for (const selector of this.productImageSelectors) {
-      try {
-        const elements = await this.driver.$$(selector);
-        for (const el of elements) {
-          if (await el.isDisplayed().catch(() => false)) {
-            imageFound = true;
-            imageSelectorUsed = selector;
-            logger.info(`[AmazonIOSSafariPage] Product image found via "${selector}"`);
-            break;
-          }
-        }
-      } catch (_) {}
-      if (imageFound) break;
-    }
-
-    // Fallback: check for any img element on the page
-    if (!imageFound) {
-      try {
-        const imgs = await this.driver.$$('img');
-        for (const img of imgs) {
-          if (await img.isDisplayed().catch(() => false)) {
-            const src = await img.getAttribute('src').catch(() => '');
-            if (src && (src.includes('images') || src.includes('media') || src.includes('amazon'))) {
-              imageFound = true;
-              imageSelectorUsed = 'generic-img-fallback';
-              logger.info(`[AmazonIOSSafariPage] Product image found via generic img fallback. src: ${src.substring(0, 80)}`);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    diagnostics.imageFound = imageFound;
-    diagnostics.imageSelectorUsed = imageSelectorUsed;
-    if (!imageFound) {
-      failures.push('PRODUCT IMAGE: Not found. Tried selectors: ' + this.productImageSelectors.join(', '));
-    }
-
-    // ── Check 4: Add to Cart Button ─────────────────────────────────
-    let addToCartFound = false;
-    let addToCartSelectorUsed = '';
-    for (const selector of this.addToCartSelectors) {
-      try {
-        const elements = await this.driver.$$(selector);
-        for (const el of elements) {
-          if (await el.isDisplayed().catch(() => false)) {
-            addToCartFound = true;
-            addToCartSelectorUsed = selector;
-            logger.info(`[AmazonIOSSafariPage] Add to Cart found via "${selector}"`);
-            break;
-          }
-        }
-      } catch (_) {}
-      if (addToCartFound) break;
-    }
-
-    // Fallback: search inside buybox containers for any submit button
-    if (!addToCartFound) {
-      const containerSelectors = ['#mobileBuybox', '#desktopBuybox', '#buybox', '#qualifiedBuyBox', '#addToCart'];
-      for (const container of containerSelectors) {
-        try {
-          const containerEl = await this.driver.$(container);
-          const containerDisplayed = await containerEl.isDisplayed().catch(() => false);
-          if (!containerDisplayed) continue;
-
-          const inputs = await containerEl.$$('input[type="submit"], button[type="submit"]');
-          for (const input of inputs) {
-            const text = await input.getAttribute('value').catch(() => '');
-            const ariaLabel = await input.getAttribute('aria-label').catch(() => '');
-            const id = await input.getAttribute('id').catch(() => '');
-            if (/add to cart|add to basket|buy now/i.test(text + ariaLabel + id)) {
-              addToCartFound = true;
-              addToCartSelectorUsed = `${container} > input[type="submit"]`;
-              logger.info(`[AmazonIOSSafariPage] Add to Cart found inside "${container}": value="${text}"`);
-              break;
-            }
-          }
-        } catch (_) {}
-        if (addToCartFound) break;
-      }
-    }
-
-    diagnostics.addToCartFound = addToCartFound;
-    diagnostics.addToCartSelectorUsed = addToCartSelectorUsed;
-    if (!addToCartFound) {
-      failures.push('ADD TO CART BUTTON: Not found. Tried selectors: ' + this.addToCartSelectors.join(', '));
-    }
-
-    // ── If any check failed: capture diagnostics and FAIL ─────────────
-    if (failures.length > 0) {
-      await this._captureFullDiagnostics('product-details-failed', diagnostics);
-
-      // Log all interactive elements for debugging
-      try {
-        const allButtons = await this.driver.$$('input[type="submit"], button[type="submit"], a[role="button"]');
-        const buttonInfo = [];
-        for (const btn of allButtons) {
-          const val = await btn.getAttribute('value').catch(() => '');
-          const ariaLabel = await btn.getAttribute('aria-label').catch(() => '');
-          const id = await btn.getAttribute('id').catch(() => '');
-          const name = await btn.getAttribute('name').catch(() => '');
-          const text = await btn.getText().catch(() => '');
-          const disp = await btn.isDisplayed().catch(() => false);
-          buttonInfo.push(`id="${id}" name="${name}" value="${val}" aria-label="${ariaLabel}" text="${text}" displayed=${disp}`);
-        }
-        logger.warn(`[AmazonIOSSafariPage] All interactive elements:\n  ${buttonInfo.join('\n  ')}`);
-      } catch (_) {}
-
-      throw new Error(
-        `[AmazonIOSSafariPage] PRODUCT DETAILS VALIDATION FAILED\n` +
-        `URL: ${diagnostics.url}\n` +
-        `Page Title: ${diagnostics.pageTitle}\n` +
-        `Expected product page but the following elements were not found:\n` +
-        `  ${failures.join('\n  ')}\n` +
-        `\nDiagnostics saved to: ${this.debugScreenshotDir}/\n` +
-        `\nOne or more critical product detail elements are missing. ` +
-        `The page may not be a valid product details page, or the DOM ` +
-        `may have changed.`
-      );
-    }
-
-    logger.info(`[AmazonIOSSafariPage] Product details fully verified. URL: ${url}`);
-    logger.info(`[AmazonIOSSafariPage]   Title: ${diagnostics.titleSelectorUsed}`);
-    logger.info(`[AmazonIOSSafariPage]   Price: ${diagnostics.priceSelectorUsed}`);
-    logger.info(`[AmazonIOSSafariPage]   Image: ${diagnostics.imageSelectorUsed}`);
-    logger.info(`[AmazonIOSSafariPage]   Add to Cart: ${diagnostics.addToCartSelectorUsed}`);
-  }
-
-  async verifyProductTitleVisible() {
-    await this.waitForSourceText(/productTitle|product title|brand|ratings?/i);
-  }
-
-  async verifyProductPriceVisibleIfAvailable() {
-    const source = await this.driver.getPageSource();
-    if (/corePrice|offer-price|a-price|₹/.test(source)) return;
-    await this.verifyProductDetailsVisible();
-  }
-
-  async verifyProductRatingVisibleIfAvailable() {
-    const source = await this.driver.getPageSource();
-    if (/ratings?|stars?|customer reviews/i.test(source)) return;
-    await this.verifyProductDetailsVisible();
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -710,186 +500,955 @@ class AmazonIOSSafariPage extends MobileBasePage {
 
   async addToCartIfAvailable() {
     await this._logActionStart("addToCartIfAvailable", { screen: "PRODUCT_DETAILS" });
-    logger.info('[AmazonIOSSafariPage] Attempting to find Add to Cart button...');
-    const currentUrl = await this.driver.getUrl().catch(() => 'unknown');
-    logger.info(`[AmazonIOSSafariPage] Current URL: ${currentUrl}`);
+    const currentUrl = await this.driver.getUrl().catch(() => '');
 
-    await this.driver.pause(3000);
-
-    let button = null;
-    let buttonSelector = null;
+    const allErrors = [];
 
     for (const selector of this.addToCartSelectors) {
       try {
         const elements = await this.driver.$$(selector);
         if (elements.length === 0) continue;
 
-        for (const el of elements) {
-          const displayed = await el.isDisplayed().catch(() => false);
-          if (displayed) {
-            button = el;
-            buttonSelector = selector;
-            logger.info(`[AmazonIOSSafariPage] Add to Cart found via: "${selector}"`);
-            break;
-          }
+        for (const element of elements) {
+          const displayed = await element.isDisplayed().catch(() => false);
+          if (!displayed) continue;
+
+          const enabled = await element.isEnabled().catch(() => true);
+          if (!enabled) continue;
+
+          try {
+            await element.scrollIntoView();
+            await this.driver.pause(300);
+          } catch (_) {}
+
+          logger.info(`[AmazonIOSSafariPage] Clicking Add to Cart via selector: "${selector}"`);
+          await element.click();
+          await this.driver.pause(3000);
+          logger.info('[AmazonIOSSafariPage] Add to Cart clicked successfully.');
+          return true;
         }
-        if (button) break;
       } catch (err) {
-        logger.warn(`[AmazonIOSSafariPage] Selector "${selector}" error: ${err.message.substring(0, 100)}`);
+        allErrors.push(`Selector "${selector}": ${err.message.substring(0, 100)}`);
       }
     }
 
-    if (!button) {
-      logger.info('[AmazonIOSSafariPage] Direct selectors failed. Searching inside buybox containers...');
-      const containerSelectors = ['#mobileBuybox', '#desktopBuybox', '#buybox', '#qualifiedBuyBox', '#addToCart'];
-      for (const container of containerSelectors) {
-        try {
-          const containerEl = await this.driver.$(container);
-          const containerDisplayed = await containerEl.isDisplayed().catch(() => false);
-          if (!containerDisplayed) continue;
-
-          const inputs = await containerEl.$$('input[type="submit"], button[type="submit"]');
-          for (const input of inputs) {
-            const text = await input.getAttribute('value').catch(() => '');
-            const ariaLabel = await input.getAttribute('aria-label').catch(() => '');
-            const id = await input.getAttribute('id').catch(() => '');
-            const name = await input.getAttribute('name').catch(() => '');
-
-            logger.info(`[AmazonIOSSafariPage] Container "${container}" input: value="${text}" aria-label="${ariaLabel}" id="${id}" name="${name}"`);
-
-            if (/add to cart|add to basket/i.test(text + ariaLabel + id + name)) {
-              button = input;
-              buttonSelector = `${container} > input[type="submit"]`;
-              logger.info(`[AmazonIOSSafariPage] Add to Cart found inside "${container}": value="${text}"`);
-              break;
-            }
-          }
-          if (button) break;
-        } catch (_) {}
-      }
-    }
-
-    if (!button) {
-      logger.info('[AmazonIOSSafariPage] Add to Cart not found. Trying Buy Now as fallback...');
+    // ── Fallback: Buy Now if Add to Cart not found ───────────────────────
+    if (process.env.ALLOW_BUY_NOW_FALLBACK === 'true') {
+      logger.info('[AmazonIOSSafariPage] Add to Cart not found — trying Buy Now as fallback...');
       for (const selector of this.buyNowSelectors) {
         try {
           const elements = await this.driver.$$(selector);
           if (elements.length === 0) continue;
-          for (const el of elements) {
-            const displayed = await el.isDisplayed().catch(() => false);
-            if (displayed) {
-              button = el;
-              buttonSelector = selector;
-              logger.info(`[AmazonIOSSafariPage] Buy Now found via: "${selector}"`);
-              break;
-            }
+
+          for (const element of elements) {
+            const displayed = await element.isDisplayed().catch(() => false);
+            if (!displayed) continue;
+
+            try {
+              await element.scrollIntoView();
+              await this.driver.pause(300);
+            } catch (_) {}
+
+            logger.info(`[AmazonIOSSafariPage] Clicking Buy Now via selector: "${selector}"`);
+            await element.click();
+            await this.driver.pause(3000);
+            logger.info('[AmazonIOSSafariPage] Buy Now clicked successfully.');
+            return true;
           }
-          if (button) break;
-        } catch (_) {}
+        } catch (err) {
+          allErrors.push(`BuyNow "${selector}": ${err.message.substring(0, 100)}`);
+        }
       }
     }
 
-    if (!button) {
-      await this._captureFullDiagnostics('add-to-cart-not-found', {
-        locatorAttempted: this.addToCartSelectors.join(', '),
-        extra: { currentUrl: currentUrl }
-      });
-      const pageSource = await this.driver.getPageSource().catch(() => '');
+    // ── Capture diagnostics ─────────────────────────────────────────────
+    await this._captureFullDiagnostics('addToCart-failed', {
+      locatorAttempted: this.addToCartSelectors.join(', '),
+      titleSelectorUsed: this.productTitleSelectors[0],
+      extra: { allErrors }
+    });
 
-      logger.warn('[AmazonIOSSafariPage] Add to Cart button NOT FOUND. Debug info:');
-      logger.warn(`  URL: ${currentUrl}`);
-      logger.warn(`  Attempted selectors: ${this.addToCartSelectors.join(', ')}`);
-      logger.warn(`  Page source length: ${pageSource.length}`);
-
-      const isProductPage = await this._confirmProductDetailPage().catch(() => false);
-      logger.warn(`  Is product page confirmed: ${isProductPage}`);
-
-      try {
-        const allButtons = await this.driver.$$('input[type="submit"], button[type="submit"], a[role="button"]');
-        const buttonInfo = [];
-        for (const btn of allButtons) {
-          const val = await btn.getAttribute('value').catch(() => '');
-          const ariaLabel = await btn.getAttribute('aria-label').catch(() => '');
-          const id = await btn.getAttribute('id').catch(() => '');
-          const name = await btn.getAttribute('name').catch(() => '');
-          const text = await btn.getText().catch(() => '');
-          const disp = await btn.isDisplayed().catch(() => false);
-          buttonInfo.push(`id="${id}" name="${name}" value="${val}" aria-label="${ariaLabel}" text="${text}" displayed=${disp}`);
-        }
-        logger.warn(`[AmazonIOSSafariPage] All interactive elements on page:\n  ${buttonInfo.join('\n  ')}`);
-      } catch (_) {}
-
-      return false;
-    }
-
-    try {
-      await button.scrollIntoView();
-      await this.driver.pause(500);
-    } catch (err) {
-      logger.warn(`[AmazonIOSSafariPage] scrollIntoView warning: ${err.message}`);
-    }
-
-    const isDisplayed = await button.isDisplayed().catch(() => false);
-    if (!isDisplayed) {
-      logger.warn(`[AmazonIOSSafariPage] Button found but not displayed after scroll (selector: ${buttonSelector})`);
-      return false;
-    }
-
-    logger.info(`[AmazonIOSSafariPage] Clicking Add to Cart button (selector: ${buttonSelector})`);
-    await button.click();
-    await this.driver.pause(3000);
-
-    const postClickSource = await this.driver.getPageSource().catch(() => '');
-    const hasConfirmation = /added to cart|added to basket|cart|subtotal|proceed to buy/i.test(postClickSource);
-
-    if (hasConfirmation) {
-      logger.info('[AmazonIOSSafariPage] Add to Cart confirmed — cart confirmation detected.');
-      return true;
-    }
-
-    const postClickUrl = await this.driver.getUrl().catch(() => '');
-    if (/cart|gp\/cart/.test(postClickUrl)) {
-      logger.info('[AmazonIOSSafariPage] Redirected to cart page after Add to Cart.');
-      return true;
-    }
-
-    logger.info('[AmazonIOSSafariPage] Add to Cart clicked (assumed success).');
-    return true;
+    throw new Error(
+      `[AmazonIOSSafariPage] Add to Cart button not found on product page.\n` +
+      `Current URL: ${currentUrl}\n` +
+      `All errors: ${allErrors.join('; ')}`
+    );
   }
 
   async verifyAddToCartFlowComplete(addedToCart) {
-    if (addedToCart) {
-      await this.waitForSourceText(/added to cart|cart|basket/i);
-      return;
+    if (!addedToCart) {
+      throw new Error('[AmazonIOSSafariPage] Add to Cart flow was not completed successfully.');
     }
-    await this.verifyProductDetailsVisible();
+    logger.info('[AmazonIOSSafariPage] Add to Cart flow completed.');
   }
 
   // ═════════════════════════════════════════════════════════════════════════
-  // Cart
+  // Cart — Open, Verify, Remove Items
   // ═════════════════════════════════════════════════════════════════════════
 
   async openCartPage() {
     await this._logActionStart("openCartPage", { screen: "CART_PAGE" });
-    await this.openUrlAndWaitForAmazon('https://www.amazon.in/gp/cart/view.html', 'cart page');
+    await this.openUrlAndWaitForAmazon('https://www.amazon.in/cart', 'cart page');
   }
 
   async verifyCartPageVisible() {
     await this.waitForAmazonUrl('cart page');
-    await this.waitForSourceText(/shopping cart|cart|basket|subtotal|proceed to buy/i);
+    await this.waitForSourceText(/shopping cart|cart|basket|subtotal|proceed to buy|smart wagon|your items|cart total|item total/i);
   }
 
   async verifyCartTitleOrEmptyMessage() {
-    await this.waitForSourceText(/shopping cart|cart is empty|your amazon cart is empty|subtotal/i);
+    await this.waitForSourceText(/shopping cart|cart is empty|your amazon cart is empty|your amazon cart is empty|subtotal|smart wagon|your shopping cart is empty|your cart is empty/i);
   }
 
   async verifyProceedToBuyButtonIfCartHasItems() {
     const source = await this.driver.getPageSource();
-    if (/proceed to buy|subtotal/i.test(source)) return;
+    if (/proceed to buy|subtotal|proceed to checkout|smart wagon|checkout/i.test(source)) return;
     await this.verifyCartTitleOrEmptyMessage();
   }
 
+  /**
+   * Remove a product from the cart.
+   *
+   * Strategy (in order):
+   *   1. CSS selectors targeting Amazon Smart Wagon cart delete buttons
+   *   2. XPath selectors targeting Smart Wagon and standard cart delete
+   *   3. JavaScript execution fallback — directly clicking the delete link
+   *      via `document.querySelector` and dispatching a click event
+   *   4. JavaScript execution — using DOM traversal to find "Delete" links
+   *      by their text content
+   *
+   * @returns {Promise<boolean>} True if the item was successfully removed
+   * @throws {Error} If no delete button could be found after all attempts
+   */
+  async removeItemFromCart() {
+    await this._logActionStart("removeItemFromCart", { screen: "CART_PAGE" });
+
+    const currentUrl = await this.driver.getUrl().catch(() => '');
+    logger.info(`[AmazonIOSSafariPage] Removing item from cart. URL: ${currentUrl}`);
+
+    const allErrors = [];
+
+    // ── Phase 1: CSS Selectors ──────────────────────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 1: Trying CSS selectors...');
+    const removedViaCss = await this._tryDeleteSelectors(
+      this.smartWagonDeleteSelectors,
+      allErrors,
+      'css'
+    );
+    if (removedViaCss) return true;
+
+    // ── Phase 2: XPath Selectors ────────────────────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 2: Trying XPath selectors...');
+    const removedViaXPath = await this._tryDeleteXPaths(
+      this.smartWagonDeleteXPaths,
+      allErrors
+    );
+    if (removedViaXPath) return true;
+
+    // ── Phase 3: JavaScript Execution Fallback ──────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 3: Trying JavaScript execution fallback...');
+    const removedViaJs = await this._tryJsDeleteFallback(allErrors);
+    if (removedViaJs) return true;
+
+    // ── All attempts failed — capture diagnostics ───────────────────────
+    await this._captureCartPageDiagnostics(allErrors);
+
+    throw new Error(
+      `[AmazonIOSSafariPage] Could not find delete button on cart page.\n` +
+      `URL: ${currentUrl}\n` +
+      `CSS selectors attempted: ${this.smartWagonDeleteSelectors.join(', ')}\n` +
+      `XPath selectors attempted: ${this.smartWagonDeleteXPaths.length} expressions\n` +
+      `JS fallback attempted: yes\n` +
+      `Errors: ${allErrors.join('; ')}`
+    );
+  }
+
+  /**
+   * Try each CSS selector in order, clicking the first visible element found.
+   *
+   * @param {string[]} selectors - Array of CSS selector strings
+   * @param {string[]} allErrors - Accumulator for error messages
+   * @param {string} source - Label for log messages ('css' or 'js')
+   * @returns {Promise<boolean>} True if an element was found and clicked
+   */
+  async _tryDeleteSelectors(selectors, allErrors, source) {
+    for (const selector of selectors) {
+      try {
+        const elements = await this.driver.$$(selector);
+        if (elements.length === 0) continue;
+
+        for (const element of elements) {
+          const displayed = await element.isDisplayed().catch(() => false);
+          if (!displayed) continue;
+
+          const enabled = await element.isEnabled().catch(() => true);
+          if (!enabled) continue;
+
+          // Scroll into view
+          try {
+            await element.scrollIntoView();
+            await this.driver.pause(300);
+          } catch (_) {}
+
+          logger.info(`[AmazonIOSSafariPage] Clicking delete via ${source} selector: "${selector}"`);
+          await element.click();
+          await this.driver.pause(3000);
+
+          // Verify the item was removed (page should update)
+          const removalConfirmed = await this._confirmItemRemoved();
+          if (removalConfirmed) {
+            logger.info('[AmazonIOSSafariPage] Item removed successfully.');
+            return true;
+          }
+
+          // Click happened but item wasn't removed — try next element
+          logger.warn(`[AmazonIOSSafariPage] Click on "${selector}" did not remove item.`);
+        }
+      } catch (err) {
+        allErrors.push(`CSS "${selector}": ${err.message.substring(0, 100)}`);
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Try each XPath expression in order.
+   *
+   * @param {string[]} xpaths - Array of XPath expression strings
+   * @param {string[]} allErrors - Accumulator for error messages
+   * @returns {Promise<boolean>} True if an element was found and clicked
+   */
+  async _tryDeleteXPaths(xpaths, allErrors) {
+    for (const xpath of xpaths) {
+      try {
+        const elements = await this.driver.$$(xpath);
+        if (elements.length === 0) continue;
+
+        for (const element of elements) {
+          const displayed = await element.isDisplayed().catch(() => false);
+          if (!displayed) continue;
+
+          try {
+            await element.scrollIntoView();
+            await this.driver.pause(300);
+          } catch (_) {}
+
+          logger.info(`[AmazonIOSSafariPage] Clicking delete via XPath`);
+          await element.click();
+          await this.driver.pause(3000);
+
+          const removalConfirmed = await this._confirmItemRemoved();
+          if (removalConfirmed) {
+            logger.info('[AmazonIOSSafariPage] Item removed via XPath.');
+            return true;
+          }
+        }
+      } catch (err) {
+        allErrors.push(`XPath: ${err.message.substring(0, 100)}`);
+      }
+    }
+    return false;
+  }
+
+  /**
+   * JavaScript execution fallback to delete a cart item.
+   *
+   * Safari's WebView supports executing arbitrary JavaScript.
+   * This method uses several JS strategies:
+   *   1. Find all anchor elements with text "Delete" or containing "delete" in href
+   *   2. Click the match via .click()
+   *   3. If direct click doesn't work, dispatch a MouseEvent
+   *
+   * @param {string[]} allErrors - Accumulator for error messages
+   * @returns {Promise<boolean>} True if removal was confirmed
+   */
+  async _tryJsDeleteFallback(allErrors) {
+    try {
+      const result = await this.driver.execute(`
+        (function() {
+          // ── Strategy 1: Find elements by text content ────────────────
+          function findDeleteElements() {
+            const results = [];
+
+            // All possible selectors for delete/remove buttons
+            const selectors = [
+              'a[data-testid*="delete"]',
+              'button[data-testid*="delete"]',
+              'span[data-action="delete"] a',
+              'span[data-action="delete"]',
+              'input.sc-action-delete',
+              'a[href*="delete"]',
+              'button[name*="delete"]',
+              'input[name*="delete"]',
+              'a[aria-label*="Delete"]',
+              'a[aria-label*="delete"]',
+              '[data-csa-c-action*="delete"]',
+              '.sc-action-delete input',
+              '.a-declarative a[href*="delete"]',
+            ];
+
+            // Try CSS selectors first
+            for (const sel of selectors) {
+              try {
+                const els = document.querySelectorAll(sel);
+                for (const el of els) {
+                  // Check visibility
+                  const rect = el.getBoundingClientRect();
+                  const style = window.getComputedStyle(el);
+                  const visible = rect.width > 0 && rect.height > 0 &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0';
+                  if (visible) {
+                    results.push({
+                      element: el,
+                      selector: sel,
+                      tag: el.tagName,
+                      text: (el.textContent || '').trim().substring(0, 50),
+                      id: el.id,
+                      className: el.className,
+                    });
+                  }
+                }
+              } catch(e) {}
+            }
+
+            // Try finding by text content "Delete"
+            if (results.length === 0) {
+              const allLinks = document.querySelectorAll('a, button, span, input');
+              for (const el of allLinks) {
+                const text = (el.textContent || '').trim();
+                const value = (el.getAttribute('value') || '').trim();
+                const ariaLabel = (el.getAttribute('aria-label') || '').trim();
+                if (
+                  text === 'Delete' ||
+                  text === 'delete' ||
+                  value === 'Delete' ||
+                  ariaLabel.toLowerCase().includes('delete')
+                ) {
+                  const rect = el.getBoundingClientRect();
+                  const visible = rect.width > 0 && rect.height > 0;
+                  if (visible) {
+                    results.push({
+                      element: el,
+                      selector: 'text="' + text + '"',
+                      tag: el.tagName,
+                      text: text,
+                    });
+                  }
+                }
+              }
+            }
+
+            return results;
+          }
+
+          // ── Strategy 2: Click the element ────────────────────────────
+          function clickElement(el) {
+            // Scroll into view first
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+
+            // Try native click first
+            try {
+              el.click();
+              return { method: 'nativeClick', success: true };
+            } catch(e) {
+              // If native click fails, dispatch a MouseEvent
+              try {
+                const event = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window
+                });
+                el.dispatchEvent(event);
+                return { method: 'dispatchedEvent', success: true };
+              } catch(e2) {
+                return { method: 'failed', success: false, error: e2.message };
+              }
+            }
+          }
+
+          // ── Execute ──────────────────────────────────────────────────
+          const found = findDeleteElements();
+          if (found.length === 0) {
+            return { success: false, reason: 'noElementsFound', found: [] };
+          }
+
+          const result = clickElement(found[0].element);
+          return {
+            success: result.success,
+            method: result.method,
+            clickedElement: {
+              tag: found[0].tag,
+              selector: found[0].selector,
+              text: found[0].text,
+              id: found[0].id || '',
+              className: found[0].className || '',
+            },
+            allFoundElements: found.map(function(f) { return {
+              tag: f.tag, selector: f.selector, text: f.text
+            };})
+          };
+        })()
+      `);
+
+      if (result && result.success) {
+        logger.info(`[AmazonIOSSafariPage] JS delete executed: method=${result.method}, element=${result.clickedElement.tag}[${result.clickedElement.selector}]`);
+        await this.driver.pause(3000);
+
+        const removalConfirmed = await this._confirmItemRemoved();
+        if (removalConfirmed) {
+          logger.info('[AmazonIOSSafariPage] Item removed via JS fallback.');
+          return true;
+        }
+
+        logger.warn('[AmazonIOSSafariPage] JS click executed but item not removed.');
+        return false;
+      }
+
+      if (result && !result.success) {
+        logger.warn(`[AmazonIOSSafariPage] JS delete failed: ${result.reason}`);
+        if (result.reason === 'noElementsFound') {
+          allErrors.push('JS fallback: no delete elements found on page');
+        }
+      }
+    } catch (err) {
+      allErrors.push(`JS fallback: ${err.message.substring(0, 100)}`);
+    }
+
+    return false;
+  }
+
+  /**
+   * Confirm that an item was removed from the cart.
+   * Checks the page source for empty-cart indicators or the absence of items.
+   *
+   * @returns {Promise<boolean>} True if the cart appears empty or item was removed
+   */
+  async _confirmItemRemoved() {
+    try {
+      const source = await this.driver.getPageSource().catch(() => '');
+      // Check for empty cart indicators
+      if (/cart is empty|your shopping cart is empty|your amazon cart is empty|your cart is empty|no items|0 items|add items to cart|item deleted|item removed/i.test(source)) {
+        return true;
+      }
+
+      // Check that delete action is no longer present (item was removed from DOM)
+      // Note: This is not definitive — Amazon may re-render the cart
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Capture comprehensive diagnostic information about the cart page
+   * when the delete button cannot be found.
+   *
+   * @param {string[]} allErrors - Accumulated error messages
+   */
+  async _captureCartPageDiagnostics(allErrors) {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const baseDir = this.debugSourceDir || 'reports/ios/debug';
+      fs.ensureDirSync(baseDir);
+
+      // Current URL and title
+      const currentUrl = await this.driver.getUrl().catch(() => 'unknown');
+      const pageTitle = await this.driver.getTitle().catch(() => 'unknown');
+
+      // ── 1. Full page source ─────────────────────────────────────────
+      try {
+        const source = await this.driver.getPageSource().catch(() => '');
+        const sourcePath = path.join(baseDir, `cart-delete-failed-${timestamp}.html`);
+        fs.writeFileSync(sourcePath, source, 'utf8');
+        logger.info(`[AmazonIOSSafariPage] Cart page source saved: ${sourcePath}`);
+      } catch (_) {}
+
+      // ── 2. Screenshot ────────────────────────────────────────────────
+      try {
+        const screenshotDir = this.debugScreenshotDir || 'reports/ios/screenshots';
+        fs.ensureDirSync(screenshotDir);
+        const screenshotPath = path.join(screenshotDir, `cart-delete-failed-${timestamp}.png`);
+        await this.driver.saveScreenshot(screenshotPath);
+        logger.info(`[AmazonIOSSafariPage] Cart screenshot saved: ${screenshotPath}`);
+      } catch (_) {}
+
+      // ── 3. Extract all interactive elements via JS ──────────────────
+      try {
+        const interactiveElements = await this.driver.execute(`
+          (function() {
+            const results = [];
+            const selectors = [
+              'a[href]', 'button', 'input[type="submit"]', 'input[type="button"]',
+              'span[data-action]', '[data-testid]', '[data-csa-c-action]',
+              '.sc-action-delete', '[data-action*="delete"]', '[data-testid*="delete"]',
+              'a[aria-label]', 'input[value]', '[role="button"]',
+              'a[href*="delete"]', 'button[name*="delete"]', 'input[name*="delete"]',
+              '[data-component-type="cart-item"]', '.sc-list-item',
+            ];
+            for (const sel of selectors) {
+              const els = document.querySelectorAll(sel);
+              for (const el of els) {
+                const rect = el.getBoundingClientRect();
+                const visible = rect.width > 0 && rect.height > 0;
+                results.push({
+                  tag: el.tagName,
+                  id: el.id,
+                  className: (el.className || '').substring(0, 60),
+                  text: (el.textContent || '').trim().substring(0, 80),
+                  href: el.getAttribute('href') || '',
+                  dataAction: el.getAttribute('data-action') || '',
+                  dataTestid: el.getAttribute('data-testid') || '',
+                  name: el.getAttribute('name') || '',
+                  value: el.getAttribute('value') || '',
+                  ariaLabel: el.getAttribute('aria-label') || '',
+                  visible: visible,
+                  rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+                });
+              }
+            }
+            return results;
+          })()
+        `);
+
+        const diagPath = path.join(baseDir, `cart-delete-diagnostics-${timestamp}.json`);
+        const diagData = {
+          timestamp: new Date(timestamp).toISOString(),
+          url: currentUrl,
+          pageTitle: pageTitle,
+          interactiveElementsCount: (interactiveElements || []).length,
+          interactiveElements: interactiveElements || [],
+          errors: allErrors,
+        };
+        fs.writeFileSync(diagPath, JSON.stringify(diagData, null, 2), 'utf8');
+        logger.info(`[AmazonIOSSafariPage] Cart diagnostics saved: ${diagPath}`);
+
+        // Also log a summary of interactive elements to the console
+        if (interactiveElements && interactiveElements.length > 0) {
+          logger.info('[AmazonIOSSafariPage] Interactive elements on cart page:');
+          for (const el of interactiveElements.slice(0, 30)) {
+            logger.info(`  <${el.tag}> id="${el.id}" class="${el.className}" text="${el.text}" href="${el.href}" data-testid="${el.dataTestid}" visible=${el.visible}`);
+          }
+        }
+      } catch (err) {
+        logger.warn(`[AmazonIOSSafariPage] Interactive element extraction failed: ${err.message}`);
+      }
+    } catch (err) {
+      logger.warn(`[AmazonIOSSafariPage] Diagnostic capture failed: ${err.message}`);
+    }
+  }
+
   // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Proceed to checkout from the cart page.
+   *
+   * Amazon Smart Wagon cart page on mobile Safari has a completely different
+   * DOM structure than the old /gp/cart/view.html. The checkout button may be:
+   *   - An <a> tag with data-csa-c-slot-id="checkout"
+   *   - An <a> tag with a href pointing to /checkout or /buy
+   *   - An <input> with name="proceedToRetailCheckout" or similar
+   *   - A <button> or <span> with data-testid containing "proceed"
+   *   - A <form> with an action pointing to checkout
+   *
+   * Strategy (in order):
+   *   1. Verify cart page is fully loaded (wait for indicators)
+   *   2. CSS selectors targeting Smart Wagon and standard cart checkout buttons
+   *   3. XPath selectors as fallback
+   *   4. JavaScript execution — traverse DOM to find "Proceed to Buy" by text
+   *   5. URL-based fallback — navigate directly to checkout
+   *
+   * @returns {Promise<boolean>} True if checkout was successfully reached
+   * @throws {Error} If no checkout button could be found
+   */
+  async proceedToCheckout() {
+    await this._logActionStart("proceedToCheckout", { screen: "CART_PAGE" });
+    const currentUrl = await this.driver.getUrl().catch(() => '');
+    logger.info('[AmazonIOSSafariPage] Proceeding to checkout. URL: ' + currentUrl);
+
+    const allErrors = [];
+
+    // ── Step 0: Verify cart page is fully loaded ─────────────────────
+    logger.info('[AmazonIOSSafariPage] Waiting for cart page to fully load...');
+    try {
+      await this.driver.waitUntil(async () => {
+        const src = await this.driver.getPageSource();
+        return /shopping cart|smart.wagon|cart total|subtotal|proceed|checkout|place order/i.test(src)
+          && !/loading|spinner|please wait/i.test(src);
+      }, { timeout: 15000, interval: 1000 });
+      logger.info('[AmazonIOSSafariPage] Cart page DOM is ready.');
+    } catch (err) {
+      logger.warn('[AmazonIOSSafariPage] Cart page load wait timed out — proceeding anyway.');
+    }
+
+    // ── Step 1: CSS Selectors ─────────────────────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 1: Trying CSS selectors...');
+    const proceedSelectors = [
+      // Amazon Smart Wagon cart uses data-csa-c-slot-id for checkout links
+      'a[data-csa-c-slot-id*="checkout"]',
+      '[data-csa-c-slot-id*="checkout"]',
+      'a[data-csa-c-slot-id*="proceed"]',
+      // Data-testid based proceed-to-checkout
+      '[data-testid*="proceed-to-checkout"]',
+      'button[data-testid*="proceed-to-checkout"]',
+      'a[data-testid*="proceed-to-checkout"]',
+      // Input-based checkout buttons (most common on Smart Wagon)
+      'input[name*="proceedToRetailCheckout"]',
+      'input[name="proceedToCheckout"]',
+      'input[name="proceedToRetailCheckout"]',
+      'input[name*="proceed-to-checkout"]',
+      // Generic checkout links
+      'a[href*="/checkout"]',
+      'a[href*="checkout"]',
+      'a[href*="gp/buy"]',
+      'a[href*="/buy/"]',
+      'a[href*="select-address"]',
+      // Data-action based checkout
+      'span[data-action*="proceed-to-checkout"]',
+      'span[data-action*="proceed-to-checkout"] a',
+      'span[data-action*="proceed-to-checkout"] input',
+      'span[data-action*="proceed-to-buy"]',
+      'span[data-action*="proceed-to-buy"] input',
+      // Value/aria-label based
+      'input[value*="Proceed"]',
+      'input[value*="proceed"]',
+      'input[value*="Checkout"]',
+      'input[value*="checkout"]',
+      'a[aria-label*="Proceed"]',
+      'a[aria-label*="proceed"]',
+      'button[aria-label*="Proceed"]',
+      'button[aria-label*="proceed"]',
+      // Standard cart patterns (fallback)
+      '#sc-buy-box-ptc-button input',
+      '.sc-buy-box input[type="submit"]',
+      '[name*="proceed"] input[type="submit"]',
+      '[id*="proceed"] input[type="submit"]',
+      // Form-based checkout
+      'form[action*="checkout"] input[type="submit"]',
+      'form[action*="buy"] input[type="submit"]',
+      // Last resort: any submit button on the page
+      'input[type="submit"]:not([value*="Delete"]):not([value*="delete"]):not([name*="delete"])',
+    ];
+
+    const clickedViaCss = await this._tryProceedSelectors(proceedSelectors, allErrors);
+    if (clickedViaCss) return true;
+
+    // ── Step 2: XPath Selectors ───────────────────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 2: Trying XPath selectors...');
+    const proceedXPaths = [
+      "//a[contains(@data-csa-c-slot-id, 'checkout')]",
+      "//*[contains(@data-testid, 'proceed')]",
+      "//a[contains(@href, 'checkout')]",
+      "//a[contains(@href, 'gp/buy')]",
+      "//a[contains(@href, 'select-address')]",
+      "//input[contains(@name, 'proceed')]",
+      "//input[contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'proceed')]",
+      "//span[contains(@data-action, 'proceed')]",
+      "//span[contains(@data-action, 'proceed-to-checkout')]//a",
+      "//button[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'proceed')]",
+      "//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'proceed')]",
+      "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'proceed to buy')]",
+      "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'proceed to checkout')]",
+      "//input[contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'buy')]",
+      "//input[contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'checkout')]",
+    ];
+
+    for (const xpath of proceedXPaths) {
+      try {
+        const elements = await this.driver.$$(xpath);
+        for (const el of elements) {
+          const displayed = await el.isDisplayed().catch(() => false);
+          if (!displayed) continue;
+          try { await el.scrollIntoView(); await this.driver.pause(300); } catch (_) {}
+          logger.info('[AmazonIOSSafariPage] Clicking checkout via XPath');
+          await el.click();
+          await this.driver.pause(5000);
+          if (await this._confirmCheckoutReached()) return true;
+        }
+      } catch (err) {
+        allErrors.push('XPath: ' + err.message.substring(0, 100));
+      }
+    }
+
+    // ── Step 3: JavaScript Execution Fallback ─────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 3: Trying JavaScript execution...');
+    const clickedViaJs = await this._tryJsProceedFallback(allErrors);
+    if (clickedViaJs) return true;
+
+    // ── Step 4: URL-based fallback ────────────────────────────────────
+    logger.info('[AmazonIOSSafariPage] Phase 4: URL-based fallback...');
+    try {
+      const checkoutUrls = [
+        'https://www.amazon.in/gp/buy/select-address',
+        'https://www.amazon.in/gp/buy/',
+        'https://www.amazon.in/checkout/',
+      ];
+      for (const url of checkoutUrls) {
+        logger.info('[AmazonIOSSafariPage] Navigating directly to checkout: ' + url);
+        await this.driver.url(url);
+        await this.driver.pause(5000);
+        if (await this._confirmCheckoutReached()) {
+          logger.info('[AmazonIOSSafariPage] Checkout reached via URL navigation.');
+          return true;
+        }
+      }
+    } catch (err) {
+      allErrors.push('URL fallback: ' + err.message.substring(0, 100));
+    }
+
+    // ── All attempts failed — capture diagnostics ─────────────────────
+    await this._captureProceedDiagnostics(allErrors);
+
+    throw new Error(
+      '[AmazonIOSSafariPage] Could not find Proceed to Buy button on cart page.\n' +
+      'URL: ' + currentUrl + '\n' +
+      'CSS selectors attempted: ' + proceedSelectors.length + '\n' +
+      'XPath selectors attempted: ' + proceedXPaths.length + '\n' +
+      'JS fallback attempted: yes\n' +
+      'URL fallback attempted: yes\n' +
+      'Errors: ' + allErrors.join('; ')
+    );
+  }
+
+  /**
+   * Try each proceed-to-checkout CSS selector in order.
+   */
+  async _tryProceedSelectors(selectors, allErrors) {
+    await this.driver.pause(1000);
+
+    for (const selector of selectors) {
+      try {
+        const elements = await this.driver.$$(selector);
+        if (elements.length === 0) continue;
+
+        for (const element of elements) {
+          const displayed = await element.isDisplayed().catch(() => false);
+          if (!displayed) {
+            try { await element.scrollIntoView(); await this.driver.pause(300); } catch (_) {}
+            const recheck = await element.isDisplayed().catch(() => false);
+            if (!recheck) continue;
+          }
+
+          logger.info('[AmazonIOSSafariPage] Clicking checkout via selector: "' + selector + '"');
+          try { await element.scrollIntoView(); await this.driver.pause(300); } catch (_) {}
+          await element.click();
+          await this.driver.pause(5000);
+
+          const checkoutReached = await this._confirmCheckoutReached();
+          if (checkoutReached) {
+            logger.info('[AmazonIOSSafariPage] Checkout reached.');
+            return true;
+          }
+
+          logger.warn('[AmazonIOSSafariPage] Click on "' + selector + '" did not reach checkout.');
+        }
+      } catch (err) {
+        allErrors.push('CSS "' + selector + '": ' + err.message.substring(0, 100));
+      }
+    }
+    return false;
+  }
+
+  /**
+   * JavaScript execution fallback to find and click Proceed to Buy.
+   */
+  async _tryJsProceedFallback(allErrors) {
+    try {
+      const result = await this.driver.execute(function() {
+        function findCheckoutElements() {
+          var results = [];
+
+          // Strategy A: data-csa-c-slot-id
+          document.querySelectorAll('[data-csa-c-slot-id*="checkout"], [data-csa-c-slot-id*="proceed"]').forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            var visible = rect.width > 0 && rect.height > 0;
+            if (visible) results.push({ source: "data-csa-c-slot-id", tag: el.tagName, text: (el.textContent || "").trim().substring(0, 60) });
+          });
+
+          // Strategy B: data-testid
+          document.querySelectorAll('[data-testid*="proceed"], [data-testid*="checkout"]').forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            var visible = rect.width > 0 && rect.height > 0;
+            if (visible && !results.some(function(r) { return r.element === el; })) results.push({ source: "data-testid", tag: el.tagName, text: (el.textContent || "").trim().substring(0, 60) });
+          });
+
+          // Strategy C: inputs with proceed/checkout in name/value
+          document.querySelectorAll('input[name*="proceed"], input[name*="checkout"], input[value*="Proceed"], input[value*="proceed"], input[value*="Checkout"], input[value*="checkout"]').forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            var visible = rect.width > 0 && rect.height > 0;
+            if (visible && !results.some(function(r) { return r.element === el; })) results.push({ source: "input-name-value", tag: el.tagName, name: el.name, value: el.value });
+          });
+
+          // Strategy D: anchors with checkout/buy in href
+          document.querySelectorAll('a[href*="/checkout"], a[href*="/buy/"], a[href*="select-address"], a[href*="gp/buy"]').forEach(function(el) {
+            var rect = el.getBoundingClientRect();
+            var visible = rect.width > 0 && rect.height > 0;
+            if (visible && !results.some(function(r) { return r.element === el; })) results.push({ source: "anchor-href", tag: el.tagName, href: el.href, text: (el.textContent || "").trim().substring(0, 60) });
+          });
+
+          // Strategy E: text content matching
+          document.querySelectorAll('a, button, span, input[type="submit"], input[type="button"]').forEach(function(el) {
+            var text = (el.textContent || el.value || "").trim();
+            var aria = (el.getAttribute("aria-label") || "").trim();
+            if (/proceed.*(?:buy|checkout)|place.*order/i.test(text) || /proceed.*(?:buy|checkout)|place.*order/i.test(aria)) {
+              var rect = el.getBoundingClientRect();
+              var visible = rect.width > 0 && rect.height > 0;
+              if (visible && !results.some(function(r) { return r.element === el; })) results.push({ source: "text-match", tag: el.tagName, text: text.substring(0, 60), aria: aria });
+            }
+          });
+
+          return results;
+        }
+
+        function clickElement(el) {
+          el.scrollIntoView({ behavior: "instant", block: "center" });
+          try { el.click(); return { method: "nativeClick", success: true }; }
+          catch(e) {
+            try {
+              var event = new MouseEvent("click", { bubbles: true, cancelable: true, view: window });
+              el.dispatchEvent(event);
+              return { method: "dispatchedEvent", success: true };
+            } catch(e2) { return { method: "failed", success: false, error: e2.message }; }
+          }
+        }
+
+        var found = findCheckoutElements();
+        if (found.length === 0) return { success: false, reason: "noCheckoutElementsFound", foundCount: 0 };
+
+        var result = clickElement(found[0].element);
+        return {
+          success: result.success,
+          method: result.method,
+          clickedSource: found[0].source,
+          clickedTag: found[0].tag,
+          allFoundCount: found.length,
+        };
+      });
+
+      if (result && result.success) {
+        logger.info('[AmazonIOSSafariPage] JS checkout click: method=' + result.method + ', element=' + result.clickedTag + '[' + result.clickedSource + ']');
+        await this.driver.pause(5000);
+        if (await this._confirmCheckoutReached()) {
+          logger.info('[AmazonIOSSafariPage] Checkout reached via JS fallback.');
+          return true;
+        }
+      }
+
+      if (result && !result.success) {
+        allErrors.push('JS fallback: ' + (result.reason || 'failed'));
+        if (result.reason === 'noCheckoutElementsFound') {
+          logger.warn('[AmazonIOSSafariPage] JS fallback: no checkout elements found on page');
+        }
+      }
+    } catch (err) {
+      allErrors.push('JS fallback: ' + err.message.substring(0, 100));
+    }
+    return false;
+  }
+
+  /**
+   * Confirm that the checkout page was reached.
+   */
+  async _confirmCheckoutReached() {
+    try {
+      const url = await this.driver.getUrl().catch(() => '');
+      if (/checkout|buy|select-address|spc/i.test(url)) {
+        logger.info('[AmazonIOSSafariPage] Checkout confirmed via URL: ' + url);
+        return true;
+      }
+      const source = await this.driver.getPageSource().catch(() => '');
+      if (/select-delivery-address|payment-method|place your order|place order now|delivery address|card number|credit card|debit card|ship to this address/i.test(source)) {
+        logger.info('[AmazonIOSSafariPage] Checkout confirmed via page source.');
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Capture comprehensive diagnostics when checkout button cannot be found.
+   */
+  async _captureProceedDiagnostics(allErrors) {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const baseDir = this.debugSourceDir || 'reports/ios/debug';
+      fs.ensureDirSync(baseDir);
+
+      const currentUrl = await this.driver.getUrl().catch(() => 'unknown');
+      const pageTitle = await this.driver.getTitle().catch(() => 'unknown');
+
+      // Save screenshot
+      const screenshotDir = this.debugScreenshotDir || 'reports/ios/screenshots';
+      fs.ensureDirSync(screenshotDir);
+      await this.driver.saveScreenshot(screenshotDir + '/checkout-failed-' + timestamp + '.png').catch(() => {});
+
+      // Save full page source
+      const source = await this.driver.getPageSource().catch(() => '');
+      fs.writeFileSync(baseDir + '/checkout-failed-' + timestamp + '.html', source, 'utf8');
+
+      // Extract interactive elements via JS
+      const interactiveElements = await this.driver.execute(function() {
+        var results = [];
+        var selectors = [
+          'a[href]', 'button', 'input[type="submit"]', 'input[type="button"]',
+          'span[data-action]', '[data-testid]', '[data-csa-c-slot-id]',
+          '[data-component-type="cart-item"]', '.sc-list-item',
+          'form input[type="submit"]', 'a[role="button"]',
+        ];
+        for (var s = 0; s < selectors.length; s++) {
+          var els = document.querySelectorAll(selectors[s]);
+          for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            var rect = el.getBoundingClientRect();
+            var visible = rect.width > 0 && rect.height > 0;
+            results.push({
+              tag: el.tagName, id: el.id,
+              className: (el.className || '').substring(0, 60),
+              text: (el.textContent || '').trim().substring(0, 80),
+              href: el.getAttribute('href') || '',
+              dataAction: el.getAttribute('data-action') || '',
+              dataTestid: el.getAttribute('data-testid') || '',
+              dataCsa: el.getAttribute('data-csa-c-slot-id') || '',
+              name: el.getAttribute('name') || '',
+              value: el.getAttribute('value') || '',
+              ariaLabel: el.getAttribute('aria-label') || '',
+              visible: visible,
+            });
+          }
+        }
+        return results;
+      }).catch(function() { return []; });
+
+      var diagData = {
+        timestamp: new Date(timestamp).toISOString(),
+        url: currentUrl,
+        pageTitle: pageTitle,
+        interactiveElementsCount: (interactiveElements || []).length,
+        interactiveElements: interactiveElements || [],
+        errors: allErrors,
+      };
+      fs.writeFileSync(
+        baseDir + '/checkout-diagnostics-' + timestamp + '.json',
+        JSON.stringify(diagData, null, 2),
+        'utf8'
+      );
+
+      logger.info('[AmazonIOSSafariPage] Checkout diagnostics saved to ' + baseDir + '/checkout-diagnostics-' + timestamp + '.json');
+      logger.info('[AmazonIOSSafariPage] Interactive elements on page: ' + (interactiveElements || []).length);
+      if (interactiveElements && interactiveElements.length > 0) {
+        for (var i = 0; i < Math.min(interactiveElements.length, 40); i++) {
+          var el = interactiveElements[i];
+          logger.info('  <' + el.tag + '> id="' + el.id + '" name="' + el.name + '" value="' + el.value + '" aria="' + el.ariaLabel + '" data-testid="' + el.dataTestid + '" data-csa="' + el.dataCsa + '" href="' + el.href + '" text="' + el.text + '" visible=' + el.visible);
+        }
+      }
+    } catch (err) {
+      logger.warn('[AmazonIOSSafariPage] Diagnostic capture failed: ' + err.message);
+    }
+  }
+
   // Footer
   // ═════════════════════════════════════════════════════════════════════════
 

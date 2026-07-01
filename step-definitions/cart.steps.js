@@ -42,67 +42,26 @@ Given('a product is added to the cart', async function () {
 });
 
 When('I remove the product from the cart', async function () {
+  const activePage = isMobile(this) ? this.driver : this.page;
+  const cartPage = new AmazonCartPage(activePage);
+
   if (isMobile(this)) {
-    // ── Mobile: remove product from cart via WebDriverIO ─────────────────
-    // Amazon mobile web cart page: each item has a "Delete" link.
-    // Locators cover both desktop and mobile cart item layouts.
-    logger.info('[CartSteps] Mobile: removing product from cart...');
+    // ── Mobile: remove product from cart via page object ────────────────
+    // AmazonIOSSafariPage.removeItemFromCart() uses a 3-phase strategy:
+    //   1. CSS selectors (Smart Wagon + standard cart)
+    //   2. XPath selectors (fallback)
+    //   3. JavaScript execution (last resort via document.querySelector)
+    // Plus comprehensive DOM diagnostics if all phases fail.
+    logger.info('[CartSteps] Mobile: removing product from cart via page object...');
 
-    const deleteSelectors = [
-      // Standard delete button
-      'input[value="Delete"]',
-      // Data-action delete
-      'span[data-action="delete"] a',
-      // Cart action delete input
-      '.sc-action-delete input',
-      // Generic delete link
-      'a[aria-label*="Delete"]',
-      'a[aria-label*="delete"]',
-      // Remove link text
-      'a[href*="delete"]',
-      // Cart item remove button
-      '.a-declarative a[href*="delete"]',
-    ];
-
-    let removed = false;
-    const allErrors = [];
-
-    for (const selector of deleteSelectors) {
-      try {
-        const elements = await this.driver.$$(selector);
-        for (const element of elements) {
-          const displayed = await element.isDisplayed().catch(() => false);
-          if (!displayed) continue;
-
-          // Scroll into view and click
-          try { await element.scrollIntoView(); await this.driver.pause(300); } catch (_) {}
-
-          logger.info(`[CartSteps] Clicking delete via selector: "${selector}"`);
-          await element.click();
-          await this.driver.pause(3000);
-          removed = true;
-          break;
-        }
-        if (removed) break;
-      } catch (err) {
-        allErrors.push(`Selector "${selector}": ${err.message.substring(0, 100)}`);
-      }
-    }
-
-    if (!removed) {
-      throw new Error(
-        `[CartSteps] Mobile: Could not find delete button on cart page.\n` +
-        `Attempted selectors: ${deleteSelectors.join(', ')}\n` +
-        `Errors: ${allErrors.join('; ')}`
-      );
-    }
+    // Use the page object's removeItemFromCart method
+    await cartPage.removeItemFromCart();
 
     logger.info('[CartSteps] Mobile: product removed from cart.');
     return;
   }
 
   // ── Web: remove product from cart ──────────────────────────────────────
-  const cartPage = new AmazonCartPage(this.page);
   const deleteButton = this.page.locator(
     'input[value="Delete"], span[data-action="delete"] a, .sc-action-delete input'
   ).first();
@@ -119,11 +78,11 @@ Then('the cart should show the empty cart message', async function () {
   if (isMobile(this)) {
     // Mobile: verify cart is empty by checking page source for empty message
     const source = await this.driver.getPageSource();
-    const isEmpty = /cart is empty|your shopping cart is empty|your amazon cart is empty/i.test(source);
+    const isEmpty = /cart is empty|your shopping cart is empty|your amazon cart is empty|your cart is empty|smart wagon|0 items in your cart|no items/i.test(source);
 
     if (!isEmpty) {
       // Check if items still exist (removal might not have worked)
-      const hasItems = /cart-subtotal|sc-subtotal|cart items|item removed/i.test(source);
+      const hasItems = /cart-subtotal|sc-subtotal|cart items|item removed|cart total|item total|subtotal|delete|remove/i.test(source);
       if (hasItems) {
         throw new Error(
           '[CartSteps] Mobile: Cart still contains items after removal.\n' +

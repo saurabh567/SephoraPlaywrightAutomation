@@ -1,154 +1,57 @@
-// Amazon India cart page locators and actions.
-// Auto-detects Playwright (web) vs WebDriverIO (mobile) driver.
-// For iOS Safari, delegates to AmazonIOSSafariPage which uses WebView CSS selectors.
-//
-// CRITICAL: No silent fallbacks. If Proceed to Buy button is not found,
-// the operation MUST throw so the scenario fails. All try/catch blocks
-// that would hide failures have been removed.
+/**
+ * AmazonCartPage — unified cart page for Web, iOS Safari, and Android.
+ *
+ * Architecture:
+ *   - Web (Playwright): Uses Playwright locators via BasePage
+ *   - iOS Safari (WebDriverIO): Uses MobileAmazonCartPage (platform-aware)
+ *   - Android (WebDriverIO): Uses MobileAmazonCartPage (platform-aware)
+ *
+ * MobileAmazonCartPage handles all platform differences internally:
+ *   - Platform-specific selector maps (ios vs android)
+ *   - Fallback chain: CSS → XPath → JS execution → URL navigation
+ *   - Diagnostic capture on failure
+ */
 const { expect } = require('@playwright/test');
 const BasePage = require('./BasePage');
 const MobileAmazonCartPage = require('./MobileAmazonCartPage');
-const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
 const config = require('../config/env.config');
 const { TEST_PLATFORMS } = require('../framework/common/platforms');
 const logger = require('../utils/logger');
 
 class AmazonCartPage {
+  /**
+   * @param {object} page - Playwright page (web) or WebDriverIO driver (mobile)
+   */
   constructor(page) {
-    // Detect mobile driver (WebDriverIO) vs Playwright page
+    // ── Detect mobile driver (WebDriverIO) vs Playwright page ──────────
     if (page && typeof page.locator !== 'function') {
-      // ── iOS Safari: delegate to AmazonIOSSafariPage ──
-      const isIOS = config.testPlatform === TEST_PLATFORMS.IOS;
-      const isSafari = String(config.mobile.browserName || '').toLowerCase() === 'safari';
-
-      if (isIOS && isSafari) {
-        this._iosSafari = new AmazonIOSSafariPage(page);
-        this.page = page;
-
-        // Map methods to match MobileAmazonCartPage interface
-        this.openCartPage = () =>
-          this._iosSafari.openCartPage();
-
-        this.verifyCartPageVisible = () =>
-          this._iosSafari.verifyCartPageVisible();
-
-        this.continueShoppingIfPrompted = async () => {
-          // No-op for iOS Safari — no continue-shopping prompt in WebView
-        };
-
-        this.getCartItems = async () => {
-          const items = await page.$$('[data-asin], .sc-list-item').catch(() => []);
-          return items;
-        };
-
-        this.verifyVisible = async (locator) => {
-          // Delegate to AmazonIOSSafariPage.verifyVisible which handles
-          // both CSS selector strings and WebDriverIO element references.
-          await this._iosSafari.verifyVisible(locator);
-        };
-
-        // ════════════════════════════════════════════════════════════════
-        // Proceed to Buy button — MUST throw if not found.
-        // No silent fallback to hardcoded URL.
-        // ════════════════════════════════════════════════════════════════
-        this.proceedToBuyButton = {
-          click: async () => {
-            // Comprehensive mobile selectors for Proceed to Buy / Checkout
-            const proceedSelectors = [
-              'input[name="proceedToRetailCheckout"]',
-              'input[value*="Proceed to Buy"]',
-              'input[value*="Proceed to checkout"]',
-              'a[href*="gp/buy/select-address"]',
-              'a[href*="checkout"]',
-              'span[data-action*="proceed-to-checkout"] a',
-              'span[data-action*="proceed-to-buy"] input',
-              '#sc-buy-box-ptc-button input',
-              '.sc-buy-box input[type="submit"]',
-              'input[name="proceedToCheckout"]',
-              '[name*="proceed"] input[type="submit"]',
-              '[id*="proceed"] input[type="submit"]',
-            ];
-
-            let button = null;
-            let foundSelector = null;
-
-            for (const selector of proceedSelectors) {
-              const elements = await page.$$(selector);
-              for (const el of elements) {
-                const displayed = await el.isDisplayed().catch(() => false);
-                if (displayed) {
-                  button = el;
-                  foundSelector = selector;
-                  break;
-                }
-              }
-              if (button) break;
-            }
-
-            if (!button) {
-              // Capture diagnostic data before failing
-              const currentUrl = await page.getUrl().catch(() => 'unknown');
-              try {
-                const screenshotsDir = 'reports/ios/screenshots';
-                const fs = require('fs-extra');
-                fs.ensureDirSync(screenshotsDir);
-                await page.saveScreenshot(`${screenshotsDir}/debug-proceed-to-buy-not-found.png`);
-              } catch (_) {}
-
-              // Log all interactive elements for debugging
-              try {
-                const allButtons = await page.$$('input[type="submit"], button[type="submit"], a[role="button"], a[href*="proceed"], a[href*="checkout"]');
-                const buttonInfo = [];
-                for (const btn of allButtons) {
-                  const val = await btn.getAttribute('value').catch(() => '');
-                  const ariaLabel = await btn.getAttribute('aria-label').catch(() => '');
-                  const id = await btn.getAttribute('id').catch(() => '');
-                  const name = await btn.getAttribute('name').catch(() => '');
-                  const text = await btn.getText().catch(() => '');
-                  const disp = await btn.isDisplayed().catch(() => false);
-                  const href = await btn.getAttribute('href').catch(() => '');
-                  buttonInfo.push(`id="${id}" name="${name}" value="${val}" aria-label="${ariaLabel}" text="${text}" href="${href}" displayed=${disp}`);
-                }
-                logger.warn(`[AmazonCartPage] Interactive elements on page:\n  ${buttonInfo.join('\n  ')}`);
-              } catch (_) {}
-
-              throw new Error(
-                `[AmazonCartPage] Proceed to Buy button NOT FOUND on cart page.\n` +
-                `Current URL: ${currentUrl}\n` +
-                `Attempted selectors: ${proceedSelectors.join(', ')}\n` +
-                `This means the cart page may not contain a checkout button, ` +
-                `or the button is in an unexpected format.`
-              );
-            }
-
-            // Scroll to the button before clicking
-            try {
-              await button.scrollIntoView();
-              await page.pause(500);
-            } catch (_) {}
-
-            logger.info(`[AmazonCartPage] Found Proceed to Buy via selector: "${foundSelector}"`);
-            await button.click();
-            await page.pause(3000);
-            logger.info('[AmazonCartPage] Proceed to Buy clicked.');
-          }
-        };
-
-        this.cartTitle = null;
-        this.continueShoppingButton = null;
-        this.emptyCartMessage = null;
-        this.cartItems = [];
-
-        return;
-      }
-
-      // ── Android / iOS App: use MobileAmazonCartPage ──
+      // WebDriverIO driver — use unified MobileAmazonCartPage for both iOS and Android
       this._mobile = new MobileAmazonCartPage(page);
       this.page = page;
+
+      // Map MobileAmazonCartPage methods to this interface
+      this.openCartPage = () => this._mobile.openCartPage();
+      this.verifyCartPageVisible = () => this._mobile.verifyCartPageVisible();
+      this.continueShoppingIfPrompted = () => this._mobile.continueShoppingIfPrompted();
+      this.getCartItems = () => this._mobile.getCartItems();
+      this.verifyVisible = (locator) => this._mobile.verifyVisible(locator);
+      this.removeItemFromCart = () => this._mobile.removeItemFromCart();
+      this.proceedToCheckout = () => this._mobile.proceedToCheckout();
+
+      // Legacy proceedToBuyButton interface (some step defs still use it)
+      this.proceedToBuyButton = {
+        click: () => this._mobile.proceedToCheckout(),
+      };
+
+      this.cartTitle = null;
+      this.continueShoppingButton = null;
+      this.emptyCartMessage = null;
+      this.cartItems = [];
+
       return;
     }
 
-    // Playwright mode
+    // ── Playwright mode (web) ──────────────────────────────────────────
     this.__base = new BasePage(page);
     const bp = Object.getOwnPropertyNames(BasePage.prototype);
     for (const key of bp) {

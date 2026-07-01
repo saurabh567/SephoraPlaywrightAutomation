@@ -1,158 +1,75 @@
 /**
- * Android Appium capabilities.
+ * Android Appium capabilities with SecurityException workaround.
  *
- * BrowserContext Isolation:
- *   - noReset: false — ensures every new session starts with a clean app state
- *   - fullReset: configurable — use FULL_RESET=true to also uninstall/reinstall the app
- *   - skipDeviceInitialization: true — avoids UiAutomator2 initialization errors
- *   - autoGrantPermissions: true — automatically grants all app permissions
+ * For Amazon Shopping app (in.amazon.mShop.android.shopping), the launcher
+ * activity may not be exported (android:exported="false"). This module
+ * provides multiple strategies to handle this:
  *
- * These settings guarantee that each test case starts with:
- *   - No cookies
- *   - No localStorage, sessionStorage, IndexedDB, Cache Storage
- *   - No browser history, saved permissions, or previous auth state
- *   - No reused browser session, tab, or shared memory
+ * 1. If APP_ACTIVITY is set explicitly, use it directly
+ * 2. If APPIUM_AUTO_LAUNCH=false, connect to already-running app
+ * 3. Otherwise, try to detect the activity via ADB and use fallback
  *
- * Launcher Activity Auto-Detection:
- *   When APP_ACTIVITY is not explicitly set (empty/undefined), this module
- *   automatically detects the correct launcher activity via ADB:
- *     adb shell cmd package resolve-activity --brief <appPackage>
- *   If detection fails, it falls back to:
- *     com.amazon.mShop.home.HomeActivity
+ * See: mobile/utils/androidAppLauncher.js for the ADB-based fallback.
  */
 
 const { execSync } = require('child_process');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Launcher Activity Auto-Detection
-// ─────────────────────────────────────────────────────────────────────────────
-
 const FALLBACK_ACTIVITY = 'com.amazon.mShop.home.HomeActivity';
 
-/**
- * Automatically detect the launcher activity for a given Android app package.
- * Uses ADB: `adb shell cmd package resolve-activity --brief <appPackage>`
- *
- * The ADB output format is:
- *   priority=0 ... isDefault=false
- *   com.example.package/com.example.package.MainActivity
- *
- * We extract the activity name from the second line after the '/'.
- *
- * @param {string} appPackage - Android app package name
- * @returns {string|null} Fully qualified activity name, or null if detection fails
- */
-function detectLauncherActivity(appPackage) {
-  if (!appPackage) return null;
-
-  try {
-    const out = execSync(
-      `adb shell cmd package resolve-activity --brief ${appPackage} 2>/dev/null || true`,
-      { encoding: 'utf8', timeout: 10000 }
-    ).trim();
-
-    if (!out || out.length === 0) return null;
-
-    // Split into lines and find the last non-empty line containing '/'
-    const lines = out.split('\n').filter(l => l.trim().length > 0);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim();
-      // Look for "package/activity" pattern
-      const slashIdx = line.indexOf('/');
-      if (slashIdx > 0) {
-        const activity = line.substring(slashIdx + 1).trim();
-        if (activity && activity.length > 0) {
-          // If activity starts with '.', prepend the package name
-          const fullActivity = activity.startsWith('.')
-            ? appPackage + activity
-            : activity;
-          console.log(`[android.capabilities] Auto-detected launcher activity: ${fullActivity}`);
-          return fullActivity;
-        }
-      }
-    }
-  } catch (err) {
-    // ADB not available or no device connected — non-fatal
-    console.warn(`[android.capabilities] ADB detection failed (non-fatal): ${err.message}`);
-  }
-
-  return null;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Capabilities builder
-// ─────────────────────────────────────────────────────────────────────────────
-
 function androidCapabilities() {
-  const capabilities = {
+  var capabilities = {
     platformName: 'Android',
     'appium:automationName': 'UiAutomator2',
     'appium:deviceName': process.env.DEVICE_NAME || 'Android Emulator',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
-
-    // =========================================================
-    // Session Isolation: Do NOT reuse app state between sessions
-    // =========================================================
-    // noReset=false ensures Appium clears app data on every new session.
-    // This guarantees cookies, localStorage, and all WebView state
-    // are wiped before each test case.
-    // =========================================================
     'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
     'appium:fullReset': process.env.FULL_RESET === 'true',
-
-    // Skip UiAutomator2 device initialization to avoid instrumentation errors
     'appium:skipDeviceInitialization': process.env.SKIP_DEVICE_INIT !== 'false',
     'appium:skipServerInstallation': process.env.SKIP_SERVER_INSTALL === 'true',
-
-    // Grant all permissions automatically
     'appium:autoGrantPermissions': process.env.AUTO_GRANT_PERMISSIONS !== 'false',
-
-    // New command timeout
     'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 180),
-
-    // WebView / browser support
     'appium:ensureWebviewsHavePages': true,
     'appium:recreateChromeDriverSessions': true,
     'appium:nativeWebScreenshot': true,
   };
 
-  // App package configuration
+  // ── Auto-Launch disabled: connect to already-running app ──────────────
+  if (process.env.APPIUM_AUTO_LAUNCH === 'false') {
+    capabilities['appium:autoLaunch'] = false;
+    capabilities['appium:noReset'] = true;
+    console.log('[android.capabilities] APPIUM_AUTO_LAUNCH=false');
+    if (process.env.APP_PACKAGE) {
+      capabilities['appium:appPackage'] = process.env.APP_PACKAGE;
+    }
+    return capabilities;
+  }
+
+  // ── App package + activity configuration ─────────────────────────────
   if (process.env.APP_PACKAGE) {
     capabilities['appium:appPackage'] = process.env.APP_PACKAGE;
     capabilities['appium:appWaitPackage'] = process.env.APP_PACKAGE;
 
-    // Determine the app activity: prefer explicit env var, auto-detect otherwise
-    let appActivity = process.env.APP_ACTIVITY;
-
-    // If APP_ACTIVITY is empty or whitespace-only, auto-detect
+    // Use explicit APP_ACTIVITY if set, otherwise fallback
+    var appActivity = process.env.APP_ACTIVITY;
     if (!appActivity || appActivity.trim().length === 0) {
-      console.log('[android.capabilities] APP_ACTIVITY not set — auto-detecting launcher activity via ADB...');
-      const detected = detectLauncherActivity(process.env.APP_PACKAGE);
-      if (detected) {
-        appActivity = detected;
-        console.log(`[android.capabilities] Using auto-detected activity: ${appActivity}`);
-      } else {
-        appActivity = FALLBACK_ACTIVITY;
-        console.log(`[android.capabilities] ADB detection failed — using fallback activity: ${appActivity}`);
-      }
+      appActivity = FALLBACK_ACTIVITY;
+    } else {
+      appActivity = appActivity.trim();
     }
 
-    if (appActivity) {
-      capabilities['appium:appActivity'] = appActivity;
-      capabilities['appium:appWaitActivity'] = appActivity;
+    // Strip package prefix if present (e.g., "com.pkg/.Activity" -> ".Activity")
+    if (appActivity.includes('/')) {
+      var parts = appActivity.split('/');
+      appActivity = parts[parts.length - 1];
     }
 
-    // App launch timeout
+    capabilities['appium:appActivity'] = appActivity;
+    capabilities['appium:appWaitActivity'] = appActivity;
     capabilities['appium:appWaitDuration'] = Number(process.env.APP_WAIT_DURATION || 30000);
   }
 
-  // Optional: path to .apk file
   if (process.env.APP_PATH) capabilities['appium:app'] = process.env.APP_PATH;
-
-  // Optional: device UDID for real devices
   if (process.env.UDID) capabilities['appium:udid'] = process.env.UDID;
-
-  // Chrome driver port for WebView debugging
   if (process.env.CHROMEDRIVER_PORT) {
     capabilities['appium:chromedriverPort'] = Number(process.env.CHROMEDRIVER_PORT);
   }

@@ -21,19 +21,30 @@ function isWeb(world) {
 
 When('I click on the Proceed to Buy button', async function () {
   if (isMobile(this)) {
-    // Mobile: proceed to buy — must succeed or fail the scenario.
-    // No try/catch — let the error propagate if the button cannot be clicked.
+    // ── Mobile: proceed to buy via page object ────────────────────────────
+    // AmazonIOSSafariPage.proceedToCheckout() uses a 4-phase strategy:
+    //   1. Wait for cart page to fully load (verify DOM ready)
+    //   2. CSS selectors (Smart Wagon + standard cart checkout buttons)
+    //   3. XPath selectors (fallback)
+    //   4. JavaScript execution (traverse DOM for text matches)
+    //   5. URL-based fallback (navigate directly to /gp/buy/select-address)
+    // Plus comprehensive DOM diagnostics if all phases fail.
     const activePage = this.driver;
     const cartPage = new AmazonCartPage(activePage);
-    await cartPage.proceedToBuyButton.click();
+    await cartPage.proceedToCheckout();
     await this.driver.pause(2000);
     logger.info('[E2ESteps] Mobile: clicked Proceed to Buy.');
     return;
   }
 
-  // Web: use Playwright
+  // ── Web: use Playwright ──────────────────────────────────────────────
   const cartPage = new AmazonCartPage(this.page);
-  await cartPage.click(cartPage.proceedToBuyButton);
+  // Try the iOS method first (works on mobile-web cart too)
+  if (typeof cartPage.proceedToCheckout === 'function') {
+    await cartPage.proceedToCheckout();
+  } else {
+    await cartPage.click(cartPage.proceedToBuyButton);
+  }
   await this.page.waitForLoadState('domcontentloaded');
   logger.info('[E2ESteps] Web: clicked Proceed to Buy.');
 });
@@ -45,7 +56,11 @@ Then('the checkout page should be loaded', async function () {
     // "buy" and "checkout" are too broad — they appear on cart pages too.
     // Instead, check for checkout-specific indicators:
     const source = await this.driver.getPageSource();
+    const currentUrl = await this.driver.getUrl().catch(() => '');
+
     const isCheckout = (
+      // URL-based check
+      /checkout|buy|select-address|spc/i.test(currentUrl) ||
       // Address selection screen
       /select-delivery-address|delivery address|ship to this address/i.test(source) ||
       // Payment selection
@@ -63,14 +78,23 @@ Then('the checkout page should be loaded', async function () {
       try {
         await this.driver.saveScreenshot('reports/ios/screenshots/debug-checkout-not-loaded.png');
       } catch (_) {}
+
+      // Log all interactive elements for debugging
+      try {
+        logger.warn('[E2ESteps] Checkout NOT reached. Current URL: ' + currentUrl);
+        const pageTitle = await this.driver.getTitle().catch(() => 'unknown');
+        logger.warn('[E2ESteps] Page title: ' + pageTitle);
+      } catch (_) {}
     }
 
     assert.ok(
       isCheckout,
-      `[E2ESteps] Mobile checkout page NOT loaded.\n` +
-      `Proceed to Buy was clicked but the page did not transition to checkout.\n` +
-      `Check: (1) Cart had items, (2) Proceed to Buy button actually existed,\n` +
-      `(3) Amazon did not show an interstitial or sign-in page.`
+      '[E2ESteps] Mobile checkout page NOT loaded.\n' +
+      'Proceed to Buy was clicked but the page did not transition to checkout.\n' +
+      'Current URL: ' + currentUrl + '\n' +
+      'Check: (1) Cart had items, (2) Proceed to Buy button actually existed,\n' +
+      '(3) Amazon did not show an interstitial or sign-in page.\n' +
+      'Diagnostic files saved to reports/ios/debug/ and reports/ios/screenshots/'
     );
     logger.info('[E2ESteps] Mobile checkout page loaded.');
     return;

@@ -27,9 +27,11 @@ class AmazonHomePage {
 
         // Map AmazonIOSSafariPage methods to the MobileAmazonHomePage interface
         this._mobile.waitForAmazonReady = this._mobile.verifyHomeLoaded.bind(this._mobile);
+        // Capture the original verifyVisible BEFORE overwriting to avoid recursion
+        const _origVerifyVisible = this._mobile.verifyVisible.bind(this._mobile);
         this._mobile.verifyVisible = async (locator) => {
           // Delegate to AmazonIOSSafariPage.verifyVisible which handles strings and elements
-          return this._mobile.verifyVisible(locator);
+          return _origVerifyVisible(locator);
         };
         this._mobile.continueShoppingIfPrompted = async () => {};
         this._mobile.openCart = this._mobile.openCartPage.bind(this._mobile);

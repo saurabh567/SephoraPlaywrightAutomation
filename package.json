@@ -99,12 +99,13 @@
     "ai:api-analysis": "node utils/generateApiAiAnalysis.js",
     "ai:api-analysis-agent": "node ai/agents/apiAnalysisAgent.js",
     "report:dashboard": "node utils/runAllSuitesAndGenerateDashboard.js",
-    "test:all:dashboard": "npm run clean:reports && npm run test:web && npm run test:android && npm run test:ios && npm run test:api && npm run perf:jmeter && npm run test:ai && npm run report:dashboard",
+    "test:all:dashboard": "node utils/cleanReports.js && npm run test:web && npm run test:android && npm run test:ios && npm run test:api && npm run perf:jmeter && npm run test:ai && npm run report:dashboard",
     "test:all:dashboard:safe": "node utils/runAllSuitesAndGenerateDashboard.js",
     "ai:consolidated-report": "node ai/agents/ConsolidatedReportAgent.js",
     "report:dashboard:only": "node utils/generateConsolidatedDashboard.js",
     "test:all:ai": "node utils/runAllPlatformsOrchestrator.js",
-    "test:all:ai-headed": "node utils/runAllAiHeaded.js"
+    "test:all:ai-headed": "node utils/runAllAiHeaded.js",
+    "pretest:all": "node utils/cleanReports.js"
   },
   "keywords": [
     "playwright",

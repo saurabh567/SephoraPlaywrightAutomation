@@ -1,121 +1,109 @@
+#!/usr/bin/env node
+
 /**
  * cleanReports.js
  *
- * Deletes old generated artifacts (reports, screenshots, videos, traces, logs)
- * before a new test execution starts.
+ * Deletes stale report and execution artifacts before running the test suite.
+ * Ensures every execution starts from a completely clean state.
  *
- * Accepts optional --platform flag to clean only a specific platform.
  * Usage:
- *   node utils/cleanReports.js                    → clean all platforms
- *   node utils/cleanReports.js --platform web     → clean only web reports
- *   node utils/cleanReports.js --platform android → clean only android reports
- *   node utils/cleanReports.js --platform ios     → clean only ios reports
+ *   node utils/cleanReports.js          # run as standalone
+ *   const clean = require('./cleanReports'); await clean();  # import as module
  *
- * NOTE: This only removes file artifacts. Browser/mobile app state (cookies,
- * localStorage, sessionStorage, IndexedDB) is cleared per-scenario by
- * framework/common/BrowserCacheCleanup.js (called from hooks/hooks.js).
+ * Directories deleted:
+ *   reports/
+ *   playwright-report/
+ *   test-results/
+ *
+ * Exits with code 0 always (cleanup failures are logged, not fatal).
+ *
+ * ORCHESTRATOR_RUN env var:
+ *   When set to 'true', this script skips cleanup entirely. This prevents
+ *   duplicate cleanup when the orchestrator (runAllPlatformsOrchestrator.js)
+ *   already called cleanup at the top and sets ORCHESTRATOR_RUN=true for
+ *   all spawned child processes (which may have pretest hooks that call
+ *   cleanReports again).
  */
+
 const fs = require('fs-extra');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 
-// Parse --platform argument
-const platformIndex = process.argv.indexOf('--platform');
-const platformFilter = platformIndex >= 0 ? process.argv[platformIndex + 1] : null;
+const TARGET_DIRS = [
+  'reports',
+  'playwright-report',
+  'test-results',
+];
 
-const reportDir = process.env.REPORT_DIR || 'reports';
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-// Platform-specific folders
-const platformFolders = {
-  web: [
-    `${reportDir}/web`,
-    `${reportDir}/screenshots`,
-    `${reportDir}/videos`,
-    `${reportDir}/traces`,
-    `${reportDir}/ai`,
-    'screenshots',
-    'videos',
-  ],
-  android: [
-    `${reportDir}/android`,
-    `${reportDir}/ai`,
-    'logs',
-  ],
-  ios: [
-    `${reportDir}/ios`,
-    `${reportDir}/ai`,
-    'logs',
-  ],
-};
+function log(msg) {
+  const ts = new Date().toISOString().split('.')[0].replace('T', ' ');
+  console.log(`[cleanReports] ${ts} ${msg}`);
+}
 
-// When running under orchestrator, skip cleaning to preserve previous platform reports
-if (process.env.ORCHESTRATOR_RUN === 'true') {
-  console.log('[cleanReports] Orchestrator mode — skipping per-platform clean to preserve cross-platform reports');
-  // Still clean screenshots, videos, traces (per-session artifacts)
-  const lightClean = [`${reportDir}/screenshots`, `${reportDir}/videos`, `${reportDir}/traces`];
-  for (const folder of lightClean) {
-    const resolved = path.resolve(ROOT, folder);
-    if (fs.existsSync(resolved)) {
-      fs.emptyDirSync(resolved);
+// ── Main ───────────────────────────────────────────────────────────────────
+
+async function cleanReports() {
+  // ── ORCHESTRATOR_RUN guard ──────────────────────────────────────────────
+  // When the orchestrator (runAllPlatformsOrchestrator.js) is driving
+  // execution, it already called cleanReports once at the top. All nested
+  // scripts (spawned via npm run) inherit ORCHESTRATOR_RUN=true and should
+  // skip cleanup to avoid redundant file-system I/O and log noise.
+  if (process.env.ORCHESTRATOR_RUN === 'true') {
+    log('ORCHESTRATOR_RUN=true — skipping cleanup (already done by orchestrator)');
+    return { deleted: [], missing: [], skipped: true };
+  }
+
+  const startTime = Date.now();
+  const deleted = [];
+  const missing = [];
+
+  log('Starting cleanup of stale execution artifacts...');
+
+  for (const dir of TARGET_DIRS) {
+    const fullPath = path.join(ROOT, dir);
+    try {
+      const exists = await fs.pathExists(fullPath);
+      if (exists) {
+        await fs.remove(fullPath);
+        deleted.push(dir);
+        log(`  ✔ removed: ${dir}/`);
+      } else {
+        missing.push(dir);
+        log(`  - skipped (not found): ${dir}/`);
+      }
+    } catch (err) {
+      log(`  ⚠ error deleting ${dir}/: ${err.message}`);
     }
   }
-  process.exit(0);
+
+  // ── Summary ──────────────────────────────────────────────────────────────
+  const elapsed = (Date.now() - startTime) + 'ms';
+
+  console.log('');
+  console.log('='.repeat(56));
+  console.log('  CLEANUP SUMMARY');
+  console.log('='.repeat(56));
+  console.log(`  Deleted:  ${deleted.length > 0 ? deleted.join(', ') : 'none'}`);
+  console.log(`  Missing:  ${missing.length > 0 ? missing.join(', ') : 'none'}`);
+  console.log(`  Time:     ${elapsed}`);
+  console.log('');
+  console.log('  ✔ Previous execution artifacts cleaned successfully.');
+  console.log('  Starting fresh test execution...');
+  console.log('='.repeat(56));
+  console.log('');
+
+  return { deleted, missing, elapsed };
 }
 
-// Determine which folders to clean
-let folders = [];
-
-if (platformFilter) {
-  // Clean only the specified platform
-  const pf = platformFilter.toLowerCase();
-  const mapped = platformFolders[pf];
-  if (mapped) {
-    folders = mapped;
-  } else {
-    console.warn(`[cleanReports] Unknown platform: ${pf}. Cleaning all.`);
-    folders = [
-      `${reportDir}/web`,
-      `${reportDir}/android`,
-      `${reportDir}/ios`,
-      `${reportDir}/screenshots`,
-      `${reportDir}/videos`,
-      `${reportDir}/traces`,
-      `${reportDir}/ai`,
-      `${reportDir}/cross-browser`,
-      'screenshots',
-      'videos',
-      'logs',
-      'reports/web',
-      'reports/android',
-      'reports/ios',
-      'reports/combined',
-    ];
-  }
-} else {
-  // Clean all platform folders (legacy behavior)
-  folders = [
-    `${reportDir}/screenshots`,
-    `${reportDir}/videos`,
-    `${reportDir}/traces`,
-    `${reportDir}/ai`,
-    `${reportDir}/cross-browser`,
-    'screenshots',
-    'videos',
-    'logs',
-    // Platform root folders
-    'reports/web',
-    'reports/android',
-    'reports/ios',
-    'reports/combined',
-  ];
+// ── CLI entry ──────────────────────────────────────────────────────────────
+if (require.main === module) {
+  cleanReports().catch((err) => {
+    console.error(`[cleanReports] FATAL: ${err.message}`);
+    process.exit(0); // Never fail the build over cleanup
+  });
 }
 
-for (const folder of folders) {
-  const resolved = path.resolve(ROOT, folder);
-  if (fs.existsSync(resolved)) {
-    fs.emptyDirSync(resolved);
-  }
-}
-
-console.log(`[cleanReports] Cleaned ${platformFilter ? `platform: ${platformFilter}` : 'all platforms'} — reports, screenshots, videos, traces and logs.`);
+module.exports = cleanReports;

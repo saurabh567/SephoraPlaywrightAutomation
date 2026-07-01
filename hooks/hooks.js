@@ -51,6 +51,7 @@ const BrowserCacheCleanup = require('../framework/common/BrowserCacheCleanup');
 const MobileSessionManager = require('../framework/mobile/MobileSessionManager');
 const { handleFirstLaunchIfNeeded } = require('../framework/mobile/AmazonFirstLaunchHandler');
 const { TEST_PLATFORMS } = require('../framework/common/platforms');
+const MobileDebugUtility = require('../utils/mobileDebugUtility');
 const AppiumAgent = require('../ai/agents/AppiumAgent');
 
 let browser;
@@ -285,6 +286,20 @@ After(async function (scenario) {
         const screenshot = await ScreenshotUtility.capture({ driver: this.driver, filePath: screenshotPath });
         await this.attach(screenshot, 'image/png');
         logger.info(`[Hooks] Mobile screenshot captured (via driver): ${screenshotPath}`);
+
+            // ── MobileDebugUtility: comprehensive diagnostics on failure ──
+            // Captures: page source (HTML), interactive elements log,
+            // DOM structure, all Appium contexts, platform info.
+            try {
+              const MobileDebugUtility = require('../utils/mobileDebugUtility');
+              await MobileDebugUtility.captureFailure(
+                this.driver,
+                scenario.pickle.name,
+                scenario.result ? scenario.result.exception : null
+              );
+            } catch (debugErr) {
+              logger.warn(`[Hooks] MobileDebug diagnostic capture failed: ${debugErr.message}`);
+            }
       } catch (err) {
         logger.warn(`[Hooks] Mobile screenshot via driver failed: ${err.message}`);
         // Fallback: try with page (legacy)
@@ -340,6 +355,15 @@ After(async function (scenario) {
         appId: getMobileAppId()
       });
       logger.info('[Hooks] Mobile session disposed successfully');
+
+    // ── Run between-scenario cleanup ────────────────────────────────
+    // Clears app data via ADB (Android) or WebKit data (iOS Safari).
+    try {
+      await MobileSessionManager.cleanupBetweenScenarios(config.testPlatform);
+      logger.info('[Hooks] Between-scenario cleanup completed');
+    } catch (cleanupErr) {
+      logger.warn('[Hooks] Between-scenario cleanup failed: ' + cleanupErr.message);
+    }
     } catch (err) {
       logger.warn(`[Hooks] Mobile session dispose failed: ${err.message}`);
     }

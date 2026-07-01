@@ -24,6 +24,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const cleanReports = require('./cleanReports');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -271,7 +272,13 @@ function formatFileSize(bytes) {
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
-function main() {
+async function main() {
+  try {
+    await cleanReports();
+  } catch (err) {
+    console.error(`[Orchestrator] Cleanup warning (non-fatal): ${err.message}`);
+  }
+
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
   console.log('='.repeat(60));
@@ -316,4 +323,7 @@ function main() {
   process.exit(criticalFailed ? 1 : 0);
 }
 
-main();
+main().catch((err) => {
+  console.error('[Orchestrator] Fatal error:', err.message);
+  process.exit(1);
+});
