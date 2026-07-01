@@ -793,6 +793,12 @@ async function phaseAmazonApp() {
   }, 60000, 2000);
 
   // ── Verify the launched activity matches our resolved activity ──────────
+  // NOTE: The monkey command uses Android's internal MAIN/LAUNCHER resolution which may
+  // resolve to the wrong activity. We log the launched activity for diagnostics
+  // but do NOT overwrite APP_ACTIVITY with it. The correct activity was already
+  // resolved by resolveAppActivity() above. Overwriting would cause:
+  //   java.lang.SecurityException:
+  //   Permission Denial: starting Intent ... cmp=...navigation.MainActivity not exported
   try {
     const launchedActivity = runCmdOptional(
       "adb shell dumpsys window 2>/dev/null | grep mCurrentFocus | grep -o 'in\.amazon[^/}]*/[^ }]*' || true"
@@ -800,14 +806,7 @@ async function phaseAmazonApp() {
     if (launchedActivity) {
       executionState.discoveredActivity = launchedActivity;
       log(`Foreground activity confirmed: ${launchedActivity}`);
-      // Update APP_ACTIVITY to the actual launched activity (more precise)
-      const actualActivity = launchedActivity.split('/').pop();
-      if (actualActivity) {
-        const fullActual = AMAZON_PACKAGE + '/' + actualActivity;
-        process.env.APP_ACTIVITY = fullActual;
-        executionState.resolvedActivity = fullActual;
-        log(`APP_ACTIVITY updated to actual launched activity: ${fullActual}`);
-      }
+      log(`Keeping resolved APP_ACTIVITY: ${process.env.APP_ACTIVITY}`);
     }
   } catch (_) {
     log('Could not verify launched activity (non-fatal)');
