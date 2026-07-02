@@ -776,6 +776,21 @@ async function phaseAmazonApp() {
   process.env.APP_ACTIVITY = appActivity;
   log(`APP_ACTIVITY set to: ${appActivity}`);
 
+
+  // ── Suppress system notifications and collapse notification shade ────
+  // Prevents system overlays from blocking the app on fresh emulator boot.
+  try {
+    runCmd("adb shell settings put global heads_up_notifications_enabled 0 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell settings put global zen_mode 2 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell settings put global policy_control immersive.status=* 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell cmd statusbar collapse 2>/dev/null || adb shell service call statusbar 2 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell input keyevent 4 2>/dev/null || true", { timeout: 3000, shell: true });
+    runCmd("adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell settings put secure user_setup_complete 1 2>/dev/null || true", { timeout: 5000, shell: true });
+    runCmd("adb shell settings put global device_provisioned 1 2>/dev/null || true", { timeout: 5000, shell: true });
+    log("System notifications suppressed and statusbar collapsed");
+  } catch (_) {}
+
   // ── Launch the app via adb monkey (package-only, no activity needed) ───
   log(`launching ${AMAZON_PACKAGE} via adb monkey`);
   try {
@@ -823,7 +838,7 @@ async function phaseAmazonApp() {
 async function phaseCacheCleanup() {
   log("cache cleanup before tests");
   try {
-    runCmd("adb shell pm clear in.amazon.mShop.android.shopping 2>/dev/null || true", { timeout: 15000 });
+    // REMOVED: pm clear Amazon app data causes crash on next launch
     runCmd("adb shell pm clear com.android.chrome 2>/dev/null || true", { timeout: 15000 });
     log("cache cleaned via adb pm clear");
   } catch (_) {

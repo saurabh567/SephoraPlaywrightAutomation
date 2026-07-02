@@ -1,5 +1,6 @@
 /**
- * Android Appium capabilities with SecurityException workaround.
+ * Android Appium capabilities with SecurityException workaround
+ * and lock screen auto-unlock support.
  *
  * For Amazon Shopping app (in.amazon.mShop.android.shopping), the launcher
  * activity may not be exported (android:exported="false"). This module
@@ -9,7 +10,22 @@
  * 2. If APPIUM_AUTO_LAUNCH=false, connect to already-running app
  * 3. Otherwise, try to detect the activity via ADB and use fallback
  *
- * See: mobile/utils/androidAppLauncher.js for the ADB-based fallback.
+ * Lock Screen Support:
+ *   - APPIUM_UNLOCK_STRATEGY env var: 'swipe', 'pin', 'pattern', 'password', or 'disabled'
+ *   - APPIUM_UNLOCK_KEY env var: the PIN/password (default: 1234)
+ *   - APPIUM_SKIP_UNLOCK env var: if 'true', skip lock screen handling entirely
+ *
+ * Appium Notification Fix:
+ *   UiAutomator2 driver installs "io.appium.settings" and "qwerty2" keyboard,
+ *   which show persistent notifications. The capabilities below include:
+ *     - appium:skipDeviceInitialization=false (lets unlock run)
+ *     - appium:dontStopAppOnReset=true (prevents app kill on session end)
+ *     - appWaitActivity=* (waits for ANY activity, avoids "never started" errors)
+ *   Additional ADB-level suppression is done in MobileSessionManager.
+ *
+ * See: mobile/utils/unlockDevice.js for programmatic unlock
+ * See: scripts/disable-android-lockscreen.sh for permanent disable
+ * See: scripts/start-emulator-unlocked.sh for emulator startup with bypass
  */
 
 const { execSync } = require('child_process');
@@ -24,14 +40,42 @@ function androidCapabilities() {
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
     'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
     'appium:fullReset': process.env.FULL_RESET === 'true',
+    'appium:dontStopAppOnReset': true,
     'appium:skipDeviceInitialization': process.env.SKIP_DEVICE_INIT !== 'false',
     'appium:skipServerInstallation': process.env.SKIP_SERVER_INSTALL === 'true',
     'appium:autoGrantPermissions': process.env.AUTO_GRANT_PERMISSIONS !== 'false',
-    'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 180),
+    'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 300),
+    'appium:adbExecTimeout': Number(process.env.ADB_EXEC_TIMEOUT || 60000),
+    'appium:uiautomator2ServerLaunchTimeout': Number(process.env.UIAUTOMATOR2_LAUNCH_TIMEOUT || 60000),
     'appium:ensureWebviewsHavePages': true,
     'appium:recreateChromeDriverSessions': true,
     'appium:nativeWebScreenshot': true,
   };
+
+  // ══════════════════════════════════════════════════════════════════
+  // LOCK SCREEN AUTO-UNLOCK CAPABILITIES
+  // ══════════════════════════════════════════════════════════════════
+  if (process.env.APPIUM_SKIP_UNLOCK !== 'true') {
+    var unlockStrategy = process.env.APPIUM_UNLOCK_STRATEGY || 'locksettings'
+    var unlockKey = process.env.APPIUM_UNLOCK_KEY || '1234';
+
+    if (unlockStrategy !== 'disabled') {
+      capabilities['appium:unlockStrategy'] = unlockStrategy;
+      capabilities['appium:unlockKey'] = unlockKey;
+
+      if (unlockStrategy === 'pin') {
+        capabilities['appium:unlockType'] = 'pin';
+      } else if (unlockStrategy === 'pattern') {
+        capabilities['appium:unlockType'] = 'pattern';
+      } else if (unlockStrategy === 'password') {
+        capabilities['appium:unlockType'] = 'password';
+      }
+
+      capabilities['appium:skipDeviceInitialization'] = false;
+
+      console.log('[android.capabilities] Lock screen unlock enabled: strategy=' + unlockStrategy + ', key=' + unlockKey);
+    }
+  }
 
   // ── Auto-Launch disabled: connect to already-running app ──────────────
   if (process.env.APPIUM_AUTO_LAUNCH === 'false') {
@@ -41,13 +85,18 @@ function androidCapabilities() {
     if (process.env.APP_PACKAGE) {
       capabilities['appium:appPackage'] = process.env.APP_PACKAGE;
     }
+    // When connecting to already-running app, use wildcard for appWaitActivity
+    // so Appium waits for ANY activity to appear, preventing timeout on
+    // activities that may not be exported or may have different names.
+    capabilities['appium:appWaitActivity'] = '*';
+    capabilities['appium:appWaitDuration'] = Number(process.env.APP_WAIT_DURATION || 45000);
     return capabilities;
   }
 
   // ── App package + activity configuration ─────────────────────────────
   if (process.env.APP_PACKAGE) {
     capabilities['appium:appPackage'] = process.env.APP_PACKAGE;
-    capabilities['appium:appWaitPackage'] = process.env.APP_PACKAGE;
+    capabilities['appium:appWaitPackage'] = process.env.APP_WAIT_PACKAGE || process.env.APP_PACKAGE;
 
     // Use explicit APP_ACTIVITY if set, otherwise fallback
     var appActivity = process.env.APP_ACTIVITY;
@@ -64,8 +113,13 @@ function androidCapabilities() {
     }
 
     capabilities['appium:appActivity'] = appActivity;
-    capabilities['appium:appWaitActivity'] = appActivity;
-    capabilities['appium:appWaitDuration'] = Number(process.env.APP_WAIT_DURATION || 30000);
+
+    // Use wildcard for appWaitActivity to handle activities that may not be
+    // exported or whose names differ between app versions. This avoids:
+    //   "Cannot start the application. '...HomeActivity' never started."
+    // when the actual launched activity is a splash or interstitial.
+    capabilities['appium:appWaitActivity'] = process.env.APP_WAIT_ACTIVITY || '*';
+    capabilities['appium:appWaitDuration'] = Number(process.env.APP_WAIT_DURATION || 45000);
   }
 
   if (process.env.APP_PATH) capabilities['appium:app'] = process.env.APP_PATH;

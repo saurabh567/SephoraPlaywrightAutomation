@@ -82,8 +82,21 @@ class AmazonProductDetailsPage {
         this.openCartFromHeader = () =>
           this._iosSafari.openCartPage();
 
-        this.verifyProductDetailsVisible = () =>
-          this._iosSafari.verifyProductDetailsVisible();
+        this.verifyProductDetailsVisible = async () => {
+          // AmazonIOSSafariPage does not have a dedicated verifyProductDetailsVisible method.
+          // Use page source check for product page indicators instead.
+          const source = await this.page.getPageSource().catch(() => '');
+          const productPattern = /add to cart|buy now|productTitle|buybox|merchant-info|#dp|deal of the day|offer expires|available from these sellers|other sellers on amazon/i;
+          if (!productPattern.test(source)) {
+            // Fallback: wait a moment and try URL check
+            await this.page.pause(2000);
+            const currentUrl = await this.page.getUrl().catch(() => '');
+            const isProductUrl = /\/dp\/|\/gp\/product\/|\/product\//i.test(currentUrl);
+            if (!isProductUrl) {
+              throw new Error('[AmazonProductDetailsPage] Product details page not visible on iOS Safari');
+            }
+          }
+        };
 
         return;
       }

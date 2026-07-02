@@ -3,7 +3,7 @@
  * Extends MobileBasePage and uses platform-aware locators.
  *
  * Locator strategy: uses `~` (accessibility id) for Android, automatically
- * resolved to `name:` strategy for iOS via MobileBasePage.resolveLocator().
+ * resolved to `name:` strategy for iOS via MobileBasePage.resolveSelector().
  *
  * Note: For iOS Safari (WebView), AmazonIOSSafariPage is used instead —
  * see AmazonHomePage constructor dispatch.
@@ -14,16 +14,16 @@ class MobileAmazonHomePage extends MobileBasePage {
   constructor(driver) {
     super(driver);
 
-    // Use this.createLocator() for platform-aware locator resolution.
+    // Use this.resolveSelector() for platform-aware locator resolution.
     // On Android: '~nav-logo' stays as-is (accessibility id).
     // On iOS: '~nav-logo' → 'name:nav-logo' (name strategy).
-    this.logo = driver.$(this.createLocator('~nav-logo'));
-    this.continueShoppingButton = driver.$(this.createLocator('~continue-shopping-button'));
-    this.searchBox = driver.$(this.createLocator('~search-box'));
-    this.searchButton = driver.$(this.createLocator('~search-button'));
-    this.accountLink = driver.$(this.createLocator('~nav-account-list'));
-    this.cartLink = driver.$(this.createLocator('~nav-cart'));
-    this.cartBadge = driver.$(this.createLocator('~nav-cart-badge'));
+    this.logo = driver.$(this.resolveSelector('~nav-logo'));
+    this.continueShoppingButton = driver.$(this.resolveSelector('~continue-shopping-button'));
+    this.searchBox = driver.$(this.resolveSelector('~search-box'));
+    this.searchButton = driver.$(this.resolveSelector('~search-button'));
+    this.accountLink = driver.$(this.resolveSelector('~nav-account-list'));
+    this.cartLink = driver.$(this.resolveSelector('~nav-cart'));
+    this.cartBadge = driver.$(this.resolveSelector('~nav-cart-badge'));
   }
 
   async openHomePage() {
@@ -49,7 +49,7 @@ class MobileAmazonHomePage extends MobileBasePage {
   async continueShoppingIfPrompted() {
     // Mobile-specific: dismiss any interstitial or continue-shopping prompt
     try {
-      const btn = this.driver.$(this.createLocator('~continue-shopping-button'));
+      const btn = this.driver.$(this.resolveSelector('~continue-shopping-button'));
       if (await btn.isDisplayed()) {
         await btn.click();
         await this.driver.pause(2000);
@@ -61,7 +61,7 @@ class MobileAmazonHomePage extends MobileBasePage {
 
   async searchProduct(productName) {
     try {
-      const search = this.driver.$(this.createLocator('~search-box'));
+      const search = this.driver.$(this.resolveSelector('~search-box'));
       await search.waitForDisplayed({ timeout: 10000 });
       await search.click();
       await search.setValue(productName);
@@ -70,7 +70,7 @@ class MobileAmazonHomePage extends MobileBasePage {
     } catch (e) {
       // Fallback: use search button
       try {
-        const btn = this.driver.$(this.createLocator('~search-button'));
+        const btn = this.driver.$(this.resolveSelector('~search-button'));
         await btn.click();
       } catch (e2) {
         // Ignore — search may already have triggered
@@ -80,7 +80,7 @@ class MobileAmazonHomePage extends MobileBasePage {
 
   async openCart() {
     try {
-      const cart = this.driver.$(this.createLocator('~nav-cart'));
+      const cart = this.driver.$(this.resolveSelector('~nav-cart'));
       await cart.waitForDisplayed({ timeout: 5000 });
       await cart.click();
     } catch (e) {
@@ -94,7 +94,7 @@ class MobileAmazonHomePage extends MobileBasePage {
   }
 
   async verifyVisible(locator) {
-    const element = typeof locator === 'string' ? this.driver.$(this.resolveLocator(locator)) : locator;
+    const element = typeof locator === 'string' ? this.driver.$(this.resolveSelector(locator)) : locator;
     if (!(await element.isDisplayed())) {
       throw new Error(`Element not visible: ${locator}`);
     }

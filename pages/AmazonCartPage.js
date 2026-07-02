@@ -25,7 +25,38 @@ class AmazonCartPage {
   constructor(page) {
     // ── Detect mobile driver (WebDriverIO) vs Playwright page ──────────
     if (page && typeof page.locator !== 'function') {
-      // WebDriverIO driver — use unified MobileAmazonCartPage for both iOS and Android
+      const isIOS = config.testPlatform === TEST_PLATFORMS.IOS;
+      const isSafari = String(config.mobile.browserName || '').toLowerCase() === 'safari';
+
+      if (isIOS && isSafari) {
+        // ── iOS Safari: use AmazonIOSSafariPage (CSS selectors in WebView) ──
+        const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
+        this._mobile = new AmazonIOSSafariPage(page);
+        this.page = page;
+
+        // Map AmazonIOSSafariPage cart methods to this interface
+        this.openCartPage = () => this._mobile.openCartPage();
+        this.verifyCartPageVisible = () => this._mobile.verifyCartPageVisible();
+        this.removeItemFromCart = () => this._mobile.removeItemFromCart();
+        this.proceedToCheckout = () => this._mobile.proceedToCheckout();
+        this.continueShoppingIfPrompted = async () => {};
+        this.getCartItems = async () => [];
+        this.verifyVisible = (locator) => this._mobile.verifyVisible(locator);
+
+        // Legacy proceedToBuyButton interface
+        this.proceedToBuyButton = {
+          click: () => this._mobile.proceedToCheckout(),
+        };
+
+        this.cartTitle = null;
+        this.continueShoppingButton = null;
+        this.emptyCartMessage = null;
+        this.cartItems = [];
+
+        return;
+      }
+
+      // ── Android / iOS App: use MobileAmazonCartPage ──
       this._mobile = new MobileAmazonCartPage(page);
       this.page = page;
 

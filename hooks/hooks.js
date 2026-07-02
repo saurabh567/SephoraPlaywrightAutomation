@@ -86,7 +86,7 @@ if (isApiOnlyExecution) {
   logger.info('[Hooks] API-only execution detected — all browser/mobile hooks are permanently skipped');
 }
 
-setDefaultTimeout(config.timeout + 10000);
+setDefaultTimeout(180000);
 
 function getMobileAppId() {
   if (isApiOnlyExecution) return '';
@@ -129,7 +129,8 @@ BeforeAll(async function () {
       if (process.env.APPIUM_AUTO_LAUNCH !== 'false') {
         try {
           const { execSync } = require('child_process');
-          execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_AMAZON_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
+          // REMOVED: pm clear Amazon app data causes crash on next launch
+          logger.info('[Hooks] Skipping Amazon pm clear - would cause app crash');
           execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_CHROME_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
           logger.info('[Hooks] Android pre-session app data cleared via ADB');
         } catch (err) {

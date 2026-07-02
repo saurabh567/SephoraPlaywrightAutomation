@@ -8,10 +8,10 @@ class MobileAmazonProductDetailsPage extends MobileBasePage {
   constructor(driver) {
     super(driver);
     this.productTitle = null;
-    this.addToCartButton = this.driver.$(this.createLocator('~add-to-cart-button'));
-    this.buyNowButton = this.driver.$(this.createLocator('~buy-now-button'));
-    this.cartConfirmation = this.driver.$(this.createLocator('~cart-confirmation'));
-    this.cartLink = this.driver.$(this.createLocator('~nav-cart'));
+    this.addToCartButton = this.driver.$(this.resolveSelector('~add-to-cart-button'));
+    this.buyNowButton = this.driver.$(this.resolveSelector('~buy-now-button'));
+    this.cartConfirmation = this.driver.$(this.resolveSelector('~cart-confirmation'));
+    this.cartLink = this.driver.$(this.resolveSelector('~nav-cart'));
   }
 
   async openProductPage(productUrl) {
@@ -25,10 +25,10 @@ class MobileAmazonProductDetailsPage extends MobileBasePage {
 
   async selectQuantity(quantity) {
     try {
-      const qty = this.driver.$(this.createLocator('~quantity-selector'));
+      const qty = this.driver.$(this.resolveSelector('~quantity-selector'));
       if (await qty.isDisplayed()) {
         await qty.click();
-        const option = this.driver.$(this.createLocator(`~quantity-${quantity}`));
+        const option = this.driver.$(this.resolveSelector(`~quantity-${quantity}`));
         if (await option.isDisplayed()) {
           await option.click();
         }
@@ -40,7 +40,7 @@ class MobileAmazonProductDetailsPage extends MobileBasePage {
 
   async addToCartIfAvailable() {
     try {
-      const btn = this.driver.$(this.createLocator('~add-to-cart-button'));
+      const btn = this.driver.$(this.resolveSelector('~add-to-cart-button'));
       if (await btn.isDisplayed()) {
         await btn.click();
         await this.driver.pause(3000);
@@ -81,7 +81,7 @@ class MobileAmazonProductDetailsPage extends MobileBasePage {
 
   async verifyProductDetailsVisible() {
     await this.driver.pause(2000);
-    const title = this.driver.$(this.createLocator('~product-title'));
+    const title = this.driver.$(this.resolveSelector('~product-title'));
     if (!(await title.isDisplayed().catch(() => false))) {
       // Fallback: check for any product content
       const content = this.driver.$('#productTitle');

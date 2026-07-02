@@ -12,12 +12,14 @@
  * until the language selection has been completed successfully.
  *
  * Flow:
- *   1. Detect "Choose your language" screen
- *   2. Select the "English" tile
- *   3. Verify English is selected (checkmark / highlight)
- *   4. Tap "Continue in English"
- *   5. Wait until the language screen disappears entirely
- *   6. ONLY THEN look for and click "Skip Sign In" (or equivalent)
+ *   1. Dismiss any system notifications/overlays (notification shade,
+ *      Google Play Services update prompt, setup wizard, etc.)
+ *   2. Detect "Choose your language" screen
+ *   3. Select the "English" tile
+ *   4. Verify English is selected (checkmark / highlight)
+ *   5. Tap "Continue in English"
+ *   6. Wait until the language screen disappears entirely
+ *   7. ONLY THEN look for and click "Skip Sign In" (or equivalent)
  *
  * If ANY step fails, a screenshot is captured, the page source is dumped
  * for debugging, and the test is stopped immediately (error thrown).
@@ -44,7 +46,63 @@ const REPORT_DIR = 'reports';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Locator groups
+//
+// NOTE: WebDriverIO v9's driver.$$() does NOT support the "xpath=" prefix.
+//       Plain XPath strings starting with "//" are auto-detected as XPath.
+//       Using "xpath=//..." causes the entire string to be treated as a raw
+//       XPath expression, producing broken queries like ".//xpath[...]".
+//       All XPath locators below use bare "//" syntax.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Detect Android system notification shade / panel */
+const NOTIFICATION_SHADE = [
+  '//android.widget.FrameLayout[@content-desc="Notification shade"]',
+  '//android.widget.FrameLayout[contains(@content-desc, "notification")]',
+  '//android.widget.ScrollView[contains(@content-desc, "notification")]',
+  '//*[contains(@content-desc, "Notifications")]',
+  '//*[contains(@text, "Notifications")]',
+  '//android.widget.FrameLayout[@content-desc="Notifications"]',
+  // UiSelector fallbacks for notification icons/entries
+  'android=new UiSelector().descriptionContains("notification")',
+  'android=new UiSelector().descriptionContains("Notification")',
+  'android=new UiSelector().textContains("notification")',
+  'android=new UiSelector().className("android.widget.FrameLayout").descriptionContains("Notification")',
+];
+
+/** Detect common system dialogs that may overlay the app */
+const SYSTEM_DIALOGS = [
+  // Google Play Services update prompt
+  '//*[@text="Update" and contains(@resource-id, "play")]',
+  '//*[contains(@text, "Google Play Services")]',
+  '//*[contains(@text, "Update Google Play")]',
+  // System update dialog
+  '//*[contains(@text, "System update")]',
+  '//*[contains(@text, "Software update")]',
+  // Setup wizard / welcome screens
+  '//*[contains(@text, "Welcome") and contains(@text, "Android")]',
+  '//*[contains(@text, "Set up your")]',
+  '//*[contains(@text, "Copy apps & data")]',
+  '//*[contains(@text, "Get started")]',
+  '//*[contains(@text, "Skip") and contains(@text, "setup")]',
+  // Permission dialogs (generic)
+  '//*[@text="Allow"]',
+  '//*[@text="Deny"]',
+  '//*[@text="While using the app"]',
+  '//*[@text="Only this time"]',
+  '//*[@text="Don\'t allow"]',
+  // System alert / dialog containers
+  '//android.widget.AlertDialog',
+  '//android:id/alertTitle',
+  '//android:id/parentPanel',
+  '//android:id/button1',  // OK / Accept button
+  '//android:id/button2',  // Cancel / Decline button
+  // Generic "OK" button
+  '//*[@text="OK"]',
+  // UiSelector fallbacks
+  'android=new UiSelector().text("Update")',
+  'android=new UiSelector().textContains("Google Play")',
+  'android=new UiSelector().textContains("Allow")',
+];
 
 const LANGUAGE_SCREEN_TITLE = [
   '~Choose your language',
@@ -56,32 +114,39 @@ const LANGUAGE_SCREEN_TITLE = [
   'android=new UiSelector().textContains("Select your language")',
   'android=new UiSelector().textContains("language")',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("language"))',
-  'xpath=//android.widget.TextView[contains(@text, "Choose your language")]',
-  'xpath=//android.widget.TextView[contains(@text, "Select your language")]',
-  'xpath=//*[contains(@text, "language")]',
+  '//android.widget.TextView[contains(@text, "Choose your language")]',
+  '//android.widget.TextView[contains(@text, "Select your language")]',
+  '//*[contains(@text, "language")]',
   'id:in.amazon.mShop.android.shopping:id/language_title',
 ];
 
 const ENGLISH_TILE = [
+  // Priority 1: Clickable parent containing English text (handles compound views)
+  '//*[@clickable="true"]//*[contains(@text, "English")]',
+  // Priority 2: UiAutomator2 with contains (most flexible)
+  'android=new UiSelector().textContains("English")',
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("English"))',
+  // Priority 3: Accessibility ID
   '~English',
   '~English (India)',
   '~English – English',
+  // Priority 4: Exact text match via UiAutomator2
   'android=new UiSelector().text("English")',
   'android=new UiSelector().text("English – English")',
   'android=new UiSelector().text("English (India)")',
-  'android=new UiSelector().textContains("English")',
   'android=new UiSelector().className("android.widget.TextView").text("English")',
   'android=new UiSelector().className("android.widget.RadioButton").text("English")',
   'android=new UiSelector().className("android.widget.CheckedTextView").text("English")',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().text("English"))',
-  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("English"))',
-  'xpath=//android.widget.RadioButton[@text="English"]',
-  'xpath=//android.widget.CheckedTextView[@text="English"]',
-  'xpath=//android.widget.TextView[@text="English"]',
-  'xpath=//*[@text="English"]',
-  'xpath=//*[@text="English – English"]',
-  'xpath=//*[@clickable="true"]//*[contains(@text, "English")]',
-  'xpath=//*[contains(@text, "English")]',
+  // Priority 5: XPath with exact class + text
+  '//android.widget.RadioButton[@text="English"]',
+  '//android.widget.CheckedTextView[@text="English"]',
+  '//android.widget.TextView[@text="English"]',
+  // Priority 6: XPath generic text match
+  '//*[@text="English"]',
+  '//*[@text="English – English"]',
+  '//*[contains(@text, "English")]',
+  // Priority 7: Resource IDs
   'id:in.amazon.mShop.android.shopping:id/language_english',
   'id:in.amazon.mShop.android.shopping:id/english_radio',
   'id:in.amazon.mShop.android.shopping:id/english_option',
@@ -92,8 +157,8 @@ const ENGLISH_SELECTED_INDICATOR = [
   'android=new UiSelector().className("android.widget.RadioButton").text("English").selected(true)',
   'android=new UiSelector().className("android.widget.RadioButton").text("English").checked(true)',
   'android=new UiSelector().className("android.widget.CheckedTextView").text("English").checked(true)',
-  'xpath=//android.widget.RadioButton[@text="English" and (@checked="true" or @selected="true")]',
-  'xpath=//android.widget.CheckedTextView[@text="English" and @checked="true"]',
+  '//android.widget.RadioButton[@text="English" and (@checked="true" or @selected="true")]',
+  '//android.widget.CheckedTextView[@text="English" and @checked="true"]',
   'id:in.amazon.mShop.android.shopping:id/selected_indicator',
   'id:in.amazon.mShop.android.shopping:id/checkmark',
   'id:in.amazon.mShop.android.shopping:id/selection_marker',
@@ -109,35 +174,60 @@ const CONTINUE_BUTTON = [
   'android=new UiSelector().textContains("Continue")',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().text("Continue"))',
   'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Continue"))',
-  'xpath=//android.widget.Button[@text="Continue"]',
-  'xpath=//android.widget.Button[contains(@text, "Continue")]',
-  'xpath=//*[@clickable="true" and contains(@text, "Continue")]',
-  'xpath=//*[contains(@text, "Continue")]',
+  '//android.widget.Button[@text="Continue"]',
+  '//android.widget.Button[contains(@text, "Continue")]',
+  '//*[@clickable="true" and contains(@text, "Continue")]',
+  '//*[contains(@text, "Continue")]',
   'id:in.amazon.mShop.android.shopping:id/continue_button',
   'id:in.amazon.mShop.android.shopping:id/continue_btn',
   'id:in.amazon.mShop.android.shopping:id/continue_english_btn',
 ];
 
 const SKIP_SIGNIN_BUTTON = [
+  // Priority 1: Clickable elements containing skip text (handles TextView links)
+  '//*[@clickable="true" and contains(@text, "Skip")]',
+  '//*[@clickable="true" and contains(@text, "skip")]',
+  '//*[@clickable="true" and contains(@text, "Not now")]',
+  '//*[@clickable="true" and contains(@text, "Continue without")]',
+  // Priority 2: UiAutomator2 scroll-into-view (handles off-screen elements)
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Skip"))',
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Not now"))',
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Continue without"))',
+  // Priority 3: UiAutomator2 textContains (flexible matching)
+  'android=new UiSelector().textContains("Skip")',
+  'android=new UiSelector().textContains("Not now")',
+  'android=new UiSelector().textContains("Continue without signing")',
+  // Priority 4: Accessibility IDs
   '~Skip sign in',
   '~Skip',
   '~Not now',
   '~Continue without signing in',
+  // Priority 5: Exact text via UiAutomator2
   'android=new UiSelector().text("Skip sign in")',
   'android=new UiSelector().text("Skip")',
   'android=new UiSelector().text("Not now")',
   'android=new UiSelector().text("Continue without signing in")',
-  'android=new UiSelector().textContains("Skip")',
-  'android=new UiSelector().textContains("Not now")',
-  'android=new UiSelector().textContains("Continue without signing")',
-  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Skip"))',
-  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Not now"))',
-  'xpath=//android.widget.Button[contains(@text, "Skip")]',
-  'xpath=//android.widget.Button[contains(@text, "Not now")]',
-  'xpath=//android.widget.Button[contains(@text, "Continue without")]',
-  'xpath=//*[contains(@text, "Skip")]',
+  // Priority 6: XPath general (catches any element type with text)
+  '//*[contains(@text, "Skip")]',
+  '//*[contains(@text, "Not now")]',
+  '//*[contains(@text, "Continue without")]',
+  // Priority 7: Resource IDs
   'id:in.amazon.mShop.android.shopping:id/skip_sign_in_button',
   'id:in.amazon.mShop.android.shopping:id/skip_btn',
+];
+
+// ── Home page / dashboard indicators ──────────────────────────────────
+// Used after onboarding to verify we reached the Amazon app dashboard.
+const HOME_PAGE_INDICATORS = [
+  'id:in.amazon.mShop.android.shopping:id/chrome_search_box',
+  'id:in.amazon.mShop.android.shopping:id/rs_search_src_text',
+  'android=new UiSelector().descriptionContains("Cart")',
+  'android=new UiSelector().descriptionContains("cart")',
+  'android=new UiSelector().textContains("Amazon")',
+  '~Search',
+  '//*[contains(@content-desc, "Search")]',
+  '//*[contains(@content-desc, "Cart")]',
+  'class name:android.webkit.WebView',
 ];
 
 const SIGNIN_SCREEN_INDICATORS = [
@@ -147,7 +237,11 @@ const SIGNIN_SCREEN_INDICATORS = [
   'android=new UiSelector().textContains("Sign-In")',
   'android=new UiSelector().textContains("Email")',
   'android=new UiSelector().textContains("phone number")',
-  'xpath=//android.widget.EditText',
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Sign in"))',
+  'android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().textContains("Sign-In"))',
+  // NOTE: //android.widget.EditText is intentionally NOT included here because
+  // the Amazon HOME PAGE also has an EditText (search box), causing false
+  // positive sign-in detection. We rely on text-based indicators instead.
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -239,10 +333,11 @@ async function findElementByTextContains(driver, text, timeoutMs = 5000) {
       const regex = new RegExp(`text="${escaped}[^"]*"`, 'i');
 
       // Try XPath with text() function (works across all element types)
+      // NOTE: bare "//" prefix — no "xpath=" — so WebDriverIO auto-detects XPath
       const xpathLocators = [
-        `xpath=//*[contains(text(), "${text}")]`,
-        `xpath=//*[@text="${text}"]`,
-        `xpath=//*[contains(@text, "${text}")]`,
+        `//*[contains(text(), "${text}")]`,
+        `//*[@text="${text}"]`,
+        `//*[contains(@text, "${text}")]`,
       ];
 
       for (const loc of xpathLocators) {
@@ -295,6 +390,23 @@ async function tapElement(driver, element, label) {
   if (!element) {
     throw new Error(`[Android] Cannot tap "${label}" — element not found`);
   }
+
+  // Strategy 1: mobile: clickGesture (most reliable — taps element center coordinates)
+  // This works even for compound views where the clickable parent is different
+  // from the child element that was located (e.g., RadioButton inside LinearLayout).
+  try {
+    const elementId = element.elementId || element.ELEMENT;
+    if (elementId) {
+      await driver.execute('mobile: clickGesture', { elementId: elementId });
+      logger.info(`[Android] ${label}`);
+      await driver.pause(300);
+      return;
+    }
+  } catch (err) {
+    // Fall through to strategy 2
+  }
+
+  // Strategy 2: Standard element.click()
   try {
     await element.click();
     logger.info(`[Android] ${label}`);
@@ -318,6 +430,113 @@ async function isSignInScreen(driver) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Notification / overlay dismissal
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Dismiss the Android notification shade if it is pulled down/visible.
+ * Uses the BACK key as the primary strategy, with coordinate tap as fallback.
+ */
+async function dismissNotificationShade(driver) {
+  const shade = await findAny(driver, NOTIFICATION_SHADE, 2000);
+  if (shade) {
+    logger.info('[Android] Notification shade detected — dismissing via BACK key');
+    // Strategy 1: Press BACK to close the shade
+    try {
+      await driver.pressKeyCode(4); // KEYCODE_BACK
+      await driver.pause(500);
+      return;
+    } catch { /* fall through */ }
+
+    // Strategy 2: Tap outside the shade (top-left corner works for most devices)
+    try {
+      await driver.execute('mobile: clickGesture', { x: 1, y: 100 });
+      await driver.pause(500);
+    } catch { /* fall through */ }
+  }
+}
+
+/**
+ * Dismiss common Android system dialogs (Google Play Services, permissions,
+ * setup wizard, etc.) by finding and tapping their dismiss buttons.
+ *
+ * Handles:
+ *   - Google Play Services update prompt → tap "Update" or dismiss
+ *   - Permission dialogs → tap "Allow" or "Don't allow"
+ *   - System alert dialogs → tap "OK"/"Cancel" or press BACK
+ *   - Welcome / setup wizard → look for "Skip" or "Get started"
+ *   - Any visible AlertDialog → press BACK to dismiss
+ */
+async function dismissSystemDialogs(driver) {
+  const dialog = await findAny(driver, SYSTEM_DIALOGS, 2000);
+  if (!dialog) return false;
+
+  logger.info('[Android] System dialog detected — attempting to dismiss');
+
+  // Strategy 1: Try tapping common dismiss buttons
+  const dismissButtons = [
+    '//*[@text="Skip"]',
+    '//*[@text="Not now"]',
+    '//*[@text="Later"]',
+    '//*[@text="Cancel"]',
+    '//*[@text="Dismiss"]',
+    '//*[@text="Remind me later"]',
+    '//*[@text="No thanks"]',
+    '//*[@text="Update"]',
+    '//*[@text="OK"]',
+    '//android:id/button2',  // Cancel/decline button in standard AlertDialog
+    '//android:id/button1',  // OK/accept button
+  ];
+
+  for (const btnLoc of dismissButtons) {
+    try {
+      const btns = await driver.$$(btnLoc);
+      if (btns && btns.length > 0) {
+        const displayed = await btns[0].isDisplayed().catch(() => false);
+        if (displayed) {
+          await btns[0].click();
+          logger.info(`[Android] Tapped dismiss button: ${btnLoc}`);
+          await driver.pause(1000);
+          return true;
+        }
+      }
+    } catch { /* try next */ }
+  }
+
+  // Strategy 2: Press BACK key to dismiss dialog
+  try {
+    await driver.pressKeyCode(4); // KEYCODE_BACK
+    logger.info('[Android] Pressed BACK to dismiss dialog');
+    await driver.pause(1000);
+    return true;
+  } catch { /* fall through */ }
+}
+
+/**
+ * Detect and dismiss any system notification overlays, notification shade,
+ * or system dialogs that might be covering the Amazon app on a fresh
+ * emulator boot.  This runs before the language-screen detection.
+ *
+ * Uses a short overall timeout so it does not delay normal flow.
+ */
+async function dismissSystemNotificationsAndOverlays(driver) {
+  const deadline = Date.now() + 6000;
+
+  while (Date.now() < deadline) {
+    const dismissedShade = await dismissNotificationShade(driver);
+    const dismissedDialog = await dismissSystemDialogs(driver);
+
+    if (!dismissedShade && !dismissedDialog) {
+      // No overlay found — screen is clear
+      break;
+    }
+    await driver.pause(400);
+  }
+
+  logger.info('[Android] System notification/overlay check complete');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Onboarding steps
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -337,6 +556,39 @@ async function stepSelectEnglish(driver) {
   if (!english) {
     logger.info('[Android] Standard locators did not find English tile — trying page-source text search...');
     english = await findElementByTextContains(driver, 'English', 3000);
+  }
+
+  // Strategy C: Coordinate-based tap as last resort
+  // The English tile is typically the first option at the top of the language list.
+  // On most 1080p+ devices, it's around (540, 350-400). Tapping by coordinates
+  // works even when locators fail due to custom compound views or non-standard
+  // element hierarchies.
+  if (!english) {
+    logger.info('[Android] All locator strategies failed — trying coordinate tap at English tile position...');
+    try {
+      await driver.execute('mobile: clickGesture', { x: 540, y: 380 });
+      await driver.pause(1500);
+      // Verify the tap worked by checking if a Continue button appeared
+      const continueBtn = await findAny(driver, CONTINUE_BUTTON, 2000);
+      if (continueBtn) {
+        logger.info('[Android] Coordinate tap on English tile succeeded (Continue button now visible)');
+        // The language was selected via coordinate tap, Continue button appeared.
+        // Return early to skip tapElement below — the coordinate tap already did the job.
+        logger.info('[Android] Language selected via coordinate tap.');
+        await driver.pause(500);
+        return; // skip the tapElement call below
+      } else {
+        logger.info('[Android] Coordinate tap did not reveal Continue button, trying one more position...');
+        // Try tapping slightly lower (some UIs have English as the second option)
+        try {
+          await driver.execute('mobile: clickGesture', { x: 540, y: 450 });
+          await driver.pause(1500);
+          logger.info('[Android] Second coordinate tap attempted');
+        } catch (_) {}
+      }
+    } catch (coordsErr) {
+      logger.warn('[Android] Coordinate tap failed: ' + coordsErr.message);
+    }
   }
 
   if (!english) {
@@ -427,7 +679,52 @@ async function stepSkipSignIn(driver) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Step 6: Verify Amazon dashboard is loaded after onboarding completes.
+ * Waits for common home page elements (search box, cart icon, etc.)
+ * to confirm we're past all onboarding screens.
+ */
+async function stepVerifyDashboardLoaded(driver) {
+  logger.info('[Android] Waiting for Amazon dashboard to load...');
+
+  // Wait up to 15 seconds for any home page indicator
+  const dashboardReady = await findAny(driver, HOME_PAGE_INDICATORS, 15000);
+
+  if (!dashboardReady) {
+    // Dashboard not detected — try navigating via deeplink or home action
+    logger.warn('[Android] Dashboard indicators not found — attempting to navigate home...');
+    try {
+      // Try pressing HOME key then re-launching the Amazon app
+      await driver.pressKeyCode(3); // KEYCODE_HOME
+      await driver.pause(1000);
+      await driver.execute('mobile: shell', [{
+        command: 'am',
+        args: ['start', '-n', 'in.amazon.mShop.android.shopping/com.amazon.mShop.home.HomeActivity']
+      }]);
+      await driver.pause(5000);
+      // Check again for indicators
+      const retryDashboard = await findAny(driver, HOME_PAGE_INDICATORS, 10000);
+      if (!retryDashboard) {
+        logger.warn('[Android] Dashboard still not confirmed — tests may fail');
+      } else {
+        logger.info('[Android] Dashboard loaded after navigation retry');
+      }
+    } catch (navErr) {
+      logger.warn('[Android] Dashboard navigation retry failed: ' + navErr.message);
+    }
+  } else {
+    logger.info('[Android] Amazon dashboard is visible');
+  }
+
+  await driver.pause(1000);
+}
+
+/**
  * Handle the Amazon first-launch onboarding flow if it is displayed.
+ *
+ * Before checking for the language screen, dismisses any Android system
+ * notification overlays (notification shade, Google Play Services update
+ * prompt, setup wizard, permission dialogs) that may have appeared on a
+ * fresh emulator boot.
  *
  * @param {object} driver - WebDriverIO driver instance
  * @returns {Promise<boolean>} true if onboarding was handled, false if not displayed
@@ -441,6 +738,16 @@ async function handleFirstLaunchIfNeeded(driver) {
 
   await driver.pause(3000);
 
+  // ── Dismiss system notification overlays before checking for language screen ──
+  // This handles:
+  //   - Notification shade pulled down at boot
+  //   - Google Play Services update dialog
+  //   - System update prompts
+  //   - Permission dialogs (Allow/Deny)
+  //   - Android setup wizard fragments
+  //   - Any standard AlertDialog on screen
+  await dismissSystemNotificationsAndOverlays(driver);
+
   const languageVisible = await isLanguageScreen(driver);
   if (!languageVisible) return false;
 
@@ -451,6 +758,9 @@ async function handleFirstLaunchIfNeeded(driver) {
   await stepTapContinue(driver);
   await stepWaitLanguageScreenDismissed(driver);
   await stepSkipSignIn(driver);
+
+  // Step 6: Verify we've reached the Amazon dashboard (home page)
+  await stepVerifyDashboardLoaded(driver);
 
   logger.info('[Android] First-launch onboarding completed successfully.');
   return true;

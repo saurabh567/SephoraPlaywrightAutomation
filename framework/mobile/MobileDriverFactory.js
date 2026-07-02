@@ -51,6 +51,10 @@ class MobileDriverFactory {
       'appium:chromedriverPort',
       'appium:udid',
       'appium:app',
+      // Lock screen unlock capabilities
+      'appium:unlockStrategy',
+      'appium:unlockKey',
+      'appium:unlockType',
     ];
 
     console.log('');
@@ -93,6 +97,10 @@ class MobileDriverFactory {
       ['DEVICE_NAME',  process.env.DEVICE_NAME],
       ['UDID',         process.env.UDID],
       ['NEW_COMMAND_TIMEOUT', process.env.NEW_COMMAND_TIMEOUT],
+      // Lock screen env vars
+      ['APPIUM_UNLOCK_STRATEGY', process.env.APPIUM_UNLOCK_STRATEGY],
+      ['APPIUM_UNLOCK_KEY',     process.env.APPIUM_UNLOCK_KEY],
+      ['APPIUM_SKIP_UNLOCK',    process.env.APPIUM_SKIP_UNLOCK],
     ];
     for (var j = 0; j < envVars.length; j++) {
       var val = envVars[j][1] !== undefined ? envVars[j][1] : '(undefined)';

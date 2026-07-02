@@ -51,7 +51,7 @@ module.exports = {
     autoStart: process.env.APPIUM_AUTO_START !== 'false',
     autoStop: process.env.APPIUM_AUTO_STOP !== 'false',
     startTimeout: Number(process.env.APPIUM_START_TIMEOUT || 30000),
-    connectionRetryTimeout: Number(process.env.APPIUM_CONNECTION_RETRY_TIMEOUT || 180000),
+    connectionRetryTimeout: Number(process.env.APPIUM_CONNECTION_RETRY_TIMEOUT || 120000),
     connectionRetryCount: Number(process.env.APPIUM_CONNECTION_RETRY_COUNT || 3),
     logPath: process.env.APPIUM_LOG_PATH || 'mobile/logs/appium-server.log',
     serverUrl: `${process.env.APPIUM_PROTOCOL || 'http'}://${process.env.APPIUM_HOST || '127.0.0.1'}:${process.env.APPIUM_PORT || 4723}${process.env.APPIUM_BASE_PATH || process.env.APPIUM_PATH || '/'}`

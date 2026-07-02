@@ -223,6 +223,31 @@ class AmazonIOSSafariPage extends MobileBasePage {
     // ── Screenshot directory for diagnostics ────────────────────────────
     this.debugScreenshotDir = 'reports/ios/screenshots';
     this.debugSourceDir = 'reports/ios/debug';
+
+    // ── Sign-in Bottom Sheet ──────────────────────────────────────────
+    // Amazon mobile web shows a "Sign in or Create Account" bottom sheet
+    // overlay when an unauthenticated user performs gated actions
+    // (add to cart, view cart, checkout). Must be dismissed before
+    // interacting with the underlying page.
+    this.signInBottomSheetSelectors = [
+      // Common sign-in overlay / modal containers
+      '#auth-signin-modal',
+      '[data-testid="sign-in-overlay"]',
+      // Bottom sheet with sign-in prompt
+      '[data-component-type="sign-in-accordion"]',
+      // Close/dismiss buttons on the overlay
+      'button[aria-label="Close"]',
+      'button[aria-label="close"]',
+      'span[aria-label="Close"]',
+      'a[aria-label="Close"]',
+      '[data-testid="close-button"]',
+      // Generic dismiss via "X" button
+      '.a-icon-close',
+      'button.a-button-close',
+      // Any visible dialog with sign-in text (catch-all)
+      '[role="dialog"]',
+    ];
+    this.signInUrlPattern = /ap\/signin|signin|sign-in/i;
   }
   // ═════════════════════════════════════════════════════════════════════════
   // Action Logger — logs 7 fields before every important action
@@ -268,6 +293,115 @@ class AmazonIOSSafariPage extends MobileBasePage {
   /**
    * Infer what page/screen the browser is currently showing based on URL.
    */
+  /**
+   * Detect and dismiss the Amazon "Sign in or Create Account" bottom sheet.
+   * This overlay appears when an unauthenticated user performs gated actions.
+   * Call at the top of every public action method before interacting with
+   * the page. Checks URL for sign-in redirect AND DOM for overlay elements.
+   *
+   * Strategy:
+   *   1. Check current URL for /ap/signin (redirect-based sign-in)
+   *   2. Search DOM for known sign-in overlay selectors
+   *   3. If found, tap Close/X button or dismiss via gesture
+   *   4. Navigate back to Amazon URL if redirected away
+   *
+   * @returns {Promise<boolean>} True if a sign-in prompt was dismissed
+   */
+  async _dismissSignInBottomSheet() {
+    const currentUrl = await this.driver.getUrl().catch(() => '');
+    const source = await this.driver.getPageSource().catch(() => '');
+
+    // Strategy 1: URL-based detection — redirected to sign-in page
+    if (this.signInUrlPattern.test(currentUrl)) {
+      logger.info('[AmazonIOSSafariPage] Sign-in page detected via URL — navigating back to Amazon');
+      await this.driver.back().catch(() => {});
+      await this.driver.pause(2000);
+      // Re-check URL
+      const afterBack = await this.driver.getUrl().catch(() => '');
+      if (this.signInUrlPattern.test(afterBack)) {
+        // Still on sign-in — try navigating to home directly
+        logger.info('[AmazonIOSSafariPage] Still on sign-in after back — navigating to home');
+        await this.driver.url('https://www.amazon.in/').catch(() => {});
+        await this.driver.pause(3000);
+      }
+      return true;
+    }
+
+    // Strategy 2: DOM-based detection — sign-in overlay on current page
+    for (const selector of this.signInBottomSheetSelectors) {
+      try {
+        const elements = await this.driver.$$(selector);
+        for (const element of elements) {
+          const displayed = await element.isDisplayed().catch(() => false);
+          if (!displayed) continue;
+
+          // Found an overlay element — try to dismiss it
+          logger.info('[AmazonIOSSafariPage] Sign-in bottom sheet detected via selector: ' + selector);
+
+          // First, try to find and click a close/dismiss button
+          const closeButtons = [
+            'button[aria-label="Close"]',
+            'button[aria-label="close"]',
+            'span[aria-label="Close"]',
+            'a[aria-label="Close"]',
+            'button.a-button-close',
+            '.a-icon-close',
+            'button[data-action="a-popover-close"]',
+            '[data-testid="close-button"]',
+          ];
+
+          for (const closeSel of closeButtons) {
+            try {
+              const closeEls = await this.driver.$$(closeSel);
+              for (const closeEl of closeEls) {
+                if (await closeEl.isDisplayed().catch(() => false)) {
+                  await closeEl.click();
+                  await this.driver.pause(1500);
+                  logger.info('[AmazonIOSSafariPage] Sign-in bottom sheet dismissed via close button');
+                  return true;
+                }
+              }
+            } catch (_) {}
+          }
+
+          // Fallback: tap the backdrop or press Escape via JS
+          try {
+            await this.driver.execute('document.body.click()');
+            await this.driver.pause(1000);
+            logger.info('[AmazonIOSSafariPage] Sign-in bottom sheet dismissed via body click');
+            return true;
+          } catch (_) {}
+
+          // Last resort: navigate back
+          try {
+            await this.driver.back().catch(() => {});
+            await this.driver.pause(2000);
+            logger.info('[AmazonIOSSafariPage] Sign-in bottom sheet dismissed via back navigation');
+            return true;
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    // Also check page source for sign-in text patterns
+    if (/sign in or create account|sign in to continue/i.test(source)) {
+      logger.info('[AmazonIOSSafariPage] Sign-in text detected in page source — attempting dismissal');
+      try {
+        await this.driver.execute(
+          'var els=document.querySelectorAll("button,a,span");' +
+          'for(var i=0;i<els.length;i++){' +
+          'var t=(els[i].textContent||"").trim().toLowerCase();' +
+          'if(t==="close"||t==="dismiss"||t==="x"||t==="cancel"){' +
+          'els[i].click();return "clicked "+t;}}return "no match";'
+        );
+        await this.driver.pause(1500);
+        return true;
+      } catch (_) {}
+    }
+
+    return false;
+  }
+
   _inferScreen(url) {
     const u = url.toLowerCase();
     if (u.includes('/cart') || u.includes('gp/cart') || u.includes('smart-wagon') || u.includes('smart_wagon')) return 'CART_PAGE';
@@ -320,6 +454,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
   // ═════════════════════════════════════════════════════════════════════════
 
   async openHomePage() {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("openHomePage", { screen: "HOME_PAGE" });
     const targetUrl = this.normalizeUrl(this.baseUrl);
     logger.info("[AmazonIOSSafariPage] Navigating directly to BASE_URL: " + targetUrl);
@@ -408,6 +543,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
   // ═════════════════════════════════════════════════════════════════════════
 
   async searchProduct(productName) {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("searchProduct", { screen: "HOME_PAGE", locator: this.searchBox });
     const searchInput = await this.waitForDisplayed(this.searchBox);
     await searchInput.click();
@@ -427,6 +563,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
   // ═════════════════════════════════════════════════════════════════════════
 
   async openFirstProductFromResults() {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("openFirstProductFromResults", { screen: "SEARCH_RESULTS" });
     await this.waitForSearchResultsRendered(30000);
 
@@ -454,9 +591,33 @@ class AmazonIOSSafariPage extends MobileBasePage {
               await this.driver.pause(500);
             } catch (_) {}
 
-            logger.info(`[AmazonIOSSafariPage] Clicking product via selector: "${selector}"`);
-            await element.click();
-            await this.driver.pause(2000);
+            // Retry click with re-query on stale element
+            let clickSuccess = false;
+            for (let clickRetry = 0; clickRetry < 2 && !clickSuccess; clickRetry++) {
+              try {
+                if (clickRetry > 0) {
+                  // Element became stale — re-query the selector
+                  const freshElements = await this.driver.$$(selector);
+                  if (freshElements.length === 0) break;
+                  element = freshElements[0];
+                  try { await element.scrollIntoView(); await this.driver.pause(300); } catch (_) {}
+                }
+                logger.info('[AmazonIOSSafariPage] Clicking product via selector: "' + selector + '" (attempt ' + (clickRetry + 1) + ')');
+                await element.click();
+                clickSuccess = true;
+              } catch (clickErr) {
+                if (clickRetry === 0) {
+                  logger.warn('[AmazonIOSSafariPage] First click attempt failed, retrying with fresh element: ' + clickErr.message.substring(0, 80));
+                } else {
+                  logger.warn('[AmazonIOSSafariPage] All click attempts exhausted for selector: ' + selector);
+                }
+              }
+            }
+
+            if (!clickSuccess) continue;
+
+            await this.cp.waitForPageStabilized({ timeout: this.cp.getTimeout(8000), checkLoaders: false }).catch(function() {});
+            await this.driver.pause(500);
 
             const currentUrl = await this.driver.getUrl().catch(() => '');
             if (/\/dp\/|\/gp\/product\/|\/product\//.test(currentUrl)) {
@@ -499,8 +660,25 @@ class AmazonIOSSafariPage extends MobileBasePage {
   // ═════════════════════════════════════════════════════════════════════════
 
   async addToCartIfAvailable() {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("addToCartIfAvailable", { screen: "PRODUCT_DETAILS" });
     const currentUrl = await this.driver.getUrl().catch(() => '');
+
+    // ── Wait for product page buy box to load before scanning selectors ──
+    // Amazon's mobile web loads the buy box (Add to Cart button) progressively.
+    // Wait for known container elements before attempting to find the button.
+    try {
+      await this.driver.waitUntil(async () => {
+        const source = await this.driver.getPageSource().catch(() => '');
+        return /buybox|add.to.cart|buy.now|qualifiedBuyBox|mobileBuybox/i.test(source);
+      }, {
+        timeout: Math.min(this.iosTimeout || this.timeout, 30000),
+        interval: 1500,
+        timeoutMsg: 'Timed out waiting for buy box to render on product page'
+      });
+    } catch (_) {
+      logger.warn('[AmazonIOSSafariPage] Buy box wait timed out — proceeding with selector scan anyway');
+    }
 
     const allErrors = [];
 
@@ -523,7 +701,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
 
           logger.info(`[AmazonIOSSafariPage] Clicking Add to Cart via selector: "${selector}"`);
           await element.click();
-          await this.driver.pause(3000);
+          await this.cp.waitForPageStabilized({ timeout: this.cp.getTimeout(8000), checkLoaders: false }).catch(function() {});
           logger.info('[AmazonIOSSafariPage] Add to Cart clicked successfully.');
           return true;
         }
@@ -587,11 +765,13 @@ class AmazonIOSSafariPage extends MobileBasePage {
   // ═════════════════════════════════════════════════════════════════════════
 
   async openCartPage() {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("openCartPage", { screen: "CART_PAGE" });
     await this.openUrlAndWaitForAmazon('https://www.amazon.in/cart', 'cart page');
   }
 
   async verifyCartPageVisible() {
+    await this._dismissSignInBottomSheet();
     await this.waitForAmazonUrl('cart page');
     await this.waitForSourceText(/shopping cart|cart|basket|subtotal|proceed to buy|smart wagon|your items|cart total|item total/i);
   }
@@ -601,6 +781,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
   }
 
   async verifyProceedToBuyButtonIfCartHasItems() {
+    await this._dismissSignInBottomSheet();
     const source = await this.driver.getPageSource();
     if (/proceed to buy|subtotal|proceed to checkout|smart wagon|checkout/i.test(source)) return;
     await this.verifyCartTitleOrEmptyMessage();
@@ -621,6 +802,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
    * @throws {Error} If no delete button could be found after all attempts
    */
   async removeItemFromCart() {
+    await this._dismissSignInBottomSheet();
     await this._logActionStart("removeItemFromCart", { screen: "CART_PAGE" });
 
     const currentUrl = await this.driver.getUrl().catch(() => '');
@@ -692,7 +874,8 @@ class AmazonIOSSafariPage extends MobileBasePage {
 
           logger.info(`[AmazonIOSSafariPage] Clicking delete via ${source} selector: "${selector}"`);
           await element.click();
-          await this.driver.pause(3000);
+          await this.cp.waitForPageStabilized({ timeout: this.cp.getTimeout(8000), checkLoaders: false }).catch(function() {});
+          await this.driver.pause(500);
 
           // Verify the item was removed (page should update)
           const removalConfirmed = await this._confirmItemRemoved();
@@ -735,7 +918,8 @@ class AmazonIOSSafariPage extends MobileBasePage {
 
           logger.info(`[AmazonIOSSafariPage] Clicking delete via XPath`);
           await element.click();
-          await this.driver.pause(3000);
+          await this.cp.waitForPageStabilized({ timeout: this.cp.getTimeout(8000), checkLoaders: false }).catch(function() {});
+          await this.driver.pause(500);
 
           const removalConfirmed = await this._confirmItemRemoved();
           if (removalConfirmed) {
@@ -1507,7 +1691,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
         lastUrl = await this.driver.getUrl().catch(() => '');
         return /amazon\.in/i.test(lastUrl);
       }, {
-        timeout: Math.min(this.timeout, 30000),
+        timeout: Math.min(this.iosTimeout || this.timeout, 45000),
         interval: 1500,
         timeoutMsg: `Timed out waiting for Safari to navigate to Amazon after opening ${description}`
       }).then(() => true).catch(() => false);
@@ -1534,7 +1718,7 @@ class AmazonIOSSafariPage extends MobileBasePage {
       currentUrl = await this.driver.getUrl().catch(() => '');
       return /amazon\.in/i.test(currentUrl);
     }, {
-      timeout: Math.min(this.timeout, 30000),
+      timeout: Math.min(this.iosTimeout || this.timeout, 45000),
       interval: 1000,
       timeoutMsg: `Timed out waiting for Amazon URL while opening ${description}. Current URL: ${currentUrl || 'unknown'}`
     });
@@ -1576,7 +1760,26 @@ class AmazonIOSSafariPage extends MobileBasePage {
       await this.driver.pause(2000);
     } finally {
       if (previousContext) {
-        await this.driver.switchContext(previousContext).catch(() => {});
+        // Restore previous context (WEBVIEW)
+        const restored = await this.driver.switchContext(previousContext)
+          .then(() => true).catch(() => false);
+
+        if (!restored) {
+          // Context switch failed — re-query available contexts and find WEBVIEW
+          logger.warn('[AmazonIOSSafariPage] Failed to restore context ' + previousContext + ' — re-querying contexts');
+          try {
+            const contexts = await this.driver.getContexts().catch(() => []);
+            const webview = contexts.find(function(c) { return String(c).toLowerCase().includes('webview'); });
+            if (webview) {
+              await this.driver.switchContext(webview);
+              logger.info('[AmazonIOSSafariPage] Switched to WebView context: ' + webview);
+            } else {
+              logger.warn('[AmazonIOSSafariPage] No WebView context available after native interaction');
+            }
+          } catch (ctxErr) {
+            logger.warn('[AmazonIOSSafariPage] Context re-query failed: ' + ctxErr.message);
+          }
+        }
       }
     }
   }
