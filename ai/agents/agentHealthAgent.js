@@ -15,7 +15,8 @@ const path = require('path');
 const REPORTS_DIR = path.join(process.cwd(), 'reports', 'ai');
 
 class AgentHealthAgent {
-  async run(input = {}) {
+  async run(input) {
+    if (!input) input = {};
     console.log('[AgentHealthAgent] Generating agent health reports');
 
     const healthTracker = require('../core/AgentHealthTracker');
@@ -28,14 +29,14 @@ class AgentHealthAgent {
 
     // Report 1: Agent Health
     results.healthReport = await this._generateHealthReport(healthTracker, registry);
-    
+
     // Report 2: Agent Performance
     results.performanceReport = await this._generatePerformanceReport(healthTracker, registry);
-    
+
     // Report 3: Agent Latency
     results.latencyReport = await this._generateLatencyReport(healthTracker, registry);
 
-    console.log(`[AgentHealthAgent] Reports generated: ${Object.keys(results).length}`);
+    console.log('[AgentHealthAgent] Reports generated: ' + Object.keys(results).length);
     return results;
   }
 
@@ -43,7 +44,7 @@ class AgentHealthAgent {
     const allHealth = healthTracker.getAllHealth();
     const summary = healthTracker.getSummary();
     const data = registry.getAll();
-    const allKeys = new Set(data.map(a => a.key));
+    const allKeys = new Set(data.map(function(a) { return a.key; }));
 
     const md = [];
     md.push('# Agent Health Report');
@@ -67,21 +68,23 @@ class AgentHealthAgent {
     md.push('| Agent | Health | Status | Runs | Success Rate | Last Duration | Last Execution |');
     md.push('|---|---|---|---|---|---|---|');
 
-    const sorted = Object.entries(allHealth).sort((a, b) => {
-      const healthOrder = { critical: 0, degraded: 1, unknown: 2, healthy: 3 };
+    var sorted = Object.entries(allHealth).sort(function(a, b) {
+      var healthOrder = { critical: 0, degraded: 1, unknown: 2, healthy: 3 };
       return (healthOrder[a[1].health] || 99) - (healthOrder[b[1].health] || 99);
     });
 
-    for (const [key, entry] of sorted) {
-      if (!allKeys.has(key)) continue; // Only show agents still in registry
-      const icon = entry.health === 'healthy' ? '✅' : entry.health === 'degraded' ? '⚠️' : entry.health === 'critical' ? '❌' : '❓';
-      const lastExec = entry.lastExecution ? new Date(entry.lastExecution).toISOString().slice(0, 19) : 'never';
-      const dur = entry.lastDuration ? entry.lastDuration + 'ms' : '-';
-      md.push(`| ${icon} ${key} | ${entry.health} | ${entry.lastStatus} | ${entry.totalRuns} | ${entry.successRate}% | ${dur} | ${lastExec} |`);
+    for (var si = 0; si < sorted.length; si++) {
+      var key = sorted[si][0];
+      var entry = sorted[si][1];
+      if (!allKeys.has(key)) continue;
+      var icon = entry.health === 'healthy' ? '✅' : entry.health === 'degraded' ? '⚠️' : entry.health === 'critical' ? '❌' : '❓';
+      var lastExec = entry.lastExecution ? new Date(entry.lastExecution).toISOString().slice(0, 19) : 'never';
+      var dur = entry.lastDuration ? entry.lastDuration + 'ms' : '-';
+      md.push('| ' + icon + ' ' + key + ' | ' + entry.health + ' | ' + entry.lastStatus + ' | ' + entry.totalRuns + ' | ' + entry.successRate + '% | ' + dur + ' | ' + lastExec + ' |');
     }
 
     md.push('');
-    const outPath = path.join(REPORTS_DIR, 'agent-health.md');
+    var outPath = path.join(REPORTS_DIR, 'agent-health.md');
     fs.writeFileSync(outPath, md.join('\n'), 'utf8');
     return { path: outPath };
   }
@@ -102,38 +105,40 @@ class AgentHealthAgent {
     md.push('| Agent | Runs | Success | Failures | Skips | Success Rate | Consecutive Failures |');
     md.push('|---|---|---|---|---|---|---|');
 
-    const sorted = Object.entries(allHealth)
-      .filter(([, e]) => e.totalRuns > 0 || e.totalSkips > 0)
-      .sort((a, b) => (b[1].totalRuns || 0) - (a[1].totalRuns || 0));
+    var sorted = Object.entries(allHealth)
+      .filter(function(e) { return e[1].totalRuns > 0 || e[1].totalSkips > 0; })
+      .sort(function(a, b) { return (b[1].totalRuns || 0) - (a[1].totalRuns || 0); });
 
-    for (const [key, entry] of sorted) {
-      const rate = entry.successRate + '%';
-      md.push(`| ${key} | ${entry.totalRuns} | ${entry.successCount} | ${entry.failureCount} | ${entry.totalSkips || 0} | ${rate} | ${entry.consecutiveFailures} |`);
+    for (var si = 0; si < sorted.length; si++) {
+      var key = sorted[si][0];
+      var entry = sorted[si][1];
+      var rate = entry.successRate + '%';
+      md.push('| ' + key + ' | ' + entry.totalRuns + ' | ' + entry.successCount + ' | ' + entry.failureCount + ' | ' + (entry.totalSkips || 0) + ' | ' + rate + ' | ' + entry.consecutiveFailures + ' |');
     }
 
     md.push('');
     md.push('## Top Performers');
     md.push('');
-    const top = Object.entries(allHealth)
-      .filter(([, e]) => e.totalRuns > 0)
-      .sort((a, b) => (b[1].successRate || 0) - (a[1].successRate || 0))
+    var top = Object.entries(allHealth)
+      .filter(function(e) { return e[1].totalRuns > 0; })
+      .sort(function(a, b) { return (b[1].successRate || 0) - (a[1].successRate || 0); })
       .slice(0, 5);
-    for (const [key, entry] of top) {
-      md.push(`- **${key}**: ${entry.successRate}% success (${entry.successCount}/${entry.totalRuns})`);
+    for (var ti = 0; ti < top.length; ti++) {
+      md.push('- **' + top[ti][0] + '**: ' + top[ti][1].successRate + '% success (' + top[ti][1].successCount + '/' + top[ti][1].totalRuns + ')');
     }
 
     md.push('');
     md.push('## Needs Attention');
     md.push('');
-    const bottom = Object.entries(allHealth)
-      .filter(([, e]) => e.totalRuns > 0)
-      .sort((a, b) => (a[1].successRate || 0) - (b[1].successRate || 0))
+    var bottom = Object.entries(allHealth)
+      .filter(function(e) { return e[1].totalRuns > 0; })
+      .sort(function(a, b) { return (a[1].successRate || 0) - (b[1].successRate || 0); })
       .slice(0, 5);
-    for (const [key, entry] of bottom) {
-      md.push(`- **${key}**: ${entry.successRate}% success (${entry.successCount}/${entry.totalRuns}) - ${entry.lastError || 'no error info'}`);
+    for (var bi = 0; bi < bottom.length; bi++) {
+      md.push('- **' + bottom[bi][0] + '**: ' + bottom[bi][1].successRate + '% success (' + bottom[bi][1].successCount + '/' + bottom[bi][1].totalRuns + ') - ' + (bottom[bi][1].lastError || 'no error info'));
     }
 
-    const outPath = path.join(REPORTS_DIR, 'agent-performance.md');
+    var outPath = path.join(REPORTS_DIR, 'agent-performance.md');
     fs.writeFileSync(outPath, md.join('\n'), 'utf8');
     return { path: outPath };
   }
@@ -151,24 +156,26 @@ class AgentHealthAgent {
     md.push('| Agent | Last Duration | Health | Priority | Stage |');
     md.push('|---|---|---|---|---|');
 
-    const sorted = Object.entries(allHealth)
-      .filter(([, e]) => e.lastDuration > 0)
-      .sort((a, b) => b[1].lastDuration - a[1].lastDuration);
+    var sorted = Object.entries(allHealth)
+      .filter(function(e) { return e[1].lastDuration > 0; })
+      .sort(function(a, b) { return b[1].lastDuration - a[1].lastDuration; });
 
-    for (const [key, entry] of sorted) {
-      const dur = entry.lastDuration + 'ms';
-      const healthIcon = entry.health === 'healthy' ? '✅' : entry.health === 'degraded' ? '⚠️' : '❌';
-      md.push(`| ${key} | ${dur} | ${healthIcon} ${entry.health} | ${entry.priority} | ${entry.stage} |`);
+    for (var si = 0; si < sorted.length; si++) {
+      var key = sorted[si][0];
+      var entry = sorted[si][1];
+      var dur = entry.lastDuration + 'ms';
+      var healthIcon = entry.health === 'healthy' ? '✅' : entry.health === 'degraded' ? '⚠️' : '❌';
+      md.push('| ' + key + ' | ' + dur + ' | ' + healthIcon + ' ' + entry.health + ' | ' + entry.priority + ' | ' + entry.stage + ' |');
     }
 
     md.push('');
     md.push('## Latency Distribution');
     md.push('');
-    const durations = Object.values(allHealth).map(e => e.lastDuration).filter(d => d > 0);
+    var durations = Object.values(allHealth).map(function(e) { return e.lastDuration; }).filter(function(d) { return d > 0; });
     if (durations.length > 0) {
-      const avg = Math.round(durations.reduce((s, d) => s + d, 0) / durations.length);
-      const max = Math.max(...durations);
-      const min = Math.min(...durations);
+      var avg = Math.round(durations.reduce(function(s, d) { return s + d; }, 0) / durations.length);
+      var max = Math.max.apply(null, durations);
+      var min = Math.min.apply(null, durations);
       md.push('| Metric | Value |');
       md.push('|---|---|');
       md.push('| Average Latency | ' + avg + 'ms |');
@@ -177,13 +184,14 @@ class AgentHealthAgent {
       md.push('| Agents Tracked | ' + durations.length + ' |');
     }
 
-    const outPath = path.join(REPORTS_DIR, 'agent-latency.md');
+    var outPath = path.join(REPORTS_DIR, 'agent-latency.md');
     fs.writeFileSync(outPath, md.join('\n'), 'utf8');
     return { path: outPath };
   }
 }
 
-module.exports = AgentHealthAgent;
+var instance = new AgentHealthAgent();
+module.exports = instance;
 
 module.exports.metadata = {
   name: 'Agent Health Agent',

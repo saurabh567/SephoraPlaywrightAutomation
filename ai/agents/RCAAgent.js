@@ -4,10 +4,8 @@ const path = require('path');
 
 // Strategy Pattern: RCAAgent is the OWNER of root cause analysis.
 // Delegates to failureAnalysisAgent (RAG strategy) when mode=rag,
-// rootCauseAnalysisAgent (LLM strategy) when mode=llm,
 // or runs its own static classification (default).
 const failureAnalysisAgent = require("./failureAnalysisAgent");
-const rootCauseAnalysisAgent = require("./rootCauseAnalysisAgent");
 
 
 const FAILURE_CATEGORIES = {
@@ -77,66 +75,82 @@ function classifyError(errorMessage) {
 }
 
 function extractLocatorFromError(errorMessage) {
-  const patterns = [
+  if (!errorMessage) return null;
+  var patterns = [
     /locator[:\s]+["']([^"']+)["']/i,
     /selector[:\s]+["']([^"']+)["']/i,
     /element[:\s]+["']([^"']+)["']/i,
     /["']([\w\-.#\[\]=\s]+)["']/
   ];
-  for (const p of patterns) {
-    const m = errorMessage && errorMessage.match(p);
+  for (var pi = 0; pi < patterns.length; pi++) {
+    var m = errorMessage.match(patterns[pi]);
     if (m) return m[1];
   }
   return null;
 }
 
+function getRecommendation(category, locator) {
+  var recs = {
+    LOCATOR_ISSUE: locator
+      ? 'The locator `' + locator + '` is unstable. Consider using a more robust selector (data-testid, role, or ID-based). Run locator healing to find alternatives.'
+      : 'Locator is failing. Consider using more robust selectors like data-testid or role-based locators.',
+    ENVIRONMENT_ISSUE: 'Check browser/driver versions, Appium status, emulator/device availability, and environment variables.',
+    NETWORK_ISSUE: 'Check network connectivity, proxy settings, VPN status, and API endpoint availability.',
+    APPLICATION_ISSUE: 'This is likely an application bug. Verify manually and create a defect ticket.',
+    TEST_ISSUE: 'Review test logic for correctness. Check assertions and expected values match actual application behavior.',
+    DATA_ISSUE: 'Verify test data exists and is correctly configured. Check test-data files and environment variables.',
+    UNKNOWN: 'Manual investigation needed. Check screenshots, videos, and traces in reports/ directory.'
+  };
+  return recs[category] || recs.UNKNOWN;
+}
+
 module.exports = {
-  run: async function run(input = {}) {
+  run: async function run(input) {
+    if (!input) input = {};
     console.log("[RCAAgent] Performing root cause analysis");
 
-    // Strategy Pattern delegation
-    const mode = input.mode || "static";
+    // Strategy Pattern delegation — RAG mode delegates to failureAnalysisAgent
+    var mode = input.mode || "static";
     if (mode === "rag") {
       console.log("[RCAAgent] Delegating to RAG strategy (failureAnalysisAgent)");
       try {
-        const ragResult = await failureAnalysisAgent.analyzeWithRag(input);
+        var ragResult = await failureAnalysisAgent.analyzeWithRag(input);
         return { ok: true, strategy: "rag", result: ragResult, totalFailures: ragResult.failedScenarios || 0 };
       } catch (err) {
         console.warn("[RCAAgent] RAG strategy failed, falling back to static:", err.message);
       }
     }
-    if (mode === "llm") {
-      console.log("[RCAAgent] Delegating to LLM strategy (rootCauseAnalysisAgent)");
-      try {
-        const llmResult = await rootCauseAnalysisAgent.run(input);
-        return { ok: true, strategy: "llm", result: llmResult };
-      } catch (err) {
-        console.warn("[RCAAgent] LLM strategy failed, falling back to static:", err.message);
-      }
-    }
 
-    // Default: static classification (original implementation)
-
-    const reportPath = path.join(process.cwd(), 'reports/json/cucumber-report.json');
-    const failures = [];
+    // Default: static classification
+    var reportPath = path.join(process.cwd(), 'reports/json/cucumber-report.json');
+    var failures = [];
 
     if (fs.existsSync(reportPath)) {
       try {
-        const report = fs.readJsonSync(reportPath);
-        const features = Array.isArray(report) ? report : [];
+        var report = fs.readJsonSync(reportPath);
+        var features = Array.isArray(report) ? report : [];
 
-        for (const feature of features) {
-          const elements = feature.elements || [];
-          for (const element of elements) {
+        for (var fi = 0; fi < features.length; fi++) {
+          var feature = features[fi];
+          var elements = feature.elements || [];
+          for (var ei = 0; ei < elements.length; ei++) {
+            var element = elements[ei];
             if (element.type !== 'scenario') continue;
-            const failedStep = (element.steps || []).find(s => s.result?.status === 'failed');
+            var steps = element.steps || [];
+            var failedStep = null;
+            for (var si = 0; si < steps.length; si++) {
+              if (steps[si].result && steps[si].result.status === 'failed') {
+                failedStep = steps[si];
+                break;
+              }
+            }
             if (!failedStep) continue;
 
             failures.push({
               feature: feature.name || 'Unknown Feature',
               scenario: element.name || 'Unknown Scenario',
               step: failedStep.name || '',
-              error: failedStep.result?.error_message || 'No error message',
+              error: (failedStep.result && failedStep.result.error_message) || 'No error message',
               uri: feature.uri || '',
               line: element.line || 0
             });
@@ -148,85 +162,93 @@ module.exports = {
     }
 
     if (!failures.length) {
-      const outPath = path.join(process.cwd(), 'reports/ai', 'root-cause.md');
+      var outPath = path.join(process.cwd(), 'reports/ai', 'root-cause.md');
       fs.ensureDirSync(path.dirname(outPath));
       fs.writeFileSync(outPath, '# Root Cause Analysis\n\nNo failures detected.\n', 'utf8');
       return { ok: true, skipped: true, reason: 'No failures found', totalFailures: 0 };
     }
 
-    console.log(`[RCAAgent] Analyzing ${failures.length} failures`);
+    console.log("[RCAAgent] Analyzing " + failures.length + " failures");
 
-    const analysis = failures.map(f => {
-      const classification = classifyError(f.error);
-      const locator = extractLocatorFromError(f.error);
-
-      return {
+    var analysis = [];
+    for (var fi2 = 0; fi2 < failures.length; fi2++) {
+      var f = failures[fi2];
+      var classification = classifyError(f.error);
+      var locator = extractLocatorFromError(f.error);
+      var catInfo = FAILURE_CATEGORIES[classification.category];
+      analysis.push({
         feature: f.feature,
         scenario: f.scenario,
         step: f.step,
         error: f.error.slice(0, 500),
         classification: {
           category: classification.category,
-          label: FAILURE_CATEGORIES[classification.category]?.label || 'Unknown',
-          severity: FAILURE_CATEGORIES[classification.category]?.severity || 'low',
+          label: catInfo ? catInfo.label : 'Unknown',
+          severity: catInfo ? catInfo.severity : 'low',
           confidence: classification.score,
           locator: locator
         },
         recommendation: getRecommendation(classification.category, locator)
-      };
-    });
+      });
+    }
 
     // Aggregate statistics
-    const categoryCount = {};
-    const severityCount = {};
-    for (const a of analysis) {
-      const cat = a.classification.category;
+    var categoryCount = {};
+    var severityCount = {};
+    for (var ai = 0; ai < analysis.length; ai++) {
+      var a = analysis[ai];
+      var cat = a.classification.category;
       categoryCount[cat] = (categoryCount[cat] || 0) + 1;
-      const sev = a.classification.severity;
+      var sev = a.classification.severity;
       severityCount[sev] = (severityCount[sev] || 0) + 1;
     }
 
-    const totalFailures = analysis.length;
+    var totalFailures = failures.length;
 
     // Write report
-    const outPath = path.join(process.cwd(), 'reports/ai', 'root-cause.md');
+    var outPath = path.join(process.cwd(), 'reports/ai', 'root-cause.md');
     fs.ensureDirSync(path.dirname(outPath));
 
-    const lines = [];
+    var lines = [];
     lines.push('# Root Cause Analysis');
     lines.push('');
-    lines.push(`Generated: ${new Date().toISOString()}`);
-    lines.push(`Total Failures Analyzed: ${totalFailures}`);
+    lines.push('Generated: ' + new Date().toISOString());
+    lines.push('Total Failures Analyzed: ' + totalFailures);
     lines.push('');
     lines.push('## Classification Summary');
     lines.push('');
     lines.push('| Category | Count | Percentage |');
     lines.push('|---|---|---|');
-    for (const [cat, count] of Object.entries(categoryCount)) {
-      const label = FAILURE_CATEGORIES[cat]?.label || cat;
-      lines.push(`| ${label} | ${count} | ${((count / totalFailures) * 100).toFixed(1)}% |`);
+    var catKeys = Object.keys(categoryCount);
+    for (var cki = 0; cki < catKeys.length; cki++) {
+      var cat = catKeys[cki];
+      var count = categoryCount[cat];
+      var label = (FAILURE_CATEGORIES[cat] && FAILURE_CATEGORIES[cat].label) || cat;
+      lines.push('| ' + label + ' | ' + count + ' | ' + ((count / totalFailures) * 100).toFixed(1) + '% |');
     }
     lines.push('');
     lines.push('| Severity | Count |');
     lines.push('|---|---|');
-    for (const [sev, count] of Object.entries(severityCount)) {
-      lines.push(`| ${sev} | ${count} |`);
+    var sevKeys = Object.keys(severityCount);
+    for (var ski = 0; ski < sevKeys.length; ski++) {
+      lines.push('| ' + sevKeys[ski] + ' | ' + severityCount[sevKeys[ski]] + ' |');
     }
     lines.push('');
     lines.push('## Detailed Analysis');
     lines.push('');
 
-    for (const a of analysis) {
-      lines.push(`### ${a.scenario}`);
-      lines.push(`- **Feature**: ${a.feature}`);
-      lines.push(`- **Failed Step**: ${a.step}`);
-      lines.push(`- **Classification**: ${a.classification.label} (confidence: ${(a.classification.confidence * 100).toFixed(0)}%)`);
-      lines.push(`- **Severity**: ${a.classification.severity}`);
+    for (var ai2 = 0; ai2 < analysis.length; ai2++) {
+      var a = analysis[ai2];
+      lines.push('### ' + a.scenario);
+      lines.push('- **Feature**: ' + a.feature);
+      lines.push('- **Failed Step**: ' + a.step);
+      lines.push('- **Classification**: ' + a.classification.label + ' (confidence: ' + (a.classification.confidence * 100).toFixed(0) + '%)');
+      lines.push('- **Severity**: ' + a.classification.severity);
       if (a.classification.locator) {
-        lines.push(`- **Problematic Locator**: \`${a.classification.locator}\``);
+        lines.push('- **Problematic Locator**: `' + a.classification.locator + '`');
       }
-      lines.push(`- **Error**: \`\`\`\n${a.error.slice(0, 300)}\n\`\`\``);
-      lines.push(`- **Recommendation**: ${a.recommendation}`);
+      lines.push('- **Error**: ```\n' + a.error.slice(0, 300) + '\n```');
+      lines.push('- **Recommendation**: ' + a.recommendation);
       lines.push('');
     }
 
@@ -235,28 +257,13 @@ module.exports = {
     return {
       ok: true,
       report: path.relative(process.cwd(), outPath),
-      totalFailures,
+      totalFailures: totalFailures,
       categoryDistribution: categoryCount,
       severityDistribution: severityCount,
-      analysis
+      analysis: analysis
     };
   }
 };
-
-function getRecommendation(category, locator) {
-  const recs = {
-    LOCATOR_ISSUE: locator
-      ? `The locator \`${locator}\` is unstable. Consider using a more robust selector (data-testid, role, or ID-based). Run locator healing to find alternatives.`
-      : 'Locator is failing. Consider using more robust selectors like data-testid or role-based locators.',
-    ENVIRONMENT_ISSUE: 'Check browser/driver versions, Appium status, emulator/device availability, and environment variables.',
-    NETWORK_ISSUE: 'Check network connectivity, proxy settings, VPN status, and API endpoint availability.',
-    APPLICATION_ISSUE: 'This is likely an application bug. Verify manually and create a defect ticket.',
-    TEST_ISSUE: 'Review test logic for correctness. Check assertions and expected values match actual application behavior.',
-    DATA_ISSUE: 'Verify test data exists and is correctly configured. Check test-data files and environment variables.',
-    UNKNOWN: 'Manual investigation needed. Check screenshots, videos, and traces in reports/ directory.'
-  };
-  return recs[category] || recs.UNKNOWN;
-}
 
 
 // Auto-registered metadata for AgentRegistry

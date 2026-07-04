@@ -9,7 +9,6 @@ module.exports = {
 
   // Analysis agents
   failureAnalysis: require('./failureAnalysisAgent'),
-  rootCauseAnalysis: require('./rootCauseAnalysisAgent'),
   playwrightCodeReview: require('./playwrightCodeReviewAgent'),
   reportSummarization: require('./reportSummarizationAgent'),
 

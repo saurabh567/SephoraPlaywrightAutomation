@@ -1,5 +1,5 @@
 {
-  "indexedAt": "2026-07-04T18:51:31.519Z",
+  "indexedAt": "2026-07-04T19:42:20.113Z",
   "categories": {
     "features": [
       {
@@ -95,36 +95,12 @@
     ],
     "aiReports": [
       {
-        "name": "agent-health.md",
-        "size": "4.2 KB"
-      },
-      {
-        "name": "agent-latency.md",
-        "size": "0.6 KB"
-      },
-      {
-        "name": "agent-performance.md",
-        "size": "1.1 KB"
-      },
-      {
         "name": "api-analysis-report.md",
         "size": "1.0 KB"
       },
       {
-        "name": "impact-analysis.md",
-        "size": "4.9 KB"
-      },
-      {
-        "name": "production-monitoring.md",
-        "size": "0.5 KB"
-      },
-      {
         "name": "vector-search-results.json",
         "size": "0.1 KB"
-      },
-      {
-        "name": "visual-validation.md",
-        "size": "0.4 KB"
       }
     ]
   }

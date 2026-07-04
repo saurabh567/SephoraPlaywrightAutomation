@@ -121,10 +121,45 @@ class AmazonProductDetailsPage {
     this.price = page.locator('.a-price .a-offscreen, #corePriceDisplay_desktop_feature_div .a-offscreen').first();
     this.rating = page.locator('#acrPopover, span[data-hook="rating-out-of-text"]').first();
     this.quantityDropdown = page.locator('#quantity').first();
-    this.addToCartButton = page.locator('#add-to-cart-button').first();
-    this.buyNowButton = page.locator('#buy-now-button').first();
     this.cartConfirmation = page.getByText(/added to cart|added to basket/i).first();
     this.cartLink = page.locator('#nav-cart').first();
+  }
+
+  /**
+   * Find the "Add to Cart" button using multiple locator strategies.
+   * Amazon India product pages vary widely — some use #add-to-cart-button,
+   * others use input[name="submit.add-to-cart"], text-based buttons, etc.
+   * Products with variations may show "See all buying options" instead.
+   */
+  async _findAddToCartButton() {
+    const strategies = [
+      // Standard desktop button
+      () => this.page.locator('#add-to-cart-button').first(),
+      // Alternate form submit input
+      () => this.page.locator('input[name="submit.add-to-cart"]').first(),
+      // Button with "Add to Cart" text (case-insensitive)
+      () => this.page.getByRole('button', { name: /add to cart/i }).first(),
+      // Any element with add-to-cart in ID or name
+      () => this.page.locator('[id*="add-to-cart"], [name*="add-to-cart"]').first(),
+      // Buy Now button as fallback
+      () => this.page.locator('#buy-now-button').first(),
+      // "See all buying options" for products with variations
+      () => this.page.getByRole('button', { name: /see all buying options/i }).first(),
+    ];
+
+    for (const strategy of strategies) {
+      try {
+        const btn = strategy();
+        const visible = await btn.isVisible({ timeout: 3000 }).catch(() => false);
+        if (visible) {
+          return btn;
+        }
+      } catch (_) {
+        // continue to next strategy
+      }
+    }
+
+    return null;
   }
 
   async openProductPage(productUrl) {
@@ -142,12 +177,34 @@ class AmazonProductDetailsPage {
 
   async addToCartIfAvailable() {
     if (this._mobile) return this._mobile.addToCartIfAvailable();
-    const canAddToCart = await this.addToCartButton.isVisible({ timeout: 10000 }).catch(() => false);
-    if (!canAddToCart) {
+
+    const addBtn = await this._findAddToCartButton();
+    if (!addBtn) {
+      logger.warn('[AmazonProductDetailsPage] No Add-to-Cart / Buy Now button found on product page');
       return false;
     }
-    await this.addToCartButton.click();
+
+    const buttonText = await addBtn.textContent().catch(() => '');
+    const isBuyingOptions = /see all buying options/i.test(buttonText);
+
+    await addBtn.click();
     await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
+
+    // If it was "See all buying options", a new section or popover appears
+    // with actual add-to-cart choices — wait briefly then try the primary
+    // add-to-cart button that appears after.
+    if (isBuyingOptions) {
+      await this.page.waitForTimeout(2000);
+      const innerBtn = await this._findAddToCartButton();
+      if (innerBtn) {
+        const innerText = await innerBtn.textContent().catch(() => '');
+        if (!/see all buying options/i.test(innerText)) {
+          await innerBtn.click();
+          await this.page.waitForLoadState('domcontentloaded').catch(() => undefined);
+        }
+      }
+    }
+
     return true;
   }
 

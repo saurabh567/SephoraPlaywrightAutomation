@@ -1,6 +1,6 @@
 # AI Knowledge Base Index
 
-Indexed At: 2026-07-04T18:51:31.519Z
+Indexed At: 2026-07-04T19:42:20.113Z
 Agent: UnifiedMCPOrchestratorAgent v1.0.0
 
 ## Categories
@@ -34,17 +34,11 @@ Agent: UnifiedMCPOrchestratorAgent v1.0.0
 
 - validation-test (undefined)
 
-### aiReports (8 files)
+### aiReports (2 files)
 
-- agent-health.md (4.2 KB)
-- agent-latency.md (0.6 KB)
-- agent-performance.md (1.1 KB)
 - api-analysis-report.md (1.0 KB)
-- impact-analysis.md (4.9 KB)
-- production-monitoring.md (0.5 KB)
 - vector-search-results.json (0.1 KB)
-- visual-validation.md (0.4 KB)
 
 ---
-Total Files Indexed: 28
+Total Files Indexed: 22
 Categories: 4

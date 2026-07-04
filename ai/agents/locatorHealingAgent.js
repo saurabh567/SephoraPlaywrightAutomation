@@ -6,7 +6,19 @@ const { readCucumberSummary } = require('../tools/cucumberReportReader');
 const LocatorApplier = require('./locatorHealingApplier');
 const LocatorAnalyzer = require('../tools/locatorAnalyzer');
 const timestamp = () => new Date().toISOString().replace(/[:.]/g,'-');
-const HealingAgent = require("./HealingAgent");
+
+// Lazy require to avoid circular dependency with HealingAgent
+let HealingAgent = null;
+function getHealingAgent() {
+  if (!HealingAgent) {
+    try {
+      HealingAgent = require("./HealingAgent");
+    } catch (_) {
+      // HealingAgent may not be available (circular dep or missing)
+    }
+  }
+  return HealingAgent;
+}
 
 
 const agent = new BaseAgent({
@@ -113,7 +125,7 @@ agent.analyzeFailures = async function analyzeFailures(input = {}) {
   fs.writeJsonSync(proposalsPath, { generatedAt: new Date().toISOString(), proposals }, { spaces: 2 });
 
   const reportPath = path.join(process.cwd(), 'reports', 'ai', 'locator-healing-report.md');
-  const header = `# Locator Healing Report\\n\\nGenerated: ${new Date().toISOString()}\\n\\nSummary: ${proposals.length} proposals\\n\\n`;
+  const header = `# Locator Healing Report\n\nGenerated: ${new Date().toISOString()}\n\nSummary: ${proposals.length} proposals\n\n`;
   fs.writeFileSync(reportPath, header);
 
   return { proposalsPath: path.relative(process.cwd(), proposalsPath), reportPath: path.relative(process.cwd(), reportPath), proposals };
@@ -155,23 +167,39 @@ agent.rollback = async function rollback(backupRoot) {
 
 // run supports modes: 'recommend' (RAG), 'analyze' (static), 'apply' (apply low-risk)
 agent.run = async function run(input = {}) {
+  // Resolve mode FIRST to avoid TDZ ReferenceError
+  const mode = input.mode || 'recommend';
+
   // Strategy Pattern: engine mode delegates to HealingAgent (LocatorHealingEngine-based)
   if (mode === "engine") {
     console.log("[locatorHealingAgent] Delegating to engine strategy (HealingAgent)");
-    try {
-      const engineResult = await HealingAgent.run(input);
-      return engineResult;
-    } catch (err) {
-      console.warn("[locatorHealingAgent] Engine strategy failed, falling back to RAG:", err.message);
+    const engine = getHealingAgent();
+    if (engine) {
+      try {
+        const engineResult = await engine.run(input);
+        return engineResult;
+      } catch (err) {
+        console.warn("[locatorHealingAgent] Engine strategy failed, falling back to RAG:", err.message);
+      }
+    } else {
+      console.warn("[locatorHealingAgent] HealingAgent unavailable, falling back to RAG");
     }
   }
 
-
-  const mode = input.mode || 'recommend';
   if (mode === 'recommend') {
-    const r = await agent.suggestWithRag(input);
-    return r.response || r.reason;
+    // RAG recommend mode — catch Ollama/Chroma failures and fall back to static analysis
+    try {
+      const r = await agent.suggestWithRag(input);
+      if (r && r.response) return r.response;
+      if (r && r.reason) return r.reason;
+      return r;
+    } catch (ragErr) {
+      console.warn("[locatorHealingAgent] RAG recommend failed (" + ragErr.message + "), falling back to static analysis");
+      const analysisResult = await agent.analyzeFailures(input);
+      return analysisResult;
+    }
   }
+
   if (mode === 'analyze') {
     return agent.analyzeFailures(input);
   }
