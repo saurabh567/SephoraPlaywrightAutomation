@@ -72,3 +72,7 @@ traces/
 
 # Temp fix files
 _fix_*.js
+
+# Xcode / WebDriverAgent build artifacts
+mobile/build/
+mobile/build/wda-derived-data/
