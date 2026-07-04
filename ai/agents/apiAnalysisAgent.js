@@ -485,3 +485,35 @@ class ApiAnalysisAgentWrapper {
   }
 }
 module.exports = ApiAnalysisAgentWrapper;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "API Analysis Agent",
+  "version": "1.0.0",
+  "description": "Reads API test results, analyzes pass/fail metrics, generates AI analysis report",
+  "dependencies": ["APIAgent"],
+  "platforms": [
+    "API"
+  ],
+  "tags": [
+    "api",
+    "analysis"
+  ],
+  "executionStage": "analysis",
+  "priority": 60,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "api"
+    },
+    {
+      "type": "hasResults"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

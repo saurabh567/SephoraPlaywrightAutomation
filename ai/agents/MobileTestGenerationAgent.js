@@ -726,3 +726,33 @@ if (require.main === module) {
 }
 
 module.exports = MobileTestGenerationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Mobile Test Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates Appium native/hybrid tests, page objects, locators, and flows",
+  "dependencies": ["AppiumAgent"],
+  "platforms": [
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "mobile",
+    "generation"
+  ],
+  "executionStage": "execution",
+  "priority": 40,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "mobile"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

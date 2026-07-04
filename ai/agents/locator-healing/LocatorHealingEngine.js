@@ -495,3 +495,33 @@ class LocatorHealingEngine {
 }
 
 module.exports = LocatorHealingEngine;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator Healing Engine",
+  "version": "1.0.0",
+  "description": "Complete locator healing workflow: candidate generation, scoring, application, reporting",
+  "dependencies": [
+    "LocatorHistoryStore",
+    "LocatorConfidenceScorer",
+    "locatorHealingApplier"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "engine"
+  ],
+  "executionStage": "analysis",
+  "priority": 50,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "internal"
+};

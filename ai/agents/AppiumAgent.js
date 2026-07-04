@@ -56,3 +56,33 @@ if (require.main === module) {
 }
 
 module.exports = AppiumAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Appium Server Agent",
+  "version": "1.0.0",
+  "description": "Appium server lifecycle management (start/stop/status)",
+  "dependencies": [],
+  "platforms": [
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "mobile",
+    "infrastructure"
+  ],
+  "executionStage": "preflight",
+  "priority": 95,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "mobile"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 3,
+    "backoff": "exponential"
+  },
+  "lifecycle": "active"
+};

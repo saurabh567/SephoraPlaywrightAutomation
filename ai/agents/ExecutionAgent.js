@@ -122,3 +122,28 @@ module.exports = {
     return state.currentRun;
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Execution Coordinator",
+  "version": "1.0.0",
+  "description": "Coordinates test execution across platforms with retry and state tracking",
+  "dependencies": ["PlannerAgent","DecisionAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "execution"
+  ],
+  "executionStage": "execution",
+  "priority": 80,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 2,
+    "backoff": "linear"
+  },
+  "lifecycle": "active"
+};

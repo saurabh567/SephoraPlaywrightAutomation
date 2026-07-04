@@ -72,3 +72,37 @@ agent.run = async function run(input = {}) {
 };
 
 module.exports = agent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Failure Analysis Agent",
+  "version": "1.0.0",
+  "description": "RAG-based analysis of test failures with historical evidence retrieval",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "analysis",
+    "rag"
+  ],
+  "executionStage": "analysis",
+  "priority": 80,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 1,
+    "backoff": "none"
+  },
+  "strategy": "rag-strategy",
+  "responsibilities": ["root-cause-analysis"],
+  "owner": "RCAAgent",
+  "lifecycle": "active"
+};

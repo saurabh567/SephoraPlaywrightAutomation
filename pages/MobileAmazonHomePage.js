@@ -8,6 +8,7 @@
  * Note: For iOS Safari (WebView), AmazonIOSSafariPage is used instead —
  * see AmazonHomePage constructor dispatch.
  */
+const logger = require('../utils/logger');
 const MobileBasePage = require('../framework/mobile/MobileBasePage');
 
 class MobileAmazonHomePage extends MobileBasePage {
@@ -59,21 +60,59 @@ class MobileAmazonHomePage extends MobileBasePage {
     }
   }
 
+  /**
+   * Search for a product on Amazon.
+   *
+   * Strategy (in priority order):
+   *   1. Type into search box, then click the search button
+   *   2. Fallback: Type into search box, then press Enter key
+   *   3. Fallback: Click the search button directly
+   *
+   * Using the search button click is more reliable than pressKeyCode(66)
+   * because the Enter key may not trigger search in all WebView contexts
+   * or app versions. The button click explicitly triggers the search action.
+   */
   async searchProduct(productName) {
     try {
+      // Step 1: Find and focus the search box
       const search = this.driver.$(this.resolveSelector('~search-box'));
       await search.waitForDisplayed({ timeout: 10000 });
       await search.click();
       await search.setValue(productName);
-      // Press Enter / search action
-      await this.driver.pressKeyCode(66); // ENTER on Android
+      await this.driver.pause(500); // Brief pause for input to settle
+
+      // Step 2: Try clicking the search button first (more reliable than Enter key)
+      try {
+        const btn = this.driver.$(this.resolveSelector('~search-button'));
+        const btnDisplayed = await btn.isDisplayed().catch(() => false);
+        if (btnDisplayed) {
+          await btn.click();
+          logger.info('[MobileAmazonHomePage] Search triggered via search button click');
+          await this.driver.pause(2000);
+          return;
+        }
+      } catch (e) {
+        logger.warn('[MobileAmazonHomePage] Search button click failed, trying Enter key: ' + e.message);
+      }
+
+      // Step 3: Fallback — press Enter key (Android key code 66)
+      try {
+        await this.driver.pressKeyCode(66); // ENTER on Android
+        logger.info('[MobileAmazonHomePage] Search triggered via Enter key');
+        await this.driver.pause(2000);
+        return;
+      } catch (e) {
+        logger.warn('[MobileAmazonHomePage] Enter key also failed: ' + e.message);
+      }
     } catch (e) {
-      // Fallback: use search button
+      // Final fallback: try clicking search button directly
+      logger.warn('[MobileAmazonHomePage] Search input failed, trying search button directly: ' + e.message);
       try {
         const btn = this.driver.$(this.resolveSelector('~search-button'));
         await btn.click();
+        await this.driver.pause(2000);
       } catch (e2) {
-        // Ignore — search may already have triggered
+        logger.warn('[MobileAmazonHomePage] All search methods failed: ' + e2.message);
       }
     }
   }

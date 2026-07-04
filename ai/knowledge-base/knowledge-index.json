@@ -1,26 +1,31 @@
 {
-  "indexedAt": "2026-06-14T07:38:12.880Z",
+  "indexedAt": "2026-07-04T18:51:31.519Z",
   "categories": {
     "features": [
       {
         "name": "cart.feature",
+        "size": "0.6 KB",
+        "modified": "2026-07-01T12:19:26.273Z"
+      },
+      {
+        "name": "e2e_purchase.feature",
         "size": "0.5 KB",
-        "modified": "2026-06-10T09:05:52.924Z"
+        "modified": "2026-07-01T12:19:27.741Z"
       },
       {
         "name": "home.feature",
-        "size": "0.8 KB",
-        "modified": "2026-06-10T09:05:51.887Z"
+        "size": "0.4 KB",
+        "modified": "2026-07-01T12:19:24.798Z"
       },
       {
         "name": "product_details.feature",
-        "size": "0.8 KB",
-        "modified": "2026-06-10T09:05:52.580Z"
+        "size": "0.6 KB",
+        "modified": "2026-07-01T12:19:27.046Z"
       },
       {
         "name": "search_results.feature",
-        "size": "0.6 KB",
-        "modified": "2026-06-10T09:06:16.667Z"
+        "size": "0.5 KB",
+        "modified": "2026-07-01T12:19:25.543Z"
       }
     ],
     "mobileGenerated": [
@@ -88,10 +93,38 @@
         "totalSizeKB": "33.5 KB"
       }
     ],
-    "pipelineReports": [
+    "aiReports": [
       {
-        "name": "pipeline-1781422083033-pipeline-report.md",
+        "name": "agent-health.md",
+        "size": "4.2 KB"
+      },
+      {
+        "name": "agent-latency.md",
         "size": "0.6 KB"
+      },
+      {
+        "name": "agent-performance.md",
+        "size": "1.1 KB"
+      },
+      {
+        "name": "api-analysis-report.md",
+        "size": "1.0 KB"
+      },
+      {
+        "name": "impact-analysis.md",
+        "size": "4.9 KB"
+      },
+      {
+        "name": "production-monitoring.md",
+        "size": "0.5 KB"
+      },
+      {
+        "name": "vector-search-results.json",
+        "size": "0.1 KB"
+      },
+      {
+        "name": "visual-validation.md",
+        "size": "0.4 KB"
       }
     ]
   }

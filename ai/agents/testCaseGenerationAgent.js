@@ -89,3 +89,34 @@ class TestCaseGenerationAgent extends BaseAgent {
 }
 
 module.exports = TestCaseGenerationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Test Case Generation Agent",
+  "version": "1.0.0",
+  "description": "RAG-based Gherkin test case generation from requirements",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "generation",
+    "gherkin"
+  ],
+  "executionStage": "execution",
+  "priority": 40,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

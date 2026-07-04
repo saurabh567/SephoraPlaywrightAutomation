@@ -233,3 +233,33 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Mobile Test Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates Appium mobile test scenarios and page objects for Android/iOS",
+  "dependencies": ["AppiumAgent"],
+  "platforms": [
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "mobile",
+    "generation"
+  ],
+  "executionStage": "execution",
+  "priority": 50,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "mobile"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

@@ -15,6 +15,12 @@
  *   - APPIUM_UNLOCK_KEY env var: the PIN/password (default: 1234)
  *   - APPIUM_SKIP_UNLOCK env var: if 'true', skip lock screen handling entirely
  *
+ * Clean Session State:
+ *   - fullReset is set to true (unless NO_RESET is explicitly true) to ensure
+ *     the app data is completely clean on every session. Combined with
+ *     MobileSessionManager's targeted WebView data clearing, this prevents
+ *     stale cookies/localStorage/cache from the Amazon Shopping app.
+ *
  * Appium Notification Fix:
  *   UiAutomator2 driver installs "io.appium.settings" and "qwerty2" keyboard,
  *   which show persistent notifications. The capabilities below include:
@@ -33,13 +39,22 @@ const { execSync } = require('child_process');
 const FALLBACK_ACTIVITY = 'com.amazon.mShop.home.HomeActivity';
 
 function androidCapabilities() {
+  var noReset = process.env.NO_RESET === 'true';
+
   var capabilities = {
     platformName: 'Android',
     'appium:automationName': 'UiAutomator2',
     'appium:deviceName': process.env.DEVICE_NAME || 'Android Emulator',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
-    'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
-    'appium:fullReset': process.env.FULL_RESET === 'true',
+
+    // ── Session Isolation: every new session starts clean ──
+    // fullReset=true forces a full app data reset. For the Amazon app,
+    // this clears all WebView data (cookies, localStorage, cache).
+    // Combined with MobileSessionManager's targeted WebView file deletion,
+    // this prevents the "stuck after search box focus" problem.
+    'appium:noReset': noReset,
+    'appium:fullReset': !noReset,
+
     'appium:dontStopAppOnReset': true,
     'appium:skipDeviceInitialization': process.env.SKIP_DEVICE_INIT !== 'false',
     'appium:skipServerInstallation': process.env.SKIP_SERVER_INSTALL === 'true',

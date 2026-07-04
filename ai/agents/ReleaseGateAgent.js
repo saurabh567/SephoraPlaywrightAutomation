@@ -170,3 +170,36 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Release Gate Agent",
+  "version": "1.0.0",
+  "description": "Evaluates release readiness based on test results, coverage, and risk",
+  "dependencies": [
+    "DecisionAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "release",
+    "quality"
+  ],
+  "executionStage": "reporting",
+  "priority": 60,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

@@ -193,3 +193,34 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Impact Analysis Agent",
+  "version": "1.0.0",
+  "description": "Git-based test impact analysis and smart test selection",
+  "dependencies": ["ExecutionAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "analysis",
+    "impact"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 60,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

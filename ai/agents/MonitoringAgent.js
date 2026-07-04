@@ -196,3 +196,36 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Monitoring Agent",
+  "version": "1.0.0",
+  "description": "Monitors application health, API endpoints, and detects regressions",
+  "dependencies": ["TestExecutionAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "monitoring",
+    "infrastructure"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 35,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["monitoring"],
+  "lifecycle": "active"
+};

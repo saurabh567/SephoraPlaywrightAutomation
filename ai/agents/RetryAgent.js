@@ -162,3 +162,33 @@ module.exports = {
     return state.retryHistory;
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Retry Agent",
+  "version": "1.0.0",
+  "description": "Smart retry logic with backoff for failed tests",
+  "dependencies": ["failureAnalysisAgent","RCAAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "retry",
+    "execution"
+  ],
+  "executionStage": "execution",
+  "priority": 60,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 3,
+    "backoff": "exponential"
+  },
+  "lifecycle": "active"
+};

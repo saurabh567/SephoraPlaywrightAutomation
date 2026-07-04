@@ -300,3 +300,31 @@ class LocatorConfidenceScorer {
 }
 
 module.exports = LocatorConfidenceScorer;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator Confidence Scorer",
+  "version": "1.0.0",
+  "description": "Confidence scoring for locator healing candidates using DOM similarity and history",
+  "dependencies": [
+    "LocatorHistoryStore"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "scoring"
+  ],
+  "executionStage": "analysis",
+  "priority": 35,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "internal"
+};

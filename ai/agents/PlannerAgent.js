@@ -82,3 +82,34 @@ agent.run = async function run(input = {}) {
 };
 
 module.exports = agent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Planner Agent",
+  "version": "1.0.0",
+  "description": "Generates step-by-step execution plans for multi-agent workflows",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "planning",
+    "orchestration"
+  ],
+  "executionStage": "preflight",
+  "priority": 70,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

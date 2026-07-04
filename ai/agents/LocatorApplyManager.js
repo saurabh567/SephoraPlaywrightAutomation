@@ -286,3 +286,29 @@ const LocatorApplyManager = {
 };
 
 module.exports = LocatorApplyManager;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator Apply Manager",
+  "version": "1.0.0",
+  "description": "Backup/rollback/apply management for locator healing proposals",
+  "dependencies": ["locatorHealingAgent","locatorHealingApplier"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "management"
+  ],
+  "executionStage": "analysis",
+  "priority": 45,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

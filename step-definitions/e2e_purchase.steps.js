@@ -21,14 +21,6 @@ function isWeb(world) {
 
 When('I click on the Proceed to Buy button', async function () {
   if (isMobile(this)) {
-    // ── Mobile: proceed to buy via page object ────────────────────────────
-    // AmazonIOSSafariPage.proceedToCheckout() uses a 4-phase strategy:
-    //   1. Wait for cart page to fully load (verify DOM ready)
-    //   2. CSS selectors (Smart Wagon + standard cart checkout buttons)
-    //   3. XPath selectors (fallback)
-    //   4. JavaScript execution (traverse DOM for text matches)
-    //   5. URL-based fallback (navigate directly to /gp/buy/select-address)
-    // Plus comprehensive DOM diagnostics if all phases fail.
     const activePage = this.driver;
     const cartPage = new AmazonCartPage(activePage);
     await cartPage.proceedToCheckout();
@@ -37,9 +29,8 @@ When('I click on the Proceed to Buy button', async function () {
     return;
   }
 
-  // ── Web: use Playwright ──────────────────────────────────────────────
+  // Web: use Playwright
   const cartPage = new AmazonCartPage(this.page);
-  // Try the iOS method first (works on mobile-web cart too)
   if (typeof cartPage.proceedToCheckout === 'function') {
     await cartPage.proceedToCheckout();
   } else {
@@ -51,39 +42,51 @@ When('I click on the Proceed to Buy button', async function () {
 
 Then('the checkout page should be loaded', async function () {
   if (isMobile(this)) {
-    // Mobile: verify checkout loaded via page source
-    // Use strict checkout indicators that do NOT appear on the cart page.
-    // "buy" and "checkout" are too broad — they appear on cart pages too.
-    // Instead, check for checkout-specific indicators:
-    const source = await this.driver.getPageSource();
+    // Mobile: verify checkout loaded via URL and element-based checks
     const currentUrl = await this.driver.getUrl().catch(() => '');
+    const source = await this.driver.getPageSource().catch(() => '');
 
-    const isCheckout = (
-      // URL-based check
-      /checkout|buy|select-address|spc/i.test(currentUrl) ||
-      // Address selection screen
-      /select-delivery-address|delivery address|ship to this address/i.test(source) ||
-      // Payment selection
-      /payment-method|payment option|card number|credit card|debit card/i.test(source) ||
-      // Place order button (final checkout step)
-      /place your order|place order now/i.test(source) ||
-      // SP checkout page
-      /spc[\-_]|checkout[\-_]spc|buybox[\-_]checkout/i.test(source) ||
-      // Delivery options in checkout
-      /select.*delivery|delivery.*option|shipping.*address/i.test(source)
+    // URL-based check (most reliable)
+    const isCheckoutUrl = /checkout|buy|select-address|spc/i.test(currentUrl);
+
+    // Element-based checks (more specific than broad regex)
+    let checkoutElementsFound = false;
+    const checkoutSelectors = [
+      '//*[contains(text(), "Select a delivery address")]',
+      '//*[contains(text(), "Delivery address")]',
+      '//*[contains(text(), "Ship to this address")]',
+      '//*[contains(text(), "Payment method")]',
+      '//*[contains(text(), "Place your order")]',
+      '//*[contains(@class, "address-book")]',
+      '//*[contains(@class, "payment-option")]',
+    ];
+    for (const sel of checkoutSelectors) {
+      try {
+        const elements = await this.driver.$$(sel);
+        for (const el of elements) {
+          if (await el.isDisplayed().catch(() => false)) {
+            checkoutElementsFound = true;
+            break;
+          }
+        }
+      } catch (_) {}
+      if (checkoutElementsFound) break;
+    }
+
+    // Source-based check (last resort, with specific patterns)
+    const isCheckoutSource = (
+      /select.*delivery.*address|ship to this address|payment.*method|place your order/i.test(source)
     );
 
+    const isCheckout = isCheckoutUrl || checkoutElementsFound || isCheckoutSource;
+
     if (!isCheckout) {
-      // Capture diagnostic screenshot
       try {
         await this.driver.saveScreenshot('reports/ios/screenshots/debug-checkout-not-loaded.png');
       } catch (_) {}
-
-      // Log all interactive elements for debugging
       try {
-        logger.warn('[E2ESteps] Checkout NOT reached. Current URL: ' + currentUrl);
         const pageTitle = await this.driver.getTitle().catch(() => 'unknown');
-        logger.warn('[E2ESteps] Page title: ' + pageTitle);
+        logger.warn('[E2ESteps] Checkout NOT reached. Current URL: ' + currentUrl + ', Title: ' + pageTitle);
       } catch (_) {}
     }
 

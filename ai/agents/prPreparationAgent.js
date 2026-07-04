@@ -100,3 +100,34 @@ async function preparePR({ appliedFiles = [], backupRoot = '', proposals = [], s
 }
 
 module.exports = { preparePR };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "PR Preparation Agent",
+  "version": "1.0.0",
+  "description": "Prepares local branch with staged files and generates PR summary",
+  "dependencies": ["PRAgent","locatorHealingAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "ci",
+    "pr"
+  ],
+  "executionStage": "reporting",
+  "priority": 25,
+  "conditions": [
+    {
+      "type": "ci"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

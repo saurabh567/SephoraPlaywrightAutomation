@@ -1,6 +1,8 @@
 // DecisionAgent - Makes autonomous decisions about test execution strategies, healing actions, and release readiness
 const fs = require('fs-extra');
 const path = require('path');
+const DecisionEngine = require("../core/DecisionEngine");
+
 const BaseAgent = require('./baseAgent');
 
 const agent = new BaseAgent({
@@ -11,7 +13,17 @@ const agent = new BaseAgent({
 });
 
 agent.run = async function run(input = {}) {
-  console.log('[DecisionAgent] Evaluating inputs and making decisions');
+  console.log("[DecisionAgent] Evaluating inputs and making decisions");
+
+  const engine = new DecisionEngine();
+  const engineDecisions = await engine.evaluate(input);
+  decision.engine = engineDecisions;
+  decision.context.riskLevel = engineDecisions.context.risk.level;
+  decision.context.riskScore = engineDecisions.context.risk.score;
+  decision.context.priority = engineDecisions.context.priority;
+  decision.context.llmStrategy = engineDecisions.llm.strategy;
+  decision.context.healingStrategy = engineDecisions.healing.primary;
+  decision.context.retryStrategy = JSON.stringify(engineDecisions.retry);
 
   const decision = {
     timestamp: new Date().toISOString(),
@@ -147,3 +159,34 @@ agent.run = async function run(input = {}) {
 };
 
 module.exports = agent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Decision Agent",
+  "version": "1.0.0",
+  "description": "Evaluates test results and makes autonomous execution decisions",
+  "dependencies": ["PlannerAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "decision",
+    "orchestration"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 75,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

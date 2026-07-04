@@ -422,7 +422,26 @@ class MobileSessionManager {
 
       logger.info('[MobileSessionManager] Navigating to: ' + config.baseUrl);
       await driver.url(config.baseUrl);
-      await driver.pause(3000);
+      // After navigation the remote debugger connection may reset and
+      // the context reverts to NATIVE_APP. Re-acquire the WEBVIEW context.
+      logger.info('[MobileSessionManager] Re-acquiring WebView context after navigation...');
+      var postNavTimeout = 20000;
+      var postNavStart = Date.now();
+      var postNavCtx = null;
+      while (Date.now() - postNavStart < postNavTimeout) {
+        var ctxs = await driver.getContexts().catch(function() { return []; });
+        for (var c = 0; c < ctxs.length; c++) {
+          if (String(ctxs[c]).toLowerCase().includes('webview')) { postNavCtx = ctxs[c]; break; }
+        }
+        if (postNavCtx) { break; }
+        await driver.pause(1000);
+      }
+      if (postNavCtx) {
+        await driver.switchContext(postNavCtx);
+        logger.info('[MobileSessionManager] Switched to post-navigation WebView: ' + postNavCtx);
+      } else {
+        logger.warn('[MobileSessionManager] WebView context not found after navigation');
+      }
 
       logger.info('[MobileSessionManager] Waiting for homepage elements...');
       var homepageSelectors = [ '#twotabsearchtextbox', 'input[name="k"]', 'input[type="search"]', '#nav-search-bar-form input', 'a[aria-label*="Amazon"]', '#nav-hamburger-menu' ];

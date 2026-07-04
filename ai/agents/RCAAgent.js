@@ -2,6 +2,14 @@
 const fs = require('fs-extra');
 const path = require('path');
 
+// Strategy Pattern: RCAAgent is the OWNER of root cause analysis.
+// Delegates to failureAnalysisAgent (RAG strategy) when mode=rag,
+// rootCauseAnalysisAgent (LLM strategy) when mode=llm,
+// or runs its own static classification (default).
+const failureAnalysisAgent = require("./failureAnalysisAgent");
+const rootCauseAnalysisAgent = require("./rootCauseAnalysisAgent");
+
+
 const FAILURE_CATEGORIES = {
   LOCATOR_ISSUE: { weight: 0.3, label: 'Locator Issue', severity: 'high' },
   ENVIRONMENT_ISSUE: { weight: 0.2, label: 'Environment Issue', severity: 'high' },
@@ -84,7 +92,30 @@ function extractLocatorFromError(errorMessage) {
 
 module.exports = {
   run: async function run(input = {}) {
-    console.log('[RCAAgent] Performing root cause analysis');
+    console.log("[RCAAgent] Performing root cause analysis");
+
+    // Strategy Pattern delegation
+    const mode = input.mode || "static";
+    if (mode === "rag") {
+      console.log("[RCAAgent] Delegating to RAG strategy (failureAnalysisAgent)");
+      try {
+        const ragResult = await failureAnalysisAgent.analyzeWithRag(input);
+        return { ok: true, strategy: "rag", result: ragResult, totalFailures: ragResult.failedScenarios || 0 };
+      } catch (err) {
+        console.warn("[RCAAgent] RAG strategy failed, falling back to static:", err.message);
+      }
+    }
+    if (mode === "llm") {
+      console.log("[RCAAgent] Delegating to LLM strategy (rootCauseAnalysisAgent)");
+      try {
+        const llmResult = await rootCauseAnalysisAgent.run(input);
+        return { ok: true, strategy: "llm", result: llmResult };
+      } catch (err) {
+        console.warn("[RCAAgent] LLM strategy failed, falling back to static:", err.message);
+      }
+    }
+
+    // Default: static classification (original implementation)
 
     const reportPath = path.join(process.cwd(), 'reports/json/cucumber-report.json');
     const failures = [];
@@ -226,3 +257,39 @@ function getRecommendation(category, locator) {
   };
   return recs[category] || recs.UNKNOWN;
 }
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Root Cause Analysis Agent",
+  "version": "1.0.0",
+  "description": "Static classification of test failures into 6 categories",
+  "dependencies": [
+    "failureAnalysisAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "analysis",
+    "rca"
+  ],
+  "executionStage": "analysis",
+  "priority": 65,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["root-cause-analysis"],
+  "strategies": ["failureAnalysisAgent"],
+  "lifecycle": "active"
+};

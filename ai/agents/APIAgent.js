@@ -236,3 +236,32 @@ function getDefaultEndpoints() {
     { method: 'GET', path: '/gp/sign-in.html', expectedStatus: 200 }
   ];
 }
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "API Test Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates API test scenarios and validates endpoints with Playwright request context",
+  "dependencies": [],
+  "platforms": [
+    "API"
+  ],
+  "tags": [
+    "api",
+    "generation"
+  ],
+  "executionStage": "execution",
+  "priority": 50,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "api"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

@@ -40,3 +40,34 @@ class ExecutionMemoryAgent {
 }
 
 module.exports = new ExecutionMemoryAgent();
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Execution Memory Agent",
+  "version": "1.0.0",
+  "description": "Persistent storage of test run summaries for trend analysis",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "memory",
+    "storage"
+  ],
+  "executionStage": "analysis",
+  "priority": 85,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

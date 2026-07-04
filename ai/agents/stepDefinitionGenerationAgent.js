@@ -156,3 +156,34 @@ class StepDefinitionGenerationAgent extends BaseAgent {
 }
 
 module.exports = StepDefinitionGenerationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Step Definition Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates Cucumber step definitions in JavaScript",
+  "dependencies": ["featureFileGenerationAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "generation",
+    "step-defs"
+  ],
+  "executionStage": "execution",
+  "priority": 30,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

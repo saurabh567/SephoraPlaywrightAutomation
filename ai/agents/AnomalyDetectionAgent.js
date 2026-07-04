@@ -508,3 +508,36 @@ if (require.main === module) {
 }
 
 module.exports = AnomalyDetectionAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Anomaly Detection Agent",
+  "version": "1.0.0",
+  "description": "Real-time anomaly detection for flaky tests, performance regressions, locator decay",
+  "dependencies": [
+    "executionMemoryAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "analysis",
+    "anomaly"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 50,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

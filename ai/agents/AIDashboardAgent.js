@@ -352,3 +352,37 @@ if (require.main === module) {
 }
 
 module.exports = AIDashboardAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "AI Dashboard Agent",
+  "version": "1.0.0",
+  "description": "Unified HTML dashboard aggregating test results, pipeline runs, and AI reports",
+  "dependencies": ["ReportAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "reporting",
+    "dashboard"
+  ],
+  "executionStage": "reporting",
+  "priority": 75,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 1,
+    "backoff": "none"
+  },
+  "strategy": "dashboard-strategy",
+  "responsibilities": ["reporting"],
+  "owner": "ReportAgent",
+  "lifecycle": "active"
+};

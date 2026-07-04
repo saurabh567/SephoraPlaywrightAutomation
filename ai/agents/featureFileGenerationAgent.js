@@ -206,3 +206,34 @@ class FeatureFileGenerationAgent extends BaseAgent {
 }
 
 module.exports = FeatureFileGenerationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Feature File Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates Cucumber Gherkin feature files from test cases",
+  "dependencies": ["testCaseGenerationAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "generation",
+    "gherkin"
+  ],
+  "executionStage": "execution",
+  "priority": 35,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

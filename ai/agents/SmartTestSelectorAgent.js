@@ -461,3 +461,34 @@ if (require.main === module) {
 }
 
 module.exports = SmartTestSelectorAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Smart Test Selector",
+  "version": "1.0.0",
+  "description": "Risk-based test selection using code change analysis and feature mapping",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "selection",
+    "ci"
+  ],
+  "executionStage": "preflight",
+  "priority": 50,
+  "conditions": [
+    {
+      "type": "ci"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

@@ -463,3 +463,34 @@ if (require.main === module) {
 }
 
 module.exports = UnifiedMCPOrchestratorAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Unified MCP Orchestrator Agent",
+  "version": "1.0.0",
+  "description": "Phase scanning, knowledge base indexing, and CI/CD integration status reporting",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "orchestration",
+    "scanning"
+  ],
+  "executionStage": "reporting",
+  "priority": 20,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

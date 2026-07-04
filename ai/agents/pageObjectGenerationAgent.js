@@ -43,3 +43,31 @@ class PageObjectGenerationAgent extends BaseAgent {
 }
 
 module.exports = PageObjectGenerationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Page Object Generation Agent",
+  "version": "1.0.0",
+  "description": "Generates Playwright Page Object Model classes",
+  "dependencies": ["stepDefinitionGenerationAgent"],
+  "platforms": [
+    "WEB"
+  ],
+  "tags": [
+    "generation",
+    "pom"
+  ],
+  "executionStage": "execution",
+  "priority": 25,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

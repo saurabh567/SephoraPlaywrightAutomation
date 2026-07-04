@@ -193,3 +193,34 @@ function extractContext(text, pattern, contextLines = 2) {
   }
   return '';
 }
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Jenkins Agent",
+  "version": "1.0.0",
+  "description": "Analyzes Jenkins/CI pipeline failures and recommends fixes",
+  "dependencies": ["ExecutionAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "ci",
+    "jenkins"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 40,
+  "conditions": [
+    {
+      "type": "ci"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

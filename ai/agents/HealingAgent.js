@@ -105,3 +105,36 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Healing Orchestrator",
+  "version": "1.0.0",
+  "description": "Orchestrates locator healing via LocatorHealingEngine",
+  "dependencies": ["failureAnalysisAgent","locatorHealingAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "orchestration"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 60,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 1,
+    "backoff": "linear"
+  },
+  "strategy": "engine-strategy",
+  "responsibilities": ["locator-healing"],
+  "owner": "locatorHealingAgent",
+  "lifecycle": "active"
+};

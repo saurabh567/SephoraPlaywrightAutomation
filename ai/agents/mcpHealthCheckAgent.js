@@ -47,3 +47,34 @@ class MCPHealthCheckAgent {
 }
 
 module.exports = new MCPHealthCheckAgent();
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "MCP Health Check Agent",
+  "version": "1.0.0",
+  "description": "Local MCP configuration validation without external servers",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "health",
+    "mcp"
+  ],
+  "executionStage": "preflight",
+  "priority": 25,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

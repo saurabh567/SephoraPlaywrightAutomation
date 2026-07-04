@@ -1,5 +1,8 @@
 // Step definitions unique to the Amazon India Cart Page features.
 // Platform-aware: uses Playwright page objects for web, MobileAmazon page objects for mobile.
+//
+// Mobile cart verification uses element-based checks with targeted fallbacks.
+// Avoids broad getPageSource() regex patterns that cause false positives.
 const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect: playwrightExpect } = require('@playwright/test');
 const assert = require('assert');
@@ -46,22 +49,13 @@ When('I remove the product from the cart', async function () {
   const cartPage = new AmazonCartPage(activePage);
 
   if (isMobile(this)) {
-    // ── Mobile: remove product from cart via page object ────────────────
-    // AmazonIOSSafariPage.removeItemFromCart() uses a 3-phase strategy:
-    //   1. CSS selectors (Smart Wagon + standard cart)
-    //   2. XPath selectors (fallback)
-    //   3. JavaScript execution (last resort via document.querySelector)
-    // Plus comprehensive DOM diagnostics if all phases fail.
     logger.info('[CartSteps] Mobile: removing product from cart via page object...');
-
-    // Use the page object's removeItemFromCart method
     await cartPage.removeItemFromCart();
-
     logger.info('[CartSteps] Mobile: product removed from cart.');
     return;
   }
 
-  // ── Web: remove product from cart ──────────────────────────────────────
+  // Web: remove product from cart
   const deleteButton = this.page.locator(
     'input[value="Delete"], span[data-action="delete"] a, .sc-action-delete input'
   ).first();
@@ -76,18 +70,43 @@ Then('the cart should show the empty cart message', async function () {
   const cartPage = new AmazonCartPage(activePage);
 
   if (isMobile(this)) {
-    // Mobile: verify cart is empty by checking page source for empty message
-    const source = await this.driver.getPageSource();
-    const isEmpty = /cart is empty|your shopping cart is empty|your amazon cart is empty|your cart is empty|smart wagon|0 items in your cart|no items/i.test(source);
+    // Mobile: verify cart is empty using element-based checks first
+    // Check for specific "empty cart" elements instead of broad regex
+    const emptySelectors = [
+      '//*[contains(text(), "empty")]',
+      '//*[contains(text(), "Your Amazon Cart is empty")]',
+      '//*[contains(text(), "Your Shopping Cart is empty")]',
+      '//*[contains(text(), "0 items")]',
+      '//*[contains(@aria-label, "empty")]',
+    ];
 
+    let isEmpty = false;
+    for (const sel of emptySelectors) {
+      try {
+        const elements = await this.driver.$$(sel);
+        for (const el of elements) {
+          if (await el.isDisplayed().catch(() => false)) {
+            isEmpty = true;
+            break;
+          }
+        }
+      } catch (_) {}
+      if (isEmpty) break;
+    }
+
+    // Fallback: check page source for empty cart indicators
     if (!isEmpty) {
-      // Check if items still exist (removal might not have worked)
-      const hasItems = /cart-subtotal|sc-subtotal|cart items|item removed|cart total|item total|subtotal|delete|remove/i.test(source);
-      if (hasItems) {
-        throw new Error(
-          '[CartSteps] Mobile: Cart still contains items after removal.\n' +
-          'The delete button was clicked but the item was not removed.'
-        );
+      const source = await this.driver.getPageSource();
+      isEmpty = /your amazon cart is empty|your shopping cart is empty|0 items in your cart/i.test(source);
+      if (!isEmpty) {
+        // Check if items still exist (removal might not have worked)
+        const hasItems = /cart-subtotal|sc-subtotal|cart total|subtotal/i.test(source);
+        if (hasItems) {
+          throw new Error(
+            '[CartSteps] Mobile: Cart still contains items after removal.\n' +
+            'The delete button was clicked but the item was not removed.'
+          );
+        }
       }
     }
 

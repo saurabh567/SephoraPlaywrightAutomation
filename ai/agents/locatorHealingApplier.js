@@ -91,3 +91,29 @@ class LocatorHealingApplier {
 }
 
 module.exports = LocatorHealingApplier;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator Healing Applier",
+  "version": "1.0.0",
+  "description": "Low-level patch creation and application for locator healing",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "utility"
+  ],
+  "executionStage": "analysis",
+  "priority": 40,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

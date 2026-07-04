@@ -8,11 +8,18 @@
  *   simulator-based Safari testing.
  *
  * ══════════════════════════════════════════════════════════════════════════════
- * Important: appium:appIdKey
- *   Must NOT be set for Safari browser sessions. The 'Missing parameter:
- *   appIdKey' error occurs when url() is called during session startup with
- *   an appIdKey that doesn't match a Safari bundle. Safari sessions use
- *   browserName — not appIdKey. Only native app sessions need appIdKey.
+ * safari:clearData:
+ *   Intentionally set to false. When true, Appium/WDA clears Safari data at
+ *   session creation, which on some iOS/WDA versions causes Safari to reset
+ *   to about:blank in a way that breaks subsequent driver.url() navigation.
+ *   Instead, we navigate to the target URL first, then clear browser storage
+ *   via JavaScript on the actual page domain.
+ *
+ * noReset / fullReset:
+ *   Read from environment variables:
+ *     NO_RESET=true  → Appium does NOT reset app state between sessions
+ *     FULL_RESET=true → Appium kills app + deletes all data (aggressive)
+ *     Default (both false): Appium terminates Safari and starts fresh.
  * ══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -20,6 +27,8 @@ function iosCapabilities() {
   const browserName = process.env.BROWSER_NAME;
   const appPath = process.env.APP_PATH;
   const bundleId = process.env.BUNDLE_ID;
+  const noReset = process.env.NO_RESET === 'true';
+  const fullReset = noReset ? false : process.env.FULL_RESET === 'true';
 
   const capabilities = {
     platformName: 'iOS',
@@ -27,25 +36,21 @@ function iosCapabilities() {
     'appium:deviceName': process.env.DEVICE_NAME || 'iPhone 15',
     'appium:platformVersion': process.env.PLATFORM_VERSION || undefined,
 
-    // Session Isolation: every new session starts clean
-    'appium:noReset': process.env.NO_RESET === 'true' ? true : false,
-    'appium:fullReset': process.env.FULL_RESET === 'true',
-
+    'appium:noReset': noReset,
+    'appium:fullReset': fullReset,
     'appium:newCommandTimeout': Number(process.env.NEW_COMMAND_TIMEOUT || 120),
   };
 
   if (browserName) {
-    // Canonical Appium 2.x browser capabilities
     capabilities.browserName = browserName;
     capabilities['appium:browserName'] = browserName;
-
-    // Required for Safari on iOS Simulator
     capabilities['safari:useSimulator'] = true;
+    // CRITICAL: safari:clearData=false. We clear storage via JS after navigation
+    // on the actual target domain. See file header comment for details.
+    capabilities['safari:clearData'] = false;
   } else {
-    // Native app capabilities
     if (appPath) capabilities['appium:app'] = appPath;
     if (bundleId) capabilities['appium:bundleId'] = bundleId;
-    // appIdKey is only valid for native app sessions, NOT Safari
     if (process.env.APP_ID_KEY) capabilities['appium:appIdKey'] = process.env.APP_ID_KEY;
   }
 

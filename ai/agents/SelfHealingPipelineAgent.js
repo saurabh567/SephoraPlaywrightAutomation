@@ -380,3 +380,36 @@ if (require.main === module) {
 }
 
 module.exports = SelfHealingPipelineAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Self-Healing Pipeline Agent",
+  "version": "1.0.0",
+  "description": "Cross-platform self-healing pipeline with automatic retry and healing",
+  "dependencies": [
+    "failureAnalysisAgent",
+    "locatorHealingAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "pipeline"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 55,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 2,
+    "backoff": "exponential"
+  },
+  "lifecycle": "active"
+};

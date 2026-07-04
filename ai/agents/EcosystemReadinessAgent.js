@@ -502,3 +502,36 @@ if (require.main === module) {
 }
 
 module.exports = EcosystemReadinessAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Ecosystem Readiness Agent",
+  "version": "1.0.0",
+  "description": "End-to-end ecosystem health validation across infrastructure and agents",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "health",
+    "infrastructure"
+  ],
+  "executionStage": "preflight",
+  "priority": 40,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["ecosystem-readiness"],
+  "lifecycle": "active"
+};

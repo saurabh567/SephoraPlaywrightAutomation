@@ -1,20 +1,22 @@
-const fs = require('fs-extra');
-const path = require('path');
-const MEMORY_PATH = path.join(process.cwd(), 'ai', 'memory', 'shared-memory.json');
+/**
+ * ai/memory/index.js
+ *
+ * Central export for all memory stores.
+ * Every execution enriches these stores for trend analysis and historical tracking.
+ */
 
-fs.ensureDirSync(path.dirname(MEMORY_PATH));
-if (!fs.existsSync(MEMORY_PATH)) {
-  fs.writeJsonSync(MEMORY_PATH, { framework: {}, agents: {}, workflows: [] }, { spaces: 2 });
-}
+const FailureMemoryStore = require('./FailureMemoryStore');
+const EnvironmentMemoryStore = require('./EnvironmentMemoryStore');
+const DeviceMemoryStore = require('./DeviceMemoryStore');
+const PerformanceMemoryStore = require('./PerformanceMemoryStore');
+const executionHistory = require('../agents/executionMemoryAgent');
+const sharedMemory = require('./sharedMemory');
 
 module.exports = {
-  read: () => fs.readJsonSync(MEMORY_PATH),
-  write: (obj) => fs.writeJsonSync(MEMORY_PATH, obj, { spaces: 2 }),
-  updateAgent: (name, value) => {
-    const mem = fs.readJsonSync(MEMORY_PATH);
-    mem.agents = mem.agents || {};
-    mem.agents[name] = Object.assign({}, mem.agents[name] || {}, value, { updatedAt: new Date().toISOString() });
-    fs.writeJsonSync(MEMORY_PATH, mem, { spaces: 2 });
-    return mem.agents[name];
-  }
+  FailureMemoryStore,
+  EnvironmentMemoryStore,
+  DeviceMemoryStore,
+  PerformanceMemoryStore,
+  executionHistory,
+  sharedMemory
 };

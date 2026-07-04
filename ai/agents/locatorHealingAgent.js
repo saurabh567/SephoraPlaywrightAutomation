@@ -6,6 +6,8 @@ const { readCucumberSummary } = require('../tools/cucumberReportReader');
 const LocatorApplier = require('./locatorHealingApplier');
 const LocatorAnalyzer = require('../tools/locatorAnalyzer');
 const timestamp = () => new Date().toISOString().replace(/[:.]/g,'-');
+const HealingAgent = require("./HealingAgent");
+
 
 const agent = new BaseAgent({
   name: 'Locator Healing Agent',
@@ -153,6 +155,18 @@ agent.rollback = async function rollback(backupRoot) {
 
 // run supports modes: 'recommend' (RAG), 'analyze' (static), 'apply' (apply low-risk)
 agent.run = async function run(input = {}) {
+  // Strategy Pattern: engine mode delegates to HealingAgent (LocatorHealingEngine-based)
+  if (mode === "engine") {
+    console.log("[locatorHealingAgent] Delegating to engine strategy (HealingAgent)");
+    try {
+      const engineResult = await HealingAgent.run(input);
+      return engineResult;
+    } catch (err) {
+      console.warn("[locatorHealingAgent] Engine strategy failed, falling back to RAG:", err.message);
+    }
+  }
+
+
   const mode = input.mode || 'recommend';
   if (mode === 'recommend') {
     const r = await agent.suggestWithRag(input);
@@ -168,3 +182,41 @@ agent.run = async function run(input = {}) {
 };
 
 module.exports = agent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator Healing Agent",
+  "version": "1.0.0",
+  "description": "RAG-based locator healing recommendations with static analysis fallback",
+  "dependencies": [
+    "failureAnalysisAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "rag"
+  ],
+  "executionStage": "analysis",
+  "priority": 70,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    },
+    {
+      "type": "locatorFailure"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 1,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["locator-healing"],
+  "strategies": ["HealingAgent"],
+  "lifecycle": "active"
+};

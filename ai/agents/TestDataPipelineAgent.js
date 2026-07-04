@@ -519,3 +519,36 @@ if (require.main === module) {
 }
 
 module.exports = TestDataPipelineAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Test Data Pipeline Agent",
+  "version": "1.0.0",
+  "description": "Synthetic test data generation for users, products, addresses, payments",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "data",
+    "generation"
+  ],
+  "executionStage": "preflight",
+  "priority": 35,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["test-data-generation"],
+  "lifecycle": "active"
+};

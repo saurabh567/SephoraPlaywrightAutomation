@@ -195,3 +195,32 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Visual Validation Agent",
+  "version": "1.0.0",
+  "description": "Visual regression testing with screenshot comparison and layout validation",
+  "dependencies": ["TestExecutionAgent"],
+  "platforms": [
+    "WEB"
+  ],
+  "tags": [
+    "visual",
+    "quality"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 55,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "web"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

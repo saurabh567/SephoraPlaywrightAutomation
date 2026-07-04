@@ -189,3 +189,37 @@ if (require.main === module) {
 }
 
 module.exports = ConsolidatedReportAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Consolidated Report Agent",
+  "version": "1.0.0",
+  "description": "Aggregated dashboard data generation with GO/NO-GO recommendation",
+  "dependencies": ["ReportAgent","AIDashboardAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "reporting",
+    "dashboard"
+  ],
+  "executionStage": "reporting",
+  "priority": 65,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "consolidated-strategy",
+  "responsibilities": ["reporting"],
+  "owner": "ReportAgent",
+  "lifecycle": "active"
+};

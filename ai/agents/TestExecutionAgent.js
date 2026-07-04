@@ -193,3 +193,38 @@ module.exports.run = async function(options = {}) {
   const inst = new TestExecutionAgent(options);
   return inst.run();
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Test Execution Agent",
+  "version": "1.0.0",
+  "description": "AI-driven test execution with health checks and platform orchestration",
+  "dependencies": [
+    "AppiumAgent",
+    "failureAnalysisAgent",
+    "locatorHealingAgent",
+    "executionMemoryAgent"
+  ],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "execution",
+    "ai"
+  ],
+  "executionStage": "execution",
+  "priority": 90,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 1,
+    "backoff": "exponential"
+  },
+  "lifecycle": "active"
+};

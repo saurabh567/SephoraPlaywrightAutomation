@@ -401,6 +401,8 @@ async function warmupWDA() {
       }
 
       // Close warmup session immediately — no navigation, no cookies, no state.
+      // First terminate Safari so the main test starts with a fresh process.
+      try { await warmupDriver.terminateApp("com.apple.mobilesafari"); } catch (_) {}
       await warmupDriver.deleteSession();
       console.log('[lifecycle] WDA warmup session closed cleanly.');
 
@@ -603,7 +605,7 @@ async function main() {
     await startAppium();
 
     // Step 3 — WDA warmup (no navigation, no cookies, no state)
-    await warmupWDA();
+    if (process.env.USE_NEW_WDA === "true") { await warmupWDA(); } else { console.log("[lifecycle] USE_NEW_WDA=false — skipping WDA warmup (already compiled)"); pass("wdaWarmup"); }
 
     // Step 4 — Execute iOS tests
     testsPassed = await runIOSTests();

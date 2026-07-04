@@ -137,3 +137,34 @@ module.exports = {
     };
   }
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "PR Agent",
+  "version": "1.0.0",
+  "description": "Generates PR descriptions, commit messages, changelogs, and release notes",
+  "dependencies": ["ReportAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "ci",
+    "pr"
+  ],
+  "executionStage": "reporting",
+  "priority": 30,
+  "conditions": [
+    {
+      "type": "ci"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

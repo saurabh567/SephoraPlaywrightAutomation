@@ -75,3 +75,33 @@ class PlaywrightCodeReviewAgent extends BaseAgent {
 }
 
 module.exports = PlaywrightCodeReviewAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Playwright Code Review Agent",
+  "version": "1.0.0",
+  "description": "Reviews Playwright framework code for best practices",
+  "dependencies": ["pageObjectGenerationAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "review",
+    "quality"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 30,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

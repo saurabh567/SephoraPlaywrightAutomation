@@ -1,0 +1,36 @@
+dependencies: \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Categories/FBXCElementSnapshotWrapper+Helpers.m \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Categories/FBXCElementSnapshotWrapper+Helpers.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBXCElementSnapshotWrapper.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBXCElementSnapshot.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/XCTest.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/XCUIAutomation.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreGraphics.framework/Modules/module.modulemap \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/CDStructures.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBElement.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Commands/FBFindElementCommands.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBCommandHandler.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBCommandStatus.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBHTTPStatusCodes.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBResponsePayload.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Routing/FBRoute.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/FBErrorBuilder.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/FBRunLoopSpinner.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/FBLogger.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/FBXCTestDaemonsProxy.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/CoreLocation.framework/Modules/module.modulemap \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCSynthesizedEventRecord.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/FBXCAXClientProxy.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCTestDriver.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCDebugLogDelegate-Protocol.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCTestDriverInterface-Protocol.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCTestManager_TestsInterface-Protocol.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCTestManager_IDEInterface-Protocol.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCTestManager_ManagerInterface-Protocol.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Utilities/XCTestPrivateSymbols.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCUIElement.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks/XCTest.framework/Headers/XCUIElement.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/WebDriverAgentLib/Categories/XCUIElement+FBWebDriverAttributes.h \
+  /Users/kumarsaurabh/Documents/AmazonWebMobilePlaywrightAutomation/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent/PrivateHeaders/XCTest/XCUIHitPointResult.h

@@ -1,16 +1,20 @@
-// Lightweight agent communication utilities (Phase-1)
-const EventEmitter = require('events');
-const emitter = new EventEmitter();
+/**
+ * AgentComm.js (Legacy Compatibility)
+ *
+ * Re-exports the enterprise EventBus for backward compatibility.
+ * All functionality now lives in EventBus.js.
+ *
+ * Legacy usage (still works):
+ *   const { publish, subscribe, log } = require('./AgentComm');
+ *   publish('topic', { data: 'value' });
+ *
+ * New usage (recommended):
+ *   const bus = require('./core/EventBus');
+ *   bus.emit(bus.EVENTS.SCENARIO_FAILED, { scenario: '...' });
+ */
 
-module.exports = {
-  publish: (topic, payload) => {
-    emitter.emit(topic, payload);
-  },
-  subscribe: (topic, cb) => {
-    emitter.on(topic, cb);
-    return () => emitter.off(topic, cb);
-  },
-  log: (agentName, message) => {
-    console.log(`[AgentComm][${agentName}] ${message}`);
-  }
-};
+const bus = require('./EventBus');
+
+module.exports = bus.legacy;
+module.exports.EventBus = bus;
+module.exports.EVENTS = bus.EVENTS;

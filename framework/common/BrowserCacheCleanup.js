@@ -16,14 +16,15 @@
  * Supports:
  *   - Web (Playwright) — cookies, localStorage, sessionStorage, IndexedDB
  *   - Android native apps with WebView (Amazon app)
- *   - iOS Safari browser (JS-based WebView cleanup only — no unsupported mobile: commands)
+ *   - iOS Safari browser (JS-based WebView cleanup + simulator-level data removal)
  *   - iOS native apps with WebView
  *
- * iOS Note:
- *   Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
- *   or mobile:clearPasteboard commands. iOS WebView state is cleared via
- *   JavaScript execution only when a WebView context exists. App removal
- *   is handled by MobileSessionManager.disposeSession() via mobile:removeApp.
+ * iOS Safari Cleanup Strategy:
+ *   1. Simulator-level: Remove Safari filesystem data via xcrun simctl spawn
+ *      (rm -rf Safari caches, WebKit data, cookies database)
+ *   2. Kill Safari process to force data flush
+ *   3. JS-based cleanup in WebView context (cookies, localStorage, etc.)
+ *   4. Multi-domain cookie clearing for amazon.in, www.amazon.in, etc.
  *
  * Thread-safe (no shared mutable state) — safe for parallel Cucumber execution.
  */
@@ -35,7 +36,9 @@ const logger = require('../../utils/logger');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const JS_CLEAR_COOKIES = `document.cookie.split(";").forEach(function(c) {
-  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=" + location.hostname);
+  // Also clear with and without leading dot for subdomain coverage
+  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=." + location.hostname);
 });`;
 
 const JS_CLEAR_LOCAL_STORAGE = 'try { localStorage.clear(); } catch(e) {}';
@@ -52,13 +55,21 @@ const JS_CLEAR_CACHE = `try {
     caches.keys().then(function(names) { names.forEach(function(n) { caches.delete(n); }); });
   }
 } catch(e) {}`;
+const JS_CLEAR_SERVICE_WORKERS = `try {
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      regs.forEach(function(reg) { reg.unregister(); });
+    });
+  }
+} catch(e) {}`;
 
 const JS_CLEAR_ALL_STORAGE = [
   JS_CLEAR_COOKIES,
   JS_CLEAR_LOCAL_STORAGE,
   JS_CLEAR_SESSION_STORAGE,
   JS_CLEAR_INDEXED_DB,
-  JS_CLEAR_CACHE
+  JS_CLEAR_CACHE,
+  JS_CLEAR_SERVICE_WORKERS
 ].join('\n');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +114,7 @@ async function clearWeb(options = {}) {
 
     // Clear localStorage, sessionStorage, IndexedDB, and Cache API via page JS
     await page.evaluate(JS_CLEAR_ALL_STORAGE);
-    logger.info('[CacheCleanup][Web] localStorage, sessionStorage, IndexedDB, and Cache cleared');
+    logger.info('[CacheCleanup][Web] localStorage, sessionStorage, IndexedDB, Cache, and Service Workers cleared');
   } catch (err) {
     logger.warn(`[CacheCleanup][Web] Cleanup failed: ${err.message}`);
   }
@@ -205,18 +216,79 @@ async function clearAndroid(driver, skipAdb = false) {
 // ─────────────────────────────────────────────────────────────────────────────
 // iOS cleanup strategies
 //
-// IMPORTANT: Does NOT use unsupported commands:
-//   - mobile:clearSafariData  ✗ (not supported)
-//   - mobile:clearCookies      ✗ (not supported)
-//   - mobile:clearPasteboard   ✗ (not supported)
+// Strategy (tiered):
+//   1. Simulator-level: Remove Safari data directories via xcrun simctl spawn
+//      (rm -rf ~/Library/Caches/com.apple.Safari, ~/Library/Safari, ~/Library/WebKit)
+//   2. Terminate Safari process to flush all data
+//   3. JS-based WebView cleanup (cookies, localStorage, sessionStorage, IndexedDB, Cache API)
+//   4. Multi-domain cookie clearing for Amazon-internal domains
 //
-// Instead:
-//   - WebView storage is cleared via JavaScript if a WebView context exists
-//   - App removal is handled by MobileSessionManager.disposeSession() via mobile:removeApp
-//   - noReset=false in capabilities ensures clean state on next session
+// Does NOT use unsupported Appium commands:
+//   - mobile:clearSafariData  ✗ (not supported by Appium)
+//   - mobile:clearCookies      ✗ (not supported for iOS)
+//   - mobile:clearPasteboard   ✗ (not supported)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const IOS_SAFARI_BUNDLE_ID = 'com.apple.mobilesafari';
+
+/**
+ * Remove Safari persistent data at the simulator filesystem level.
+ * This is the most thorough cleanup — removes cookies database, cache,
+ * localStorage files, IndexedDB, and Service Worker registrations.
+ */
+async function iosRemoveSafariSimulatorData() {
+  if (process.env.NO_RESET === "true") {
+    logger.info("[CacheCleanup][iOS] NO_RESET=true -- skipping Safari simulator data removal to prevent Web Inspector disconnection");
+    return false;
+  }
+  try {
+    const { execSync } = require('child_process');
+
+    // Kill Safari first so file locks are released
+    try {
+      execSync('xcrun simctl spawn booted launchctl kill SIGTERM system/com.apple.Safari 2>/dev/null || true', { timeout: 5000 });
+    } catch (_) {}
+
+    // Wait for process to release file locks
+    await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+
+    // Remove Safari data directories at simulator filesystem level
+    // These are the iOS simulator paths for Safari persistent storage
+    const safariDataDirs = [
+      // Safari caches and website data
+      '~/Library/Caches/com.apple.Safari',
+      // Safari preferences and state
+      '~/Library/Safari',
+      // WebKit framework data (cookies, localStorage, IndexedDB)
+      '~/Library/WebKit',
+      // Safari-specific website data store
+      '~/Library/Caches/com.apple.WebKit.WebContent',
+      // Safari safe browsing data
+      '~/Library/Caches/com.apple.Safari.SafeBrowsing',
+    ];
+
+    for (var i = 0; i < safariDataDirs.length; i++) {
+      try {
+        execSync(
+          'xcrun simctl spawn booted rm -rf ' + safariDataDirs[i] + ' 2>/dev/null || true',
+          { timeout: 5000, shell: true }
+        );
+      } catch (_) {}
+    }
+
+    logger.info('[CacheCleanup][iOS] Safari simulator data directories removed');
+
+    // Kill Safari again after data removal (it may have restarted)
+    try {
+      execSync('xcrun simctl spawn booted launchctl kill SIGTERM system/com.apple.Safari 2>/dev/null || true', { timeout: 5000 });
+    } catch (_) {}
+
+    return true;
+  } catch (err) {
+    logger.warn('[CacheCleanup][iOS] Simulator data removal failed (non-fatal): ' + (err.message || 'unknown'));
+    return false;
+  }
+}
 
 /**
  * Clear iOS WebView state via JavaScript execution.
@@ -251,6 +323,7 @@ async function iosClearWebViewViaJS(driver) {
   for (const ctx of webviewContexts) {
     try {
       await driver.switchContext(ctx);
+      // Execute the full storage cleanup including multi-domain cookies and service workers
       await driver.execute(JS_CLEAR_ALL_STORAGE);
       logger.info(`[CacheCleanup] iOS: Cleared WebView storage in context: ${ctx}`);
     } catch (err) {
@@ -269,6 +342,7 @@ async function iosClearWebViewViaJS(driver) {
 
 /**
  * Clear iOS Safari cookies via JavaScript (executed in Safari's WebView context).
+ * Enhanced to clear cookies across multiple Amazon-related domains.
  */
 async function iosClearSafariCookiesViaJS(driver) {
   let previousContext = null;
@@ -280,8 +354,33 @@ async function iosClearSafariCookiesViaJS(driver) {
     );
     if (safariContext) {
       await driver.switchContext(safariContext);
+
+      // Clear cookies for the current domain
       await driver.execute(JS_CLEAR_COOKIES);
-      logger.info('[CacheCleanup] iOS: Cleared Safari cookies via JS');
+
+      // Use JS to also clear cookies for common Amazon subdomains
+      await driver.execute(function() {
+        var domains = [
+          location.hostname,
+          'www.amazon.in',
+          'amazon.in',
+          'payments.amazon.in',
+          'sellercentral.amazon.in',
+          'affiliate-program.amazon.in',
+        ];
+        var cookieParts = document.cookie.split(';');
+        for (var d = 0; d < domains.length; d++) {
+          for (var c = 0; c < cookieParts.length; c++) {
+            var name = cookieParts[c].split('=')[0];
+            if (name) {
+              document.cookie = name.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=' + domains[d];
+              document.cookie = name.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;domain=.' + domains[d];
+            }
+          }
+        }
+      });
+
+      logger.info('[CacheCleanup] iOS: Cleared Safari cookies via JS (multi-domain)');
     }
   } catch (err) {
     logger.warn(`[CacheCleanup] iOS: Safari JS cookie clear failed: ${err.message}`);
@@ -299,20 +398,31 @@ async function iosClearSafariCookiesViaJS(driver) {
 /**
  * Primary iOS cache cleanup.
  *
- * Does NOT use unsupported mobile:clearSafariData, mobile:clearCookies,
- * or mobile:clearPasteboard commands. WebView state is cleared via JS.
- * App removal is handled by MobileSessionManager.disposeSession().
+ * Tiered approach:
+ *   1. Simulator-level Safari data directory removal (most thorough)
+ *   2. WebView storage cleanup via JavaScript
+ *   3. Multi-domain Safari cookie clearing
+ *
+ * @param {object} driver - WebDriverIO/Appium driver
+ * @param {boolean} [isSafari=false] - true if running iOS Safari browser
  */
 async function clearIOS(driver, isSafari = false) {
-  // Clear WebView storage via JavaScript (works for both native apps and Safari)
+  // Tier 1: Simulator-level Safari data removal (most thorough)
+  // This removes cookies database files, cache files, localStorage,
+  // IndexedDB, and Service Worker registrations from the filesystem.
+  if (isSafari) {
+    await iosRemoveSafariSimulatorData();
+  }
+
+  // Tier 2: Clear WebView storage via JavaScript
   await iosClearWebViewViaJS(driver);
 
-  // Clear Safari cookies via JavaScript if running in Safari mode
+  // Tier 3: Clear Safari cookies via JavaScript if running in Safari mode
   if (isSafari) {
     await iosClearSafariCookiesViaJS(driver);
   }
 
-  logger.info('[CacheCleanup] iOS: Cache cleanup completed (no unsupported mobile: commands used)');
+  logger.info('[CacheCleanup] iOS: Cache cleanup completed (simulator-level + JS)');
 }
 
 /**
@@ -397,6 +507,7 @@ module.exports = {
   clearPostScenario,
   clearAndroid,
   clearIOS,
+  iosRemoveSafariSimulatorData,
   // Exported for unit testing
   JS_CLEAR_ALL_STORAGE,
   JS_CLEAR_COOKIES,

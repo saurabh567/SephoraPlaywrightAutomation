@@ -199,3 +199,29 @@ class LocatorHistoryStore {
 }
 
 module.exports = LocatorHistoryStore;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Locator History Store",
+  "version": "1.0.0",
+  "description": "Persistent storage of locator versions, successes, failures, and replacements",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "storage"
+  ],
+  "executionStage": "analysis",
+  "priority": 30,
+  "conditions": [],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "internal"
+};

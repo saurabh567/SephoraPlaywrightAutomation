@@ -559,3 +559,38 @@ if (require.main === module) {
 }
 
 module.exports = MobileDeviceFarmAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Mobile Device Farm Agent",
+  "version": "1.0.0",
+  "description": "Cross-platform device farm execution on emulators, real devices, BrowserStack, SauceLabs",
+  "dependencies": [
+    "AppiumAgent"
+  ],
+  "platforms": [
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "mobile",
+    "device-farm"
+  ],
+  "executionStage": "execution",
+  "priority": 45,
+  "conditions": [
+    {
+      "type": "platform",
+      "value": "mobile"
+    },
+    {
+      "type": "deviceFarm"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 2,
+    "backoff": "linear"
+  },
+  "lifecycle": "active"
+};

@@ -41,3 +41,38 @@ class JenkinsBuildFailureAnalysisAgent extends BaseAgent {
 }
 
 module.exports = JenkinsBuildFailureAnalysisAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Jenkins Build Failure Analysis Agent",
+  "version": "1.0.0",
+  "description": "Analyzes Jenkins console errors and identifies root cause",
+  "dependencies": ["JenkinsAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "ci",
+    "jenkins",
+    "analysis"
+  ],
+  "executionStage": "multi-agent",
+  "priority": 35,
+  "conditions": [
+    {
+      "type": "ci"
+    },
+    {
+      "type": "hasJenkinsLog"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

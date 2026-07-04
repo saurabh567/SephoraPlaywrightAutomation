@@ -475,7 +475,25 @@ async function main() {
   process.exit(0);
 }
 
+if (require.main === module) {
 main().catch(err => {
   console.error('❌ Unexpected error:', err);
   process.exit(1);
 });
+}
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "JMeter Performance Analysis Agent",
+  "version": "1.0.0",
+  "description": "Analyzes JMeter JTL/summary reports for performance issues",
+  "dependencies": [],
+  "platforms": ["WEB", "ANDROID", "IOS", "API"],
+  "tags": ["performance", "jmeter"],
+  "executionStage": "multi-agent",
+  "priority": 40,
+  "conditions": [{"type": "hasPerformanceData"}],
+  "retryPolicy": {"maxRetries": 0, "backoff": "none"},
+  "lifecycle": "active"
+};

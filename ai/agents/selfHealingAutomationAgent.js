@@ -44,3 +44,33 @@ class SelfHealingAutomationAgent extends BaseAgent {
 }
 
 module.exports = SelfHealingAutomationAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Self-Healing Automation Agent",
+  "version": "1.0.0",
+  "description": "Placeholder locator suggestion agent. Returns template-based suggestions only. Available via CLI: node ai/index.js --agent SelfHealingAutomationAgent",
+  "dependencies": ["failureAnalysisAgent","locatorHealingAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS"
+  ],
+  "tags": [
+    "healing",
+    "placeholder"
+  ],
+  "executionStage": "analysis",
+  "priority": 30,
+  "conditions": [
+    {
+      "type": "hasFailures"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "on_demand"
+};

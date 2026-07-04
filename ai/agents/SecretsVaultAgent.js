@@ -493,3 +493,34 @@ if (require.main === module) {
 }
 
 module.exports = SecretsVaultAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Secrets Vault Agent",
+  "version": "1.0.0",
+  "description": "AES-256-CBC encrypted credential management with profiles and key rotation",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "security",
+    "infrastructure"
+  ],
+  "executionStage": "preflight",
+  "priority": 30,
+  "conditions": [
+    {
+      "type": "onDemand"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

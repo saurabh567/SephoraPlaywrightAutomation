@@ -1,52 +1,52 @@
-// Validates AI services, runs Cucumber, then runs retrieval-augmented post-execution agents.
-const { spawnSync } = require('child_process');
-const path = require('path');
+#!/usr/bin/env node
+/**
+ * runCucumberWithAi.js
+ *
+ * Thin wrapper that dispatches to the unified orchestrator for AI-powered test execution.
+ * This is the entry point for `npm test` and `npm run test:ai`.
+ *
+ * The unified orchestrator (ai/orchestrator/unifiedOrchestrator.js) handles:
+ *   - Pre-flight: AI service health checks (Ollama, Chroma, ecosystem)
+ *   - Execution: platform test execution (Web/Android/iOS/API) with Appium lifecycle
+ *   - AI Analysis: vector ingestion, failure analysis, locator healing, RCA, retry
+ *   - Multi-Agent: smart test selection, impact analysis, visual validation, anomaly detection
+ *   - Reporting: consolidated reports, dashboard, PR preparation, telemetry
+ *
+ * Legacy behavior preserved:
+ *   - LOCATOR_HEALING=1 still triggers post-test locator analysis (via unified orchestrator)
+ *   - Exit code propagation
+ *   - All output directories unchanged
+ */
 
-// Delegate test execution to the TestExecutionAgent to make AI mandatory for npm test
-const agentArgs = ['--agent', 'TestExecutionAgent', ...process.argv.slice(2)];
+const { orchestrate } = require('../ai/orchestrator/unifiedOrchestrator');
 
-const agentResult = spawnSync('node', ['ai/index.js', ...agentArgs], {
-  stdio: 'inherit',
-  env: process.env
-});
+async function main() {
+  const platform = (process.env.TEST_PLATFORM || 'WEB').toUpperCase();
 
-if (agentResult.status !== 0) {
-  console.error('TestExecutionAgent failed. Aborting with status', agentResult.status);
-}
+  console.log('══════════════════════════════════════════════');
+  console.log('  AI-Powered Test Execution');
+  console.log(`  Platform: ${platform}`);
+  console.log(`  Mode:     ${process.env.CI ? 'CI' : 'Local'}`);
+  console.log('══════════════════════════════════════════════\n');
 
-// --- Post-test: Generate AI Executive Dashboard ---
-try {
-  console.log('\n[Post-Test] Generating AI Executive Dashboard...');
-  const dashboardResult = spawnSync('node', ['utils/runDashboard.js'], {
-    stdio: 'inherit',
-    env: process.env,
+  const result = await orchestrate({
+    platform,
+    skipMultiAgent: process.env.CI ? false : true,  // Full multi-agent in CI, skip locally
+    enableRetry: process.env.CI ? true : true,
+    maxRetries: Number(process.env.RETRIES || 2),
+    reportDir: process.env.REPORT_DIR || 'reports'
   });
-  if (dashboardResult.status === 0) {
-    console.log('[Post-Test] ✅ AI Executive Dashboard generated successfully.');
-  } else {
-    console.warn('[Post-Test] ⚠ Dashboard generation exited with code', dashboardResult.status);
+
+  // Legacy LOCATOR_HEALING env var support
+  if (process.env.LOCATOR_HEALING === '1') {
+    console.log('\n[Post-Test] LOCATOR_HEALING enabled - locator analysis already handled by orchestrator Phase 2');
   }
-} catch (e) {
-  console.warn('[Post-Test] Failed to generate dashboard:', e && (e.message || e));
+
+  const exitCode = result.exitCode !== undefined ? result.exitCode : 0;
+  process.exit(exitCode);
 }
 
-// --- appended opt-in post-test hook (Phase 3) ---
-// If LOCATOR_HEALING=1 then run post-test locator analysis (dry-run by default)
-if (process.env.LOCATOR_HEALING === '1') {
-  try {
-    const spawnSync = require('child_process').spawnSync;
-    const reportDir = process.env.REPORT_DIR || require('path').join(process.cwd(), 'reports');
-    console.log('LOCATOR_HEALING enabled: running post-test locator analysis (dry-run).');
-    const args = ['utils/postTestLocatorAnalyze.js', '--reportDir', reportDir];
-    const res = spawnSync('node', args, { stdio: 'inherit' });
-    if (res.status !== 0) {
-      console.warn('postTestLocatorAnalyze exited non-zero:', res.status);
-    } else {
-      console.log('postTestLocatorAnalyze completed.');
-    }
-  } catch (e) {
-    console.warn('Failed to run postTestLocatorAnalyze:', e && (e.message||e));
-  }
-}
-
-process.exit(agentResult.status || 0);
+main().catch(err => {
+  console.error('[runCucumberWithAi] Fatal:', err.stack || err.message);
+  process.exit(2);
+});

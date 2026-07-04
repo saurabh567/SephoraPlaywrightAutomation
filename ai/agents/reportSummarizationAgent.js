@@ -27,3 +27,34 @@ module.exports = {
   },
   agent
 };
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Report Summarization Agent",
+  "version": "1.0.0",
+  "description": "LLM-based executive test report summary generation",
+  "dependencies": [],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "reporting",
+    "llm"
+  ],
+  "executionStage": "reporting",
+  "priority": 70,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

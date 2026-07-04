@@ -484,3 +484,34 @@ if (require.main === module) {
 }
 
 module.exports = DocumentationGeneratorAgent;
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Documentation Generator Agent",
+  "version": "1.0.0",
+  "description": "Auto-generates multi-format documentation for the entire AI ecosystem",
+  "dependencies": ["UnifiedMCPOrchestratorAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "documentation",
+    "utility"
+  ],
+  "executionStage": "reporting",
+  "priority": 10,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "lifecycle": "active"
+};

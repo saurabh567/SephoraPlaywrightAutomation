@@ -1,9 +1,32 @@
 // ReportAgent - Generates comprehensive test execution reports by aggregating data from multiple sources
 const fs = require('fs-extra');
 const path = require('path');
-
+const AIDashboardAgent = require("./AIDashboardAgent");
+const ConsolidatedReportAgent = require("./ConsolidatedReportAgent");
 module.exports = {
   run: async function run(input = {}) {
+    console.log("[ReportAgent] Generating execution report");
+
+    // Strategy Pattern delegation
+    const mode = input.mode || "basic";
+    if (mode === "dashboard") {
+      console.log("[ReportAgent] Delegating to dashboard strategy (AIDashboardAgent)");
+      try { return await AIDashboardAgent.run(input); }
+      catch (err) { console.warn("[ReportAgent] Dashboard strategy failed:", err.message); }
+    }
+    if (mode === "consolidated") {
+      console.log("[ReportAgent] Delegating to consolidated strategy (ConsolidatedReportAgent)");
+      try { return await new ConsolidatedReportAgent(input).run(); }
+      catch (err) { console.warn("[ReportAgent] Consolidated strategy failed:", err.message); }
+    }
+    if (mode === "summary") {
+      console.log("[ReportAgent] Delegating to summary strategy (reportSummarizationAgent)");
+      try { return await reportSummarizationAgent.run(input); }
+      catch (err) { console.warn("[ReportAgent] Summary strategy failed:", err.message); }
+    }
+
+    // Default: basic execution report (original implementation)
+
     console.log('[ReportAgent] Generating execution report');
 
     const reportData = {
@@ -135,4 +158,37 @@ module.exports = {
       failureCount: reportData.failures.length
     };
   }
+};
+
+
+// Auto-registered metadata for AgentRegistry
+module.exports.metadata = {
+  "name": "Report Agent",
+  "version": "1.0.0",
+  "description": "Generates comprehensive execution reports from multiple sources",
+  "dependencies": ["TestExecutionAgent","failureAnalysisAgent","RCAAgent","locatorHealingAgent"],
+  "platforms": [
+    "WEB",
+    "ANDROID",
+    "IOS",
+    "API"
+  ],
+  "tags": [
+    "reporting"
+  ],
+  "executionStage": "reporting",
+  "priority": 80,
+  "conditions": [
+    {
+      "type": "always"
+    }
+  ],
+  "retryPolicy": {
+    "maxRetries": 0,
+    "backoff": "none"
+  },
+  "strategy": "owner",
+  "responsibilities": ["reporting"],
+  "strategies": ["AIDashboardAgent","ConsolidatedReportAgent"],
+  "lifecycle": "active"
 };
