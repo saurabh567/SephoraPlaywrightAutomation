@@ -1,0 +1,69 @@
+{
+  "agentKey": "MonitoringAgent",
+  "summary": {
+    "totalExecutions": 3,
+    "totalDuration": 2600,
+    "meanDuration": 867,
+    "minDuration": 600,
+    "maxDuration": 1200,
+    "totalMemory": 15,
+    "meanMemory": 5,
+    "peakMemory": 5,
+    "totalCPU": 27,
+    "meanCPU": 9,
+    "failures": 1,
+    "retries": 0,
+    "successes": 1,
+    "skips": 0,
+    "recoveries": 1,
+    "successRate": 50,
+    "skipRate": 0,
+    "recoveryRate": 100,
+    "lastExecution": "2026-07-07T08:09:36.990Z",
+    "lastDuration": 600,
+    "lastMemory": 5,
+    "lastCPU": 9,
+    "trend": "improving"
+  },
+  "executions": [
+    {
+      "timestamp": "2026-07-07T08:09:36.990Z",
+      "duration": 1200,
+      "memory": 5,
+      "peakMemory": 5,
+      "cpu": 9,
+      "status": "failed",
+      "retries": 0,
+      "error": "Timeout",
+      "executionId": null,
+      "phaseId": null,
+      "platform": "WEB"
+    },
+    {
+      "timestamp": "2026-07-07T08:09:36.990Z",
+      "duration": 800,
+      "memory": 5,
+      "peakMemory": 5,
+      "cpu": 9,
+      "status": "recovered",
+      "retries": 0,
+      "error": null,
+      "executionId": null,
+      "phaseId": null,
+      "platform": "WEB"
+    },
+    {
+      "timestamp": "2026-07-07T08:09:36.990Z",
+      "duration": 600,
+      "memory": 5,
+      "peakMemory": 5,
+      "cpu": 9,
+      "status": "completed",
+      "retries": 0,
+      "error": null,
+      "executionId": null,
+      "phaseId": null,
+      "platform": "WEB"
+    }
+  ]
+}

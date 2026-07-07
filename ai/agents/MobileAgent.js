@@ -237,7 +237,7 @@ module.exports = {
 
 // Auto-registered metadata for AgentRegistry
 module.exports.metadata = {
-  "name": "Mobile Test Generation Agent",
+  "name": "Mobile Agent (Legacy)",
   "version": "1.0.0",
   "description": "Generates Appium mobile test scenarios and page objects for Android/iOS",
   "dependencies": ["AppiumAgent"],

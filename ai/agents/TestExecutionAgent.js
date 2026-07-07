@@ -4,6 +4,7 @@ const fs = require('fs-extra');
 
 const AppiumAgent = require('./AppiumAgent');
 const UnifiedHealth = require('../health/unifiedHealth');
+const PlaywrightCLIAgent = require('./PlaywrightCLIAgent');
 
 class TestExecutionAgent {
   constructor(options = {}) {
@@ -12,6 +13,14 @@ class TestExecutionAgent {
 
   async run() {
     console.log('[TestExecutionAgent] Starting AI-driven test execution');
+
+    // ── Route through Playwright CLI if enabled ─────────────────────────
+    if (process.env.PLAYWRIGHT_CLI === 'true' || this.options.usePlaywrightCLI) {
+      console.log('[TestExecutionAgent] Playwright CLI execution mode enabled — routing through PlaywrightCLIAgent');
+      return this._executeViaPlaywrightCLI();
+    }
+
+    // ── Legacy execution path (preserved) ───────────────────────────────
 
     // 1) Health check (Ollama + Vector fallback)
     try {
@@ -88,8 +97,7 @@ class TestExecutionAgent {
       console.error('[TestExecutionAgent] Ingest failed:', err.message);
     }
 
-    // 5b) Canonicalize Cucumber JSON to reports/json/cucumber-report.json so post-exec RAG can find it.
-    //     Searches both flat (reports/*/cucumber-report.json) and nested (reports/*/json/cucumber-report.json) structures.
+    // 5b) Canonicalize Cucumber JSON
     try {
       const reportsRoot = path.join(process.cwd(), 'reports');
       function findCucumberReport(dir) {
@@ -100,13 +108,10 @@ class TestExecutionAgent {
           let stat;
           try { stat = fs.statSync(full); } catch (ex) { continue; }
           if (stat.isDirectory()) {
-            // Check flat structure: reports/{platform}/cucumber-report.json
             const flatCandidate = path.join(full, 'cucumber-report.json');
             if (fs.existsSync(flatCandidate)) return flatCandidate;
-            // Check nested structure: reports/{platform}/json/cucumber-report.json
             const nestedCandidate = path.join(full, 'json', 'cucumber-report.json');
             if (fs.existsSync(nestedCandidate)) return nestedCandidate;
-            // Recurse into subdirectory
             const deeper = findCucumberReport(full);
             if (deeper) return deeper;
           }
@@ -123,7 +128,6 @@ class TestExecutionAgent {
             JSON.parse(raw);
             return true;
           } catch (e) {
-            // likely incomplete write — wait and retry
             await new Promise(r => setTimeout(r, intervalMs));
           }
         }
@@ -135,7 +139,6 @@ class TestExecutionAgent {
         const targetDir = path.join(process.cwd(), 'reports', 'json');
         fs.ensureDirSync(targetDir);
         const dest = path.join(targetDir, 'cucumber-report.json');
-        // wait for the source JSON to be fully written and valid
         const ok = await waitForValidJson(found, { timeoutMs: 30000, intervalMs: 500 });
         if (ok) {
           fs.copyFileSync(found, dest);
@@ -144,7 +147,6 @@ class TestExecutionAgent {
           console.warn('[TestExecutionAgent] Found cucumber JSON but it appears incomplete or invalid after waiting; skipping copy to', dest);
         }
       } else {
-        // Also search the top-level reports directory directly
         const topLevelFlat = path.join(reportsRoot, 'cucumber-report.json');
         if (fs.existsSync(topLevelFlat)) {
           const targetDir = path.join(process.cwd(), 'reports', 'json');
@@ -160,7 +162,7 @@ class TestExecutionAgent {
       console.warn('[TestExecutionAgent] Error while canonicalizing cucumber JSON:', e.message);
     }
 
-    // 6) Run post-execution RAG analysis (failure analysis, locator healing, etc.)
+    // 6) Run post-execution RAG analysis
     try {
       console.log('[TestExecutionAgent] Running post-execution RAG analysis');
       const workflow = require('../workflows/runPostExecutionAgents');
@@ -184,6 +186,130 @@ class TestExecutionAgent {
 
     return { agent: 'TestExecutionAgent', exitCode };
   }
+
+  /**
+   * Execute tests through the Playwright CLI agent.
+   * This is the new official execution path — AI controls Playwright CLI.
+   */
+  async _executeViaPlaywrightCLI() {
+    const platform = (process.env.TEST_PLATFORM || 'WEB').toUpperCase();
+    const headed = process.env.HEADLESS !== 'false' ? false : true;
+
+    console.log(`[TestExecutionAgent] Initializing Playwright CLI path for ${platform}`);
+
+    // 1) Health checks
+    try {
+      const health = await UnifiedHealth.run();
+      console.log('[TestExecutionAgent] Health OK:', health.summary || 'ok');
+    } catch (err) {
+      console.error('[TestExecutionAgent] Health check failed:', err.message);
+      throw err;
+    }
+
+    try {
+      const ollamaManager = require('../health/ollamaManager');
+      await ollamaManager.ensureRunning();
+    } catch (e) {
+      console.warn('[TestExecutionAgent] ollama ensureRunning failed (continuing):', e.message);
+    }
+
+    try {
+      const chromaManager = require('../vector-db/chromaServerManager');
+      await chromaManager.ensureRunning();
+    } catch (e) {
+      console.warn('[TestExecutionAgent] chroma ensureRunning failed (continuing):', e.message);
+    }
+
+    // 2) Start Appium if mobile
+    if (platform === 'ANDROID' || platform === 'IOS') {
+      console.log('[TestExecutionAgent] Preparing Appium for mobile run');
+      await AppiumAgent.startServerIfNeeded();
+    }
+
+    // 3) Execute via Playwright CLI Agent
+    const cliAgent = new PlaywrightCLIAgent({
+      platform,
+      headed,
+      browser: process.env.BROWSER || 'chromium',
+      project: platform === 'ANDROID' ? 'android' : platform === 'IOS' ? 'ios' : platform === 'API' ? 'api' : undefined,
+      envOverrides: {
+        TEST_PLATFORM: platform,
+        PLAYWRIGHT_CLI_AGENT: 'true',
+        PLAYWRIGHT_CLI_EXECUTION: 'true'
+      }
+    });
+
+    let cliResult;
+    try {
+      cliResult = await cliAgent.run({
+        hasFailures: false,
+        priority: this.options.priority || 'normal'
+      });
+    } catch (err) {
+      // Playwright CLI threw — capture as failure result
+      cliResult = { exitCode: 1, error: err.message, agent: 'PlaywrightCLIAgent' };
+    } finally {
+      // 4) Stop Appium if started
+      if (platform === 'ANDROID' || platform === 'IOS') {
+        try {
+          await AppiumAgent.stopServerIfStartedByFramework();
+        } catch (e) {
+          console.warn('[TestExecutionAgent] Appium stop failed:', e.message);
+        }
+      }
+    }
+
+    const exitCode = cliResult && cliResult.exitCode !== undefined ? cliResult.exitCode : 0;
+
+    // 5) Ingest artifacts into vector store
+    try {
+      console.log('[TestExecutionAgent] Ingesting artifacts into local vector store');
+      spawnSync('node', [path.join('ai', 'local', 'localIngest.js')], { stdio: 'inherit', env: process.env });
+    } catch (err) {
+      console.error('[TestExecutionAgent] Ingest failed:', err.message);
+    }
+
+    // 6) Run post-execution RAG analysis
+    try {
+      console.log('[TestExecutionAgent] Running post-execution RAG analysis');
+      const workflow = require('../workflows/runPostExecutionAgents');
+      await workflow.run();
+    } catch (err) {
+      console.error('[TestExecutionAgent] Post-execution RAG failed:', err.stack || err.message);
+    }
+
+    // 7) Write summary with Playwright CLI metadata
+    const summaryPath = path.join(process.cwd(), 'ai', 'output', 'test-execution-summary.json');
+    fs.ensureDirSync(path.dirname(summaryPath));
+    fs.writeJsonSync(summaryPath, {
+      platform,
+      exitCode,
+      engine: 'playwright-cli',
+      cliResult: {
+        profile: cliResult.profileName || cliResult.profile,
+        passed: cliResult.passed,
+        failed: cliResult.failed,
+        skipped: cliResult.skipped,
+        duration: cliResult.duration
+      },
+      executedAt: new Date().toISOString()
+    }, { spaces: 2 });
+
+    console.log('[TestExecutionAgent] Playwright CLI path completed. Exit code:', exitCode);
+
+    if (exitCode !== 0) {
+      const err = new Error(`Tests failed with exit code ${exitCode}`);
+      err.code = exitCode;
+      throw err;
+    }
+
+    return {
+      agent: 'TestExecutionAgent',
+      engine: 'playwright-cli',
+      exitCode,
+      cliResult
+    };
+  }
 }
 
 module.exports = TestExecutionAgent;
@@ -199,8 +325,9 @@ module.exports.run = async function(options = {}) {
 module.exports.metadata = {
   "name": "Test Execution Agent",
   "version": "1.0.0",
-  "description": "AI-driven test execution with health checks and platform orchestration",
+  "description": "AI-driven test execution with health checks and platform orchestration. Supports Playwright CLI as official execution engine when PLAYWRIGHT_CLI=true.",
   "dependencies": [
+    "PlaywrightCLIAgent",
     "AppiumAgent",
     "failureAnalysisAgent",
     "locatorHealingAgent",
@@ -213,7 +340,8 @@ module.exports.metadata = {
   ],
   "tags": [
     "execution",
-    "ai"
+    "ai",
+    "playwright-cli"
   ],
   "executionStage": "execution",
   "priority": 90,

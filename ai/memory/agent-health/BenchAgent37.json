@@ -1,0 +1,82 @@
+{
+  "agentKey": "BenchAgent37",
+  "summary": {
+    "totalExecutions": 4,
+    "totalDuration": 2992,
+    "meanDuration": 748,
+    "minDuration": 748,
+    "maxDuration": 748,
+    "totalMemory": 231,
+    "meanMemory": 58,
+    "peakMemory": 58,
+    "totalCPU": 36,
+    "meanCPU": 9,
+    "failures": 0,
+    "retries": 0,
+    "successes": 0,
+    "skips": 4,
+    "recoveries": 0,
+    "successRate": 0,
+    "skipRate": 100,
+    "recoveryRate": 0,
+    "lastExecution": "2026-07-07T08:32:30.750Z",
+    "lastDuration": 748,
+    "lastMemory": 58,
+    "lastCPU": 9,
+    "trend": "stable"
+  },
+  "executions": [
+    {
+      "timestamp": "2026-07-07T08:32:30.750Z",
+      "duration": 748,
+      "memory": 57,
+      "peakMemory": 57,
+      "cpu": 9,
+      "status": "skipped",
+      "retries": 0,
+      "error": "Platform mismatch",
+      "executionId": null,
+      "phaseId": "bench",
+      "platform": "WEB"
+    },
+    {
+      "timestamp": "2026-07-07T08:32:30.750Z",
+      "duration": 748,
+      "memory": 58,
+      "peakMemory": 58,
+      "cpu": 9,
+      "status": "skipped",
+      "retries": 0,
+      "error": "Platform mismatch",
+      "executionId": null,
+      "phaseId": "bench",
+      "platform": "WEB"
+    },
+    {
+      "timestamp": "2026-07-07T08:32:30.750Z",
+      "duration": 748,
+      "memory": 58,
+      "peakMemory": 58,
+      "cpu": 9,
+      "status": "skipped",
+      "retries": 0,
+      "error": "Platform mismatch",
+      "executionId": null,
+      "phaseId": "bench",
+      "platform": "WEB"
+    },
+    {
+      "timestamp": "2026-07-07T08:32:30.750Z",
+      "duration": 748,
+      "memory": 58,
+      "peakMemory": 58,
+      "cpu": 9,
+      "status": "skipped",
+      "retries": 0,
+      "error": "Platform mismatch",
+      "executionId": null,
+      "phaseId": "bench",
+      "platform": "WEB"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "indexedAt": "2026-07-04T19:42:20.113Z",
+  "indexedAt": "2026-07-05T09:56:30.822Z",
   "categories": {
     "features": [
       {
@@ -94,10 +94,6 @@
       }
     ],
     "aiReports": [
-      {
-        "name": "api-analysis-report.md",
-        "size": "1.0 KB"
-      },
       {
         "name": "vector-search-results.json",
         "size": "0.1 KB"

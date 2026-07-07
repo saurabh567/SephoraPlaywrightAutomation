@@ -21,7 +21,8 @@
  *   node ai/orchestrator/unifiedOrchestrator.js              # Full pipeline
  *   node ai/orchestrator/unifiedOrchestrator.js --platform WEB
  *   node ai/orchestrator/unifiedOrchestrator.js --skip-analysis
- *   node ai/orchestrator/unifiedOrchestrator.js --dry-run     # Show plan only
+ * *   node ai/orchestrator/unifiedOrchestrator.js --dry-run     # Show plan only
+ *   node ai/orchestrator/unifiedOrchestrator.js --playwright-cli  # Use Playwright CLI engine
  */
 
 const fs = require('fs-extra');
@@ -414,12 +415,18 @@ async function orchestrate(options = {}) {
   const stats = registry.getStats();
   const platform = (options.platform || process.env.TEST_PLATFORM || 'WEB').toUpperCase();
 
+  // Enable Playwright CLI execution engine if requested
+  if (options.usePlaywrightCLI) {
+    process.env.PLAYWRIGHT_CLI = 'true';
+  }
+
   console.log('\n╔══════════════════════════════════════════════════════╗');
   console.log('║     Enterprise AI Automation Orchestrator            ║');
   console.log('╚══════════════════════════════════════════════════════╝');
   console.log(`  Platform: ${platform}`);
   console.log(`  Mode:     ${process.env.CI ? 'CI' : 'Local'}`);
   console.log(`  Agents:   ${stats.totalAgents} discovered`);
+  console.log(`  Engine:   ${process.env.PLAYWRIGHT_CLI === 'true' ? 'Playwright CLI' : 'Cucumber (legacy)'}`);
   console.log(`  Dry run:  ${options.dryRun ? 'YES (plan only)' : 'NO'}`);
   console.log('');
 
@@ -524,6 +531,7 @@ function parseArgs(argv) {
     else if (t === '--dry-run') { args.dryRun = true; }
     else if (t === '--force-full') { args.forceFull = true; }
     else if (t === '--ci') { process.env.CI = 'true'; }
+    else if (t === '--playwright-cli') { args.usePlaywrightCLI = true; process.env.PLAYWRIGHT_CLI = 'true'; }
     else if (t === '--help' || t === '-h') { args.help = true; }
   }
   return args;
@@ -542,6 +550,7 @@ Options:
   --dry-run                         Show execution plan only, don't execute
   --force-full                      Run all agents regardless of context
   --ci                              Run in CI mode
+  --playwright-cli                  Use Playwright CLI as execution engine
   --help, -h                        Show this help
 `);
     process.exit(0);

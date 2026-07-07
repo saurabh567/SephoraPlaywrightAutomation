@@ -61,7 +61,9 @@ async function listAgents() {
 
 async function showAgentInfo(agentKey) {
   await registry.discover();
-  const agent = registry.get(agentKey);
+  let agent = registry.get(agentKey);
+  if (!agent) agent = registry.getByName(agentKey);
+  if (!agent) agent = registry.getAll().find(a => a.key.toLowerCase() === agentKey.toLowerCase());
   if (!agent) {
     console.error(`Agent '${agentKey}' not found in registry.`);
     console.log(`Available agents: ${registry.getAll().map(a => a.key).join(', ')}`);
@@ -173,7 +175,9 @@ async function main() {
 
   if (args.agent) {
     const agentName = args.agent;
-    const agent = registry.get(agentName);
+    let agent = registry.get(agentName);
+    if (!agent) agent = registry.getByName(agentName);
+    if (!agent) agent = registry.getAll().find(a => a.key.toLowerCase() === agentName.toLowerCase());
     if (!agent) {
       console.error(`Unknown agent: ${agentName}`);
       console.log(`Available agents: ${registry.getAll().map(a => a.key).join(', ')}`);

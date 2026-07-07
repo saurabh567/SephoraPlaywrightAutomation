@@ -1,0 +1,596 @@
+/**
+ * PlaywrightCommandBuilder.js
+ *
+ * Pure command builder for Playwright CLI — no execution, no spawning.
+ * Generates structured Playwright CLI commands that can be passed to
+ * PlaywrightExecutionEngine for execution or logged/inspected.
+ *
+ * The DecisionAgent uses this builder to dynamically construct commands
+ * based on context analysis, risk assessment, and execution strategy.
+ *
+ * Architecture:
+ *   DecisionAgent ──► PlaywrightCommandBuilder ──► { command, args, commandString }
+ *                                                         │
+ *                                                         ▼
+ *                                              PlaywrightExecutionEngine.execute()
+ *
+ * Every method returns a CanonicalCommand:
+ *   { command: 'npx playwright test', args: [...], commandString: '...' }
+ *
+ * Usage (standalone):
+ *   const builder = require('./core/PlaywrightCommandBuilder');
+ *   const cmd = builder.build({ project: 'Android', tags: '@Smoke', workers: 6 });
+ *   // cmd.commandString = 'npx playwright test --project Android --grep @Smoke --workers 6'
+ *
+ * Usage (DecisionAgent):
+ *   const commands = [];
+ *   if (isSmokeRun) commands.push(builder.forSmoke({ workers: 6 }));
+ *   if (needsShard)  commands.push(builder.forShard(2, 4, { project: 'Android' }));
+ *   // Execute each via PlaywrightExecutionEngine
+ */
+
+const path = require('path');
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const NPX_PW = 'npx playwright test';
+const DEFAULT_CONFIG = 'playwright.config.cli.js';
+
+// ─── Canonical Command ─────────────────────────────────────────────────────
+
+class CanonicalCommand {
+  constructor(options = {}) {
+    this.command = options.command || NPX_PW;
+    this.args = options.args || [];
+    this.config = options.config || DEFAULT_CONFIG;
+    this.platform = options.platform || 'WEB';
+    this.project = options.project || null;
+    this.tags = options.tags || null;
+    this.workers = options.workers || null;
+    this.retries = options.retries || null;
+    this.shard = options.shard || null;
+    this.headed = options.headed || false;
+    this.browser = options.browser || null;
+    this.trace = options.trace || null;
+    this.video = options.video || null;
+    this.screenshot = options.screenshot || null;
+    this.testFile = options.testFile || null;
+    this.timeout = options.timeout || null;
+    this.maxFailures = options.maxFailures || null;
+    this.repeatEach = options.repeatEach || null;
+    this.forbidOnly = options.forbidOnly === true;
+    this.fullyParallel = options.fullyParallel || false;
+    this.extraArgs = options.extraArgs || [];
+    this.description = options.description || '';
+  }
+
+  /** Full command string for display/logging */
+  get commandString() {
+    return [this.command, ...this._buildArgs()].join(' ');
+  }
+
+  /** Build the full CLI arg array */
+  _buildArgs() {
+    const args = [];
+
+    if (this.config) {
+      args.push('--config', this.config);
+    }
+
+    if (this.project) {
+      args.push('--project', this.project);
+    }
+
+    if (this.tags) {
+      const tagList = this.tags.split(',').map(t => t.trim()).filter(Boolean);
+      if (tagList.length === 1) {
+        args.push('--grep', tagList[0]);
+      } else if (tagList.length > 1) {
+        const grepPattern = tagList.map(t => `(?=.*${t})`).join('');
+        args.push('--grep', grepPattern);
+      }
+    }
+
+    if (this.testFile) {
+      args.push(this.testFile);
+    }
+
+    if (this.workers) {
+      args.push('--workers', String(this.workers));
+    }
+
+    if (this.retries) {
+      args.push('--retries', String(this.retries));
+    }
+
+    if (this.repeatEach && this.repeatEach > 1) {
+      args.push('--repeat-each', String(this.repeatEach));
+    }
+
+    if (this.shard) {
+      args.push('--shard', this.shard);
+    }
+
+    if (this.timeout) {
+      args.push('--timeout', String(this.timeout));
+    }
+
+    if (this.maxFailures) {
+      args.push('--max-failures', String(this.maxFailures));
+    }
+
+    if (this.forbidOnly) {
+      args.push('--forbid-only');
+    }
+
+    if (this.fullyParallel) {
+      args.push('--fully-parallel');
+    }
+
+    if (this.headed) {
+      args.push('--headed');
+    }
+
+    if (this.browser) {
+      args.push('--browser', this.browser);
+    }
+
+    if (this.trace) {
+      args.push('--trace', this.trace);
+    }
+
+    if (this.video) {
+      args.push('--video', this.video);
+    }
+
+    if (this.screenshot) {
+      args.push('--screenshot', this.screenshot);
+    }
+
+    if (this.extraArgs.length > 0) {
+      args.push(...this.extraArgs);
+    }
+
+    return args;
+  }
+
+  /** Serialize to plain object */
+  toJSON() {
+    return {
+      command: this.command,
+      args: this._buildArgs(),
+      commandString: this.commandString,
+      config: this.config,
+      platform: this.platform,
+      project: this.project,
+      tags: this.tags,
+      workers: this.workers,
+      retries: this.retries,
+      shard: this.shard,
+      headed: this.headed,
+      browser: this.browser,
+      trace: this.trace,
+      video: this.video,
+      screenshot: this.screenshot,
+      testFile: this.testFile,
+      timeout: this.timeout,
+      description: this.description
+    };
+  }
+}
+
+// ─── Playwright Command Builder ───────────────────────────────────────────
+
+class PlaywrightCommandBuilder {
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                      CORE BUILD METHOD                           ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /**
+   * Build a Playwright CLI command from options.
+   * This is the single method DecisionAgent should call.
+   *
+   * @param {Object} options
+   * @param {string}  [options.platform]    - WEB | ANDROID | IOS | API
+   * @param {string}  [options.project]     - Playwright project name
+   * @param {string}  [options.tags]        - '@Smoke' or '@Smoke,@Regression'
+   * @param {number}  [options.workers]     - Worker count
+   * @param {number}  [options.retries]     - Retry count
+   * @param {string}  [options.shard]       - '2/4' format
+   * @param {boolean} [options.headed]      - Run headed
+   * @param {string}  [options.browser]     - Browser name
+   * @param {string}  [options.trace]       - Trace mode
+   * @param {string}  [options.video]       - Video mode
+   * @param {string}  [options.screenshot]  - Screenshot mode
+   * @param {string}  [options.testFile]    - Test file path
+   * @param {number}  [options.timeout]     - Test timeout ms
+   * @param {number}  [options.maxFailures] - Stop after N failures
+   * @param {number}  [options.repeatEach]  - Repeat count
+   * @param {boolean} [options.forbidOnly]  - Forbid .only
+   * @param {boolean} [options.fullyParallel]
+   * @param {string}  [options.config]      - Config file path
+   * @param {string}  [options.description] - Human-readable description
+   * @param {string[]}[options.extraArgs]   - Extra raw args
+   * @returns {CanonicalCommand}
+   */
+  build(options = {}) {
+    const platform = (options.platform || 'WEB').toUpperCase();
+
+    // Map platform to project if not explicitly set
+    let project = options.project;
+    if (!project) {
+      if (platform === 'ANDROID') project = 'Android';
+      else if (platform === 'IOS') project = 'iOS';
+      else if (platform === 'API') project = 'API Tests';
+    }
+
+    // Map platform to browser if not explicitly set
+    let browser = options.browser;
+    if (!browser) {
+      if (platform === 'ANDROID' || platform === 'IOS') browser = 'chromium';
+    }
+
+    return new CanonicalCommand({
+      command: NPX_PW,
+      config: options.config || DEFAULT_CONFIG,
+      platform,
+      project,
+      tags: options.tags || null,
+      workers: options.workers || null,
+      retries: options.retries || null,
+      shard: options.shard || null,
+      headed: options.headed || false,
+      browser,
+      trace: options.trace || null,
+      video: options.video || null,
+      screenshot: options.screenshot || null,
+      testFile: options.testFile || null,
+      timeout: options.timeout || null,
+      maxFailures: options.maxFailures || null,
+      repeatEach: options.repeatEach || null,
+      forbidOnly: options.forbidOnly === true,
+      fullyParallel: options.fullyParallel || false,
+      extraArgs: options.extraArgs || [],
+      description: options.description || this._describe(options)
+    });
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                  PLATFORM-SPECIFIC BUILDERS                       ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /** Build a command for Web tests */
+  forWeb(options = {}) {
+    return this.build({ ...options, platform: 'WEB', description: 'Web tests' });
+  }
+
+  /** Build a command for Android tests */
+  forAndroid(options = {}) {
+    return this.build({ ...options, platform: 'ANDROID', project: 'Android', description: 'Android mobile tests' });
+  }
+
+  /** Build a command for iOS tests */
+  forIOS(options = {}) {
+    return this.build({ ...options, platform: 'IOS', project: 'iOS', description: 'iOS mobile tests' });
+  }
+
+  /** Build a command for API tests */
+  forAPI(options = {}) {
+    return this.build({ ...options, platform: 'API', project: 'API Tests', description: 'API tests' });
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                  EXECUTION MODE BUILDERS                          ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /** Build a command for smoke tests — tagged @Smoke */
+  forSmoke(options = {}) {
+    return this.build({
+      ...options,
+      tags: options.tags || '@Smoke',
+      workers: options.workers || 2,
+      retries: options.retries || 1,
+      description: 'Smoke test suite'
+    });
+  }
+
+  /** Build a command for regression tests — tagged @Regression */
+  forRegression(options = {}) {
+    return this.build({
+      ...options,
+      tags: options.tags || '@Regression',
+      workers: options.workers || 4,
+      retries: options.retries || 1,
+      fullyParallel: true,
+      description: 'Full regression suite'
+    });
+  }
+
+  /** Build a command for sanity tests — tagged @Sanity */
+  forSanity(options = {}) {
+    return this.build({
+      ...options,
+      tags: options.tags || '@Sanity',
+      workers: options.workers || 2,
+      retries: options.retries || 0,
+      description: 'Sanity check suite'
+    });
+  }
+
+  /** Build a command for CI execution */
+  forCI(options = {}) {
+    return this.build({
+      ...options,
+      workers: options.workers || 4,
+      retries: options.retries || 2,
+      forbidOnly: true,
+      fullyParallel: true,
+      description: 'CI pipeline execution'
+    });
+  }
+
+  /** Build a command for local development */
+  forLocal(options = {}) {
+    return this.build({
+      ...options,
+      headed: true,
+      workers: options.workers || 1,
+      retries: options.retries || 0,
+      description: 'Local development run'
+    });
+  }
+
+  /** Build a command for headed mode */
+  forHeaded(options = {}) {
+    return this.build({ ...options, headed: true, description: 'Headed browser execution' });
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                  SPECIFIC FEATURE BUILDERS                        ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /**
+   * Build a command with specific tag filter.
+   * @param {string} tags - '@Smoke' or '@Smoke,@Regression'
+   */
+  withTags(tags, options = {}) {
+    return this.build({ ...options, tags, description: `Tag filter: ${tags}` });
+  }
+
+  /**
+   * Build a command for a specific project.
+   * @param {string} project - Project name
+   */
+  forProject(project, options = {}) {
+    return this.build({ ...options, project, description: `Project: ${project}` });
+  }
+
+  /**
+   * Build a command with explicit worker count.
+   * @param {number} workers - Number of parallel workers
+   */
+  withWorkers(workers, options = {}) {
+    return this.build({ ...options, workers, description: `${workers} parallel workers` });
+  }
+
+  /**
+   * Build a command with explicit retry count.
+   * @param {number} retries - Number of retries
+   */
+  withRetries(retries, options = {}) {
+    return this.build({ ...options, retries, description: `${retries} retries` });
+  }
+
+  /**
+   * Build a command for shard execution.
+   * @param {number} current - Current shard (1-based)
+   * @param {number} total   - Total shards
+   */
+  forShard(current, total, options = {}) {
+    const shard = `${current}/${total}`;
+    return this.build({ ...options, shard, description: `Shard ${current}/${total}` });
+  }
+
+  /**
+   * Build a command for a specific test file or directory.
+   * @param {string} testFile - Path to test file or directory
+   */
+  forTestFile(testFile, options = {}) {
+    return this.build({ ...options, testFile, description: `Test file: ${testFile}` });
+  }
+
+  /**
+   * Build a command with trace mode.
+   * @param {string} mode - 'on' | 'off' | 'retain-on-failure'
+   */
+  withTrace(mode = 'on', options = {}) {
+    return this.build({ ...options, trace: mode, description: `Trace: ${mode}` });
+  }
+
+  /**
+   * Build a command with video mode.
+   * @param {string} mode - 'on' | 'off' | 'retain-on-failure'
+   */
+  withVideo(mode = 'on', options = {}) {
+    return this.build({ ...options, video: mode, description: `Video: ${mode}` });
+  }
+
+  /**
+   * Build a command with screenshot mode.
+   * @param {string} mode - 'on' | 'off' | 'only-on-failure'
+   */
+  withScreenshot(mode = 'on', options = {}) {
+    return this.build({ ...options, screenshot: mode, description: `Screenshot: ${mode}` });
+  }
+
+  /**
+   * Build a command with explicit timeout.
+   * @param {number} timeoutMs - Timeout in milliseconds
+   */
+  withTimeout(timeoutMs, options = {}) {
+    return this.build({ ...options, timeout: timeoutMs, description: `Timeout: ${timeoutMs}ms` });
+  }
+
+  /**
+   * Build a command with max failures limit.
+   * @param {number} max - Stop after N failures
+   */
+  withMaxFailures(max, options = {}) {
+    return this.build({ ...options, maxFailures: max, description: `Max failures: ${max}` });
+  }
+
+  /**
+   * Build a fully parallel command.
+   */
+  fullyParallel(options = {}) {
+    return this.build({ ...options, fullyParallel: true, description: 'Fully parallel execution' });
+  }
+
+  /**
+   * Build a command for the full test suite (no filters).
+   */
+  fullSuite(options = {}) {
+    return this.build({ ...options, description: 'Full test suite' });
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                  DECISION-ENGINE DRIVEN BUILD                     ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /**
+   * Build a command from DecisionEngine context.
+   * This is the high-level API the DecisionAgent uses to dynamically
+   * construct commands based on AI analysis.
+   *
+   * @param {Object} context - DecisionEngine context
+   * @param {Object} [overrides] - Additional overrides
+   * @returns {CanonicalCommand[]} Array of commands to execute
+   */
+  buildFromContext(context = {}, overrides = {}) {
+    const commands = [];
+    const platform = (context.platform || process.env.TEST_PLATFORM || 'WEB').toUpperCase();
+    const isCI = context.isCI === true || process.env.CI === 'true';
+    const riskLevel = context.risk ? (context.risk.level || 'low') : 'low';
+    const priority = context.priority || 'normal';
+    const hasFailures = context.hasFailures === true;
+
+    // Determine execution mode from context
+    const tags = context.tags || process.env.TAGS || '';
+    let baseCommand;
+
+    if (tags.includes('@Smoke') || tags.includes('@smoke')) {
+      baseCommand = this.forSmoke({ ...overrides, platform });
+    } else if (tags.includes('@Sanity') || tags.includes('@sanity')) {
+      baseCommand = this.forSanity({ ...overrides, platform });
+    } else if (tags.includes('@Regression') || tags.includes('@regression')) {
+      baseCommand = this.forRegression({ ...overrides, platform });
+    } else if (isCI) {
+      baseCommand = this.forCI({ ...overrides, platform });
+    } else {
+      baseCommand = this.forLocal({ ...overrides, platform });
+    }
+
+    commands.push(baseCommand);
+
+    // For critical risk, add a parallel sharded execution as fallback
+    if (riskLevel === 'critical' || priority === 'critical') {
+      commands.push(
+        this.forShard(1, 2, { ...overrides, platform, description: 'Critical retry shard 1/2' })
+      );
+      commands.push(
+        this.forShard(2, 2, { ...overrides, platform, description: 'Critical retry shard 2/2' })
+      );
+    }
+
+    // For CI with failures, add a retry command with trace
+    if (isCI && hasFailures) {
+      commands.push(
+        this.withRetries(3, {
+          ...overrides,
+          platform,
+          trace: 'on',
+          video: 'on',
+          description: 'Failure retry with full artifacts'
+        })
+      );
+    }
+
+    // Add platform-specific follow-up
+    if (platform === 'ANDROID') {
+      commands.push(this.forAndroid({ ...overrides, description: 'Android-specific execution' }));
+    } else if (platform === 'IOS') {
+      commands.push(this.forIOS({ ...overrides, description: 'iOS-specific execution' }));
+    } else if (platform === 'API') {
+      commands.push(this.forAPI({ ...overrides, description: 'API-specific execution' }));
+    }
+
+    return commands;
+  }
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║                      UTILITY METHODS                              ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+
+  /**
+   * Parse a command string representation back into a CanonicalCommand.
+   * Useful for logging, debugging, and serialization round-trips.
+   *
+   * @param {string} cmdString - e.g. 'npx playwright test --project Android --grep @Smoke'
+   * @returns {CanonicalCommand}
+   */
+  parse(cmdString) {
+    const parts = cmdString.split(/\s+/);
+    const command = parts[0] + ' ' + parts[1]; // 'npx playwright test'
+    const args = parts.slice(3); // everything after 'npx playwright test'
+    const options = {};
+
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--config' && args[i + 1]) options.config = args[++i];
+      else if (arg === '--project' && args[i + 1]) options.project = args[++i];
+      else if (arg === '--grep' && args[i + 1]) options.tags = args[++i];
+      else if (arg === '--workers' && args[i + 1]) options.workers = parseInt(args[++i], 10);
+      else if (arg === '--retries' && args[i + 1]) options.retries = parseInt(args[++i], 10);
+      else if (arg === '--shard' && args[i + 1]) options.shard = args[++i];
+      else if (arg === '--headed') options.headed = true;
+      else if (arg === '--browser' && args[i + 1]) options.browser = args[++i];
+      else if (arg === '--trace' && args[i + 1]) options.trace = args[++i];
+      else if (arg === '--video' && args[i + 1]) options.video = args[++i];
+      else if (arg === '--screenshot' && args[i + 1]) options.screenshot = args[++i];
+      else if (arg === '--timeout' && args[i + 1]) options.timeout = parseInt(args[++i], 10);
+      else if (arg === '--max-failures' && args[i + 1]) options.maxFailures = parseInt(args[++i], 10);
+      else if (arg === '--repeat-each' && args[i + 1]) options.repeatEach = parseInt(args[++i], 10);
+      else if (arg === '--forbid-only') options.forbidOnly = true;
+      else if (arg === '--fully-parallel') options.fullyParallel = true;
+      else if (arg === '--update-snapshots') options.updateSnapshots = true;
+      else if (arg === '--pass-with-no-tests') options.passWithNoTests = true;
+      else if (arg.startsWith('--')) { /* unknown flag, skip */ }
+      else if (!arg.startsWith('-')) options.testFile = arg; // positional
+    }
+
+    return this.build(options);
+  }
+
+  /**
+   * Generate a human-readable description for a set of options.
+   */
+  _describe(options) {
+    const parts = [];
+    if (options.platform) parts.push(options.platform);
+    if (options.tags) parts.push(options.tags);
+    if (options.project) parts.push(`project=${options.project}`);
+    if (options.workers) parts.push(`${options.workers} workers`);
+    if (options.retries) parts.push(`${options.retries} retries`);
+    if (options.shard) parts.push(`shard=${options.shard}`);
+    if (options.headed) parts.push('headed');
+    return parts.join(' | ') || 'Playwright CLI command';
+  }
+}
+
+// ─── Singleton ─────────────────────────────────────────────────────────────
+const instance = new PlaywrightCommandBuilder();
+
+module.exports = instance;
+module.exports.PlaywrightCommandBuilder = PlaywrightCommandBuilder;
+module.exports.CanonicalCommand = CanonicalCommand;

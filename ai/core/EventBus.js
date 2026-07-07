@@ -80,6 +80,13 @@ const EVENTS = {
   RETRY_COMPLETED:                 'RetryCompleted',
   RETRY_EXHAUSTED:                 'RetryExhausted',
 
+  // ── Playwright CLI ──
+  PLAYWRIGHT_CLI_STARTED:          'PlaywrightCLIStarted',
+  PLAYWRIGHT_CLI_COMPLETED:        'PlaywrightCLICompleted',
+  PLAYWRIGHT_CLI_FAILED:           'PlaywrightCLIFailed',
+  PLAYWRIGHT_CLI_CONFIG_SELECTED:  'PlaywrightCLIConfigSelected',
+  PLAYWRIGHT_CLI_PROFILE_APPLIED:  'PlaywrightCLIProfileApplied',
+
   // ── Locator Healing ──
   LOCATOR_FAILED:                  'LocatorFailed',
   HEALING_REQUESTED:               'HealingRequested',
@@ -123,7 +130,24 @@ const EVENTS = {
   AGENT_REGISTRY_READY:            'AgentRegistryReady',
   AGENT_EXECUTION_STARTED:         'AgentExecutionStarted',
   AGENT_EXECUTION_COMPLETED:       'AgentExecutionCompleted',
-  AGENT_EXECUTION_FAILED:          'AgentExecutionFailed'
+  AGENT_EXECUTION_FAILED:          'AgentExecutionFailed',
+
+  // ── Agent Lifecycle Events ──
+  AGENT_REGISTERED:                'AgentRegistered',
+  AGENT_INITIALIZED:               'AgentInitialized',
+  AGENT_WAITING:                   'AgentWaiting',
+  AGENT_ELIGIBLE:                  'AgentEligible',
+  AGENT_STARTED:                   'AgentStarted',
+  AGENT_COMPLETED:                 'AgentCompleted',
+  AGENT_FAILED:                    'AgentFailed',
+  AGENT_RECOVERED:                 'AgentRecovered',
+  AGENT_SKIPPED:                   'AgentSkipped',
+  AGENT_DISABLED:                  'AgentDisabled',
+
+  // ── Execution Events ──
+  EXECUTION_STARTED:               'ExecutionStarted',
+  EXECUTION_COMPLETED:             'ExecutionCompleted',
+  EXECUTION_FAILED:                'ExecutionFailed'
 };
 
 // ─── Event Bus ─────────────────────────────────────────────────────────────
@@ -144,7 +168,7 @@ class EventBus {
 
   /**
    * Get all event type constants.
-  }
+   */
 
   /**
    * Subscribe to an event type.

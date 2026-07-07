@@ -5,23 +5,28 @@
  * Determines WHICH agents to run based on the current execution context,
  * instead of running all agents blindly.
  *
+ * Uses the singleton ExecutionContext (ai/core/ExecutionContext.js) for all
+ * execution state. No duplicate context creation.
+ *
+ * Every skipped agent includes an explicit human-readable reason.
+ * No agent is silently skipped.
+ *
  * Architecture:
- *   - Builds an ExecutionContext from current state (platform, failures, CI mode, etc.)
+ *   - Reads the singleton ExecutionContext for current state
  *   - Evaluates each agent's metadata.conditions against the context
+ *   - Returns { satisfied: boolean, reason: string } for every condition
  *   - Respects agent priority and execution stage ordering
- *   - Returns a filtered, ordered execution plan
+ *   - Returns a filtered, ordered execution plan with skip reasons
  *
  * Usage:
  *   const router = require('./core/AgentRouter');
- *   const plan = await router.buildPlan({
- *     platform: 'WEB',
- *     hasFailures: true,
- *     isCI: false
- *   });
+ *   const plan = await router.buildPlan({ platform: 'WEB' });
  *   // plan = [{ key, module, metadata, ... }, ...]
+ *   // plan.skipped = [{ key, reason: 'Platform mismatch: ...' }, ...]
  */
 
 const registry = require('./AgentRegistry');
+const executionContext = require('./ExecutionContext');
 
 // ─── Execution Stage Constants ─────────────────────────────────────────────
 const STAGES = {
@@ -35,143 +40,127 @@ const STAGES = {
 
 const STAGE_ORDER = [STAGES.PREFLIGHT, STAGES.EXECUTION, STAGES.ANALYSIS, STAGES.MULTI_AGENT, STAGES.REPORTING, STAGES.CLEANUP];
 
-// ─── Execution Context ─────────────────────────────────────────────────────
+// ─── Condition Evaluator ───────────────────────────────────────────────────
+// Evaluates agent metadata.conditions against the execution context.
+// Every condition returns { satisfied: boolean, reason: string|null }.
 
-class ExecutionContext {
-  constructor(options = {}) {
-    // Platform context
-    this.platform = (options.platform || process.env.TEST_PLATFORM || 'WEB').toUpperCase();
-    this.isMobile = this.platform === 'ANDROID' || this.platform === 'IOS';
-    this.isAndroid = this.platform === 'ANDROID';
-    this.isIOS = this.platform === 'IOS';
-    this.isWeb = this.platform === 'WEB';
-    this.isAPI = this.platform === 'API';
+class ConditionEvaluator {
+  constructor(context) {
+    this.ctx = context;
+  }
 
-    // Execution state
-    this.hasFailures = options.hasFailures === true || (options.exitCode !== undefined && options.exitCode !== 0);
-    this.exitCode = options.exitCode !== undefined ? options.exitCode : 0;
-    this.hasResults = options.hasResults === true;
-    this.hasHistory = options.hasHistory === true;
-    this.hasPerformanceData = options.hasPerformanceData === true;
-    this.hasJenkinsLog = options.hasJenkinsLog === true;
-    this.hasLocatorFailures = options.hasLocatorFailures === true;
+  /**
+   * Determine if an agent's conditions are satisfied.
+   * @returns {{ satisfied: boolean, reason: string|null }}
+   */
+  satisfies(conditions) {
+    if (!conditions || conditions.length === 0) {
+      return { satisfied: true, reason: null };
+    }
 
-    // Mode context
-    this.isCI = options.isCI === true || process.env.CI === 'true';
-    this.isDeviceFarm = options.isDeviceFarm === true;
-    this.isHealingEnabled = options.isHealingEnabled !== false;
-    this.isRetryEnabled = options.isRetryEnabled !== false;
+    for (const cond of conditions) {
+      const result = typeof cond === 'string'
+        ? this._evaluate(cond)
+        : cond.type ? this._evaluate(cond.type, cond) : { satisfied: true, reason: null };
 
-    // Override flags (explicit user requests)
-    this.forceFull = options.forceFull === true;
-    this.runOnDemand = options.runOnDemand === true;
-    this.skipStage = options.skipStage || [];
-    this.onlyStage = options.onlyStage || null;
+      if (!result.satisfied) {
+        return result;
+      }
+    }
+    return { satisfied: true, reason: null };
+  }
 
-    // Additional metadata
-    this.browser = options.browser || process.env.BROWSER || 'chromium';
-    this.tags = options.tags || process.env.TAGS || '';
+  _evaluate(type, cond = {}) {
+    const ctx = this.ctx;
 
-    // Timestamp
-    this.createdAt = new Date().toISOString();
+    switch (type) {
+      case 'always':
+        return { satisfied: true, reason: null };
+
+      case 'hasFailures': {
+        const hasF = ctx.hasFailures === true || (ctx.exitCode !== null && ctx.exitCode !== 0);
+        return { satisfied: hasF, reason: hasF ? null : 'No failed tests' };
+      }
+
+      case 'hasResults': {
+        const hasR = ctx.passedCount > 0 || ctx.failedCount > 0;
+        return { satisfied: hasR, reason: hasR ? null : 'No execution data available' };
+      }
+
+      case 'hasHistory': {
+        const hasH = ctx.scenarioCount > 0;
+        return { satisfied: hasH, reason: hasH ? null : 'No execution data available' };
+      }
+
+      case 'hasPerformanceData':
+        return { satisfied: false, reason: 'No performance data available' };
+
+      case 'hasJenkinsLog': {
+        const hasJ = !!ctx.jenkinsBuildNumber;
+        return { satisfied: hasJ, reason: hasJ ? null : 'No Jenkins log available' };
+      }
+
+      case 'locatorFailure': {
+        const hasL = ctx.hasFailures && ctx.failedCount > 0;
+        return { satisfied: hasL, reason: hasL ? null : 'No locator failures' };
+      }
+
+      case 'platform': {
+        if (cond.value) {
+          const match = cond.value.toUpperCase() === ctx.platform;
+          return {
+            satisfied: match,
+            reason: match ? null : 'Platform mismatch: expected ' + cond.value + ', got ' + ctx.platform
+          };
+        }
+        return { satisfied: true, reason: null };
+      }
+
+      case 'ci':
+        return { satisfied: ctx.isCI === true, reason: ctx.isCI ? null : 'Not a CI execution' };
+
+      case 'onDemand':
+        return { satisfied: false, reason: 'Manual trigger required' };
+
+      case 'deviceFarm':
+        return { satisfied: false, reason: 'No device farm execution' };
+
+      case 'mobile': {
+        const isMob = ctx.platform === 'ANDROID' || ctx.platform === 'IOS';
+        return { satisfied: isMob, reason: isMob ? null : 'No mobile execution' };
+      }
+
+      case 'web': {
+        const isWeb = ctx.platform === 'WEB';
+        return { satisfied: isWeb, reason: isWeb ? null : 'Not a web execution' };
+      }
+
+      case 'android': {
+        const isDroid = ctx.platform === 'ANDROID';
+        return { satisfied: isDroid, reason: isDroid ? null : 'No Android execution' };
+      }
+
+      case 'ios': {
+        const isIos = ctx.platform === 'IOS';
+        return { satisfied: isIos, reason: isIos ? null : 'No iOS execution' };
+      }
+
+      case 'api': {
+        const isApi = ctx.platform === 'API';
+        return { satisfied: isApi, reason: isApi ? null : 'No API execution' };
+      }
+
+      default:
+        return { satisfied: true, reason: null };
+    }
   }
 
   /**
    * Check if a given stage should be executed.
    */
-  shouldRunStage(stage) {
-    if (this.onlyStage) return stage === this.onlyStage;
-    return !this.skipStage.includes(stage);
-  }
-
-  /**
-   * Determine if an agent's conditions are satisfied by this context.
-   */
-  satisfiesConditions(conditions) {
-    if (!conditions || conditions.length === 0) return true;
-
-    return conditions.every(cond => {
-      if (typeof cond === 'string') {
-        return this._evaluateCondition(cond);
-      }
-      if (cond.type) {
-        return this._evaluateCondition(cond.type, cond);
-      }
-      return true;
-    });
-  }
-
-  _evaluateCondition(type, cond = {}) {
-    switch (type) {
-      case 'always':
-        return true;
-
-      case 'hasFailures':
-        return this.hasFailures;
-
-      case 'hasResults':
-        return this.hasResults;
-
-      case 'hasHistory':
-        return this.hasHistory;
-
-      case 'hasPerformanceData':
-        return this.hasPerformanceData;
-
-      case 'hasJenkinsLog':
-        return this.hasJenkinsLog;
-
-      case 'locatorFailure':
-        return this.hasLocatorFailures;
-
-      case 'platform':
-        if (cond.value) {
-          return cond.value.toUpperCase() === this.platform;
-        }
-        return true;
-
-      case 'ci':
-        return this.isCI;
-
-      case 'onDemand':
-        return this.runOnDemand;
-
-      case 'deviceFarm':
-        return this.isDeviceFarm;
-
-      case 'mobile':
-        return this.isMobile;
-
-      case 'web':
-        return this.isWeb;
-
-      case 'android':
-        return this.isAndroid;
-
-      case 'ios':
-        return this.isIOS;
-
-      case 'api':
-        return this.isAPI;
-
-      default:
-        return true;
-    }
-  }
-
-  /**
-   * Serialize context for logging/reporting.
-   */
-  summarize() {
-    return {
-      platform: this.platform,
-      mode: this.isCI ? 'CI' : 'Local',
-      hasFailures: this.hasFailures,
-      hasHistory: this.hasHistory,
-      isMobile: this.isMobile,
-      isDeviceFarm: this.isDeviceFarm,
-      stages: STAGE_ORDER.filter(s => this.shouldRunStage(s))
-    };
+  shouldRunStage(stage, onlyStage, skipStage) {
+    if (onlyStage) return stage === onlyStage;
+    return !(skipStage || []).includes(stage);
   }
 }
 
@@ -183,28 +172,46 @@ class AgentRouter {
   }
 
   /**
-   * Build an execution plan filtered by the given context.
-   * @param {Object|ExecutionContext} contextOptions
-   * @returns {Promise<{plan: Array, context: ExecutionContext, stats: Object}>}
+   * Build an execution plan filtered by the current context.
+   * Every skipped entry includes a human-readable reason.
+   *
+   * @param {Object} [options] - Overrides for context fields
+   * @returns {Promise<{plan: Array, skipped: Array, context: Object, stats: Object}>}
    */
-  async buildPlan(contextOptions = {}) {
+  async buildPlan(options = {}) {
     if (!this._discovered) {
       await registry.discover();
       this._discovered = true;
     }
 
-    const context = contextOptions instanceof ExecutionContext
-      ? contextOptions
-      : new ExecutionContext(contextOptions);
+    // Use the singleton ExecutionContext, enriched with any call-site overrides
+    const ctx = executionContext;
+    if (options.platform) ctx.platform = options.platform.toUpperCase();
+    if (options.hasFailures !== undefined) ctx.hasFailures = options.hasFailures;
+    if (options.exitCode !== undefined) ctx.exitCode = options.exitCode;
+    if (options.isCI !== undefined) ctx.isCI = options.isCI;
+    if (options.tags) ctx.tags = options.tags;
+    if (options.browser) ctx.browser = options.browser;
 
+    const onlyStage = options.onlyStage || null;
+    const skipStage = options.skipStage || [];
+    const forceFull = options.forceFull === true;
+
+    const evaluator = new ConditionEvaluator(ctx);
     const allAgents = registry.getAll();
     const plan = [];
     const skipped = [];
     const seen = new Set();
 
     for (const stage of STAGE_ORDER) {
-      if (!context.shouldRunStage(stage)) {
-        skipped.push({ stage, reason: 'stage-skipped' });
+      if (!evaluator.shouldRunStage(stage, onlyStage, skipStage)) {
+        // Stage-level skip
+        for (const agent of allAgents) {
+          if (agent.metadata.executionStage === stage && !seen.has(agent.key)) {
+            skipped.push({ key: agent.key, name: agent.metadata.name, stage, reason: 'Execution stage skipped: ' + stage });
+            seen.add(agent.key);
+          }
+        }
         continue;
       }
 
@@ -217,29 +224,45 @@ class AgentRouter {
         if (seen.has(agent.key)) continue;
 
         // Check lifecycle
-        if (agent.metadata.lifecycle === 'deprecated' || agent.metadata.lifecycle === 'placeholder') {
-          skipped.push({ key: agent.key, stage, reason: `lifecycle:${agent.metadata.lifecycle}` });
+        if (agent.metadata.lifecycle === 'deprecated') {
+          skipped.push({ key: agent.key, name: agent.metadata.name, stage, reason: 'Agent lifecycle deprecated' });
+          seen.add(agent.key);
+          continue;
+        }
+        if (agent.metadata.lifecycle === 'placeholder') {
+          skipped.push({ key: agent.key, name: agent.metadata.name, stage, reason: 'Agent is a placeholder' });
+          seen.add(agent.key);
           continue;
         }
 
         // Check platform support
         const platforms = agent.metadata.platforms || [];
-        if (platforms.length > 0 && !platforms.includes(context.platform) && !context.forceFull) {
-          skipped.push({ key: agent.key, stage, reason: `platform:${context.platform} not in [${platforms.join(',')}]` });
+        if (platforms.length > 0 && !platforms.includes(ctx.platform) && !forceFull) {
+          skipped.push({
+            key: agent.key, name: agent.metadata.name, stage,
+            reason: 'Platform mismatch: agent supports [' + platforms.join(', ') + '], current platform is ' + ctx.platform
+          });
+          seen.add(agent.key);
           continue;
         }
 
-        // Check conditions
+        // Check conditions — returns { satisfied, reason }
         const conditions = agent.metadata.conditions || [];
-        if (!context.satisfiesConditions(conditions) && !context.forceFull) {
-          const condStr = conditions.map(c => typeof c === 'string' ? c : c.type).join(',');
-          skipped.push({ key: agent.key, stage, reason: `conditions:[${condStr}] not satisfied` });
+        const conditionResult = evaluator.satisfies(conditions);
+        if (!conditionResult.satisfied && !forceFull) {
+          const condStr = conditions.map(c => typeof c === 'string' ? c : c.type).join(', ');
+          skipped.push({
+            key: agent.key, name: agent.metadata.name, stage,
+            reason: conditionResult.reason || 'Condition not met: [' + condStr + ']'
+          });
+          seen.add(agent.key);
           continue;
         }
 
         // Check if agent has a run() method
-        if (!agent.hasRun && !agent.module.run && !(agent.module.prototype && typeof agent.module.prototype.run === "function")) {
-          skipped.push({ key: agent.key, stage, reason: 'no-run-method' });
+        if (!agent.hasRun && !agent.module.run && !(agent.module.prototype && typeof agent.module.prototype.run === 'function')) {
+          skipped.push({ key: agent.key, name: agent.metadata.name, stage, reason: 'Agent has no run() method' });
+          seen.add(agent.key);
           continue;
         }
 
@@ -278,7 +301,7 @@ class AgentRouter {
       }
     }
 
-    // Deduplicate: keep first occurrence only
+    // Deduplicate plan
     const seenKeys = new Set();
     const dedupedPlan = [];
     for (const a of plan) {
@@ -291,7 +314,7 @@ class AgentRouter {
     return {
       plan: dedupedPlan,
       skipped,
-      context: context.summarize(),
+      context: ctx.summarize(),
       stats: {
         totalAgents: allAgents.length,
         planned: dedupedPlan.length,
@@ -301,27 +324,20 @@ class AgentRouter {
   }
 
   /**
-   * Create a context from real execution results.
+   * Update the execution context from real execution results.
    */
-  createContextFromResults(execPhase, options = {}) {
-    const hasFailures = execPhase && execPhase.exitCode !== 0;
-    const hasResults = execPhase && execPhase.execResult && execPhase.execResult.failures && execPhase.execResult.failures.length > 0;
+  updateContextFromResults(execPhase, options = {}) {
+    const ctx = executionContext;
+    ctx.hasFailures = execPhase && execPhase.exitCode !== 0;
+    ctx.exitCode = execPhase ? execPhase.exitCode : 0;
 
-    return new ExecutionContext({
-      platform: execPhase ? execPhase.platform : undefined,
-      exitCode: execPhase ? execPhase.exitCode : 0,
-      hasFailures,
-      hasResults,
-      hasLocatorFailures: hasResults && (execPhase.execResult.failures || []).some(f =>
-        (f.error || '').toLowerCase().includes('locator') ||
-        (f.error || '').toLowerCase().includes('selector')
-      ),
-      isCI: process.env.CI === 'true',
-      forceFull: options.forceFull || false,
-      skipStage: options.skipStage || [],
-      onlyStage: options.onlyStage || null,
-      ...options
-    });
+    if (execPhase && execPhase.passed !== undefined) ctx.passedCount = execPhase.passed;
+    if (execPhase && execPhase.failed !== undefined) ctx.failedCount = execPhase.failed;
+    if (execPhase && execPhase.skipped !== undefined) ctx.skippedCount = execPhase.skipped;
+
+    if (options.forceFull !== undefined) ctx.set('forceFull', options.forceFull);
+
+    return ctx;
   }
 }
 
@@ -330,6 +346,6 @@ const instance = new AgentRouter();
 
 module.exports = instance;
 module.exports.AgentRouter = AgentRouter;
-module.exports.ExecutionContext = ExecutionContext;
+module.exports.ExecutionContext = executionContext.constructor;
 module.exports.STAGES = STAGES;
 module.exports.STAGE_ORDER = STAGE_ORDER;
