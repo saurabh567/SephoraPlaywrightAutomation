@@ -2,18 +2,22 @@
 // ============================================================================
 // API ISOLATION: This config does NOT load hooks/hooks.js.
 // API tests use Playwright APIRequestContext directly — no Browser, Context,
-// or Page instances. All API step definitions are in step-definitions/api/*.js.
+// or Page instances. All API step definitions are in step-definitions/api/*.ts.
 // ============================================================================
 // SECURITY GUARANTEES:
 //   1. Does NOT require 'hooks/hooks.js' — no browser launch hooks
-//   2. Does NOT require 'step-definitions/**/*.js' — only API-specific steps
+//   2. Does NOT require 'step-definitions/**/*.ts' — only API-specific steps
 //   3. Feature paths are limited to 'features/api/**/*.feature' — no UI features
 //   4. Uses Playwright's request.newContext() — standalone, no browser needed
 // ============================================================================
+// TypeScript runtime: tsx is loaded via requireModule so .ts step definitions
+// and their extensionless imports resolve at runtime.
+// ============================================================================
 module.exports = {
   default: {
+    requireModule: ['tsx'],
     require: [
-      'step-definitions/api/**/*.js'
+      'step-definitions/api/**/*.ts'
     ],
     paths: ['features/api/**/*.feature'],
     format: [

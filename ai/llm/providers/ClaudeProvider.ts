@@ -1,0 +1,69 @@
+import LLMProvider from '../LLMProvider';
+import https from 'https';
+/**
+ * ClaudeProvider.js
+ *
+ * Anthropic Claude provider for architecture reviews and reasoning.
+ * Supports Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku.
+ */
+
+
+class ClaudeProvider extends LLMProvider {
+  [key: string]: any;
+  constructor(options: any = {}) {
+    super({
+      name: 'claude',
+      model: options.model || process.env.CLAUDE_MODEL || 'claude-3-5-sonnet-20241022',
+      apiKey: options.apiKey || process.env.ANTHROPIC_API_KEY || '',
+      baseUrl: options.baseUrl || 'https://api.anthropic.com/v1',
+      costPerToken: options.costPerToken || 0.00003,
+      ...options
+    });
+  }
+
+  async complete({ systemPrompt, userPrompt, temperature, maxTokens }: any) {
+    const start = Date.now();
+    const messages = [{ role: 'user', content: userPrompt || '' }];
+
+    const data: any = await this._post('/messages', {
+      model: this.model,
+      messages,
+      system: systemPrompt || undefined,
+      max_tokens: maxTokens || 8192,
+      temperature: temperature || 0.2
+    });
+
+    const latency = Date.now() - start;
+    const content = (data && data.content && data.content[0] && data.content[0].text) || '';
+    const usage = data && data.usage || {};
+    const tokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
+    this._recordCall(tokens, latency, data && data.error && data.error.message);
+    return { content, tokens, model: this.model, provider: 'claude', latency };
+  }
+
+  _post(path: any, body: any) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(path, this.baseUrl);
+      const data = JSON.stringify(body);
+      const req = https.request({
+        hostname: url.hostname, path: url.pathname, method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(data)
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => { try { resolve(JSON.parse(body)); } catch (e: any) { resolve({}); } });
+      });
+      req.on('error', reject);
+      req.setTimeout(this.timeout, () => { req.destroy(); reject(new Error('Timeout')); });
+      req.write(data);
+      req.end();
+    });
+  }
+}
+
+export default ClaudeProvider;

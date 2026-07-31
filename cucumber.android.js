@@ -26,7 +26,9 @@
 'use strict';
 
 const path = require('path');
-const startupTimer = require('./hooks/startup-timer');
+// Load tsx hook BEFORE any .ts require (config files load before requireModule takes effect)
+try { require('tsx'); } catch (_) {}
+const startupTimer = require('./hooks/startup-timer').default || require('./hooks/startup-timer');
 
 startupTimer.mark('Cucumber Config Loaded');
 
@@ -35,9 +37,10 @@ const REPORT_DIR = process.env.REPORT_DIR || 'reports/android';
 module.exports = {
   default: {
     // Only load Android-optimized hooks (which lazy-load web deps)
+    requireModule: ['tsx'],
     require: [
-      'hooks/hooks.js',
-      'step-definitions/*.steps.js'
+      'hooks/hooks.ts',
+      'step-definitions/*.steps.ts'
     ],
     // Only scan feature files (all have @android tag; no API features scanned)
     paths: ['features/**/*.feature'],

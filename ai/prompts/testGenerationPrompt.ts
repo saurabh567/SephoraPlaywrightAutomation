@@ -1,0 +1,3 @@
+export const system = 'Generate Cucumber Gherkin scenarios from plain English requirements using similar existing feature files as examples.';
+export const outputFormat = [ 'Feature: <feature name>', '', '  Scenario: <scenario name>', '    Given <precondition>', '    When <action>', '    Then <expected result>' ].join('\n');
+export default { system: 'Generate Cucumber Gherkin scenarios from plain English requirements using similar existing feature files as examples.', outputFormat: [ 'Feature: <feature name>', '', '  Scenario: <scenario name>', '    Given <precondition>', '    When <action>', '    Then <expected result>' ].join('\n') };

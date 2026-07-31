@@ -1,13 +1,16 @@
 // Cucumber runtime configuration for features, step definitions, hooks, reports, retries, parallel runs, and timeouts.
 // ============================================================================
 // API ISOLATION NOTE:
-// This config loads hooks/hooks.js which contains browser-launch logic.
+// This config loads hooks/hooks.ts which contains browser-launch logic.
 // For API-only execution, use cucumber.api.js instead (does NOT load hooks).
-// If this config is accidentally used with @api-tagged features, hooks/hooks.js
+// If this config is accidentally used with @api-tagged features, hooks/hooks.ts
 // contains a three-layer defense that prevents any browser interaction:
 //   1. Config detection (cucumber.api.js in argv)
 //   2. Env var detection (TEST_PLATFORM=API or API_ONLY=true)
 //   3. Scenario tag detection (@api)
+// ============================================================================
+// TypeScript runtime: tsx is loaded via requireModule so .ts hooks and
+// step definitions (plus their extensionless imports) resolve at runtime.
 // ============================================================================
 const path = require('path');
 
@@ -25,9 +28,10 @@ const REPORT_DIR = process.env.REPORT_DIR || (() => {
 
 module.exports = {
   default: {
+    requireModule: ['tsx'],
     require: [
-      'hooks/hooks.js',
-      'step-definitions/**/*.js'
+      'hooks/hooks.ts',
+      'step-definitions/**/*.ts'
     ],
     paths: ['features/**/*.feature'],
     format: [
