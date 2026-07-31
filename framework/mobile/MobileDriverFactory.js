@@ -1,17 +1,69 @@
+/**
+ * MobileDriverFactory.js
+ *
+ * Factory for creating Appium driver sessions.
+ *
+ * ══════════════════════════════════════════════════════════════════
+ * IMPORTANT: This factory is the FALLBACK session creator.
+ * The PRIMARY session creator is the lifecycle DriverManager
+ * (mobile/lifecycle/DriverManager.js), which is used by the
+ * StartupOrchestrator.
+ *
+ * This factory is used when:
+ *   1. The lifecycle DriverManager delegates to it (backward compat)
+ *   2. Standalone execution without the orchestrator
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * Capabilities are now separated:
+ *   - ANDROID_NATIVE → androidNativeCapabilities (no browserName)
+ *   - ANDROID_WEB    → androidWebCapabilities (no appPackage/activity)
+ *   - IOS_NATIVE     → iosCapabilities (native)
+ *   - IOS_WEB        → iosCapabilities (Safari)
+ */
+
 const { TEST_PLATFORMS, normalizePlatform } = require('../common/platforms');
+const ExecutionMode = require('../common/ExecutionMode');
 const androidCapabilities = require('../../mobile/capabilities/android.capabilities');
+const androidNativeCapabilities = require('../../mobile/capabilities/androidNativeCapabilities');
+const androidWebCapabilities = require('../../mobile/capabilities/androidWebCapabilities');
 const iosCapabilities = require('../../mobile/capabilities/ios.capabilities');
 
 class MobileDriverFactory {
+  /**
+   * Get capabilities for the given platform.
+   * Uses execution mode to determine native vs web capabilities.
+   *
+   * @param {string} platform - 'ANDROID' or 'IOS'
+   * @returns {object} Capabilities object
+   */
   static getCapabilities(platform) {
     const normalizedPlatform = normalizePlatform(platform);
 
-    if (normalizedPlatform === TEST_PLATFORMS.ANDROID) return androidCapabilities();
-    if (normalizedPlatform === TEST_PLATFORMS.IOS) return iosCapabilities();
+    if (normalizedPlatform === TEST_PLATFORMS.ANDROID) {
+      // Check execution mode to determine which capabilities to use
+      if (ExecutionMode.isAndroidNative()) {
+        return androidNativeCapabilities();
+      }
+      if (ExecutionMode.isAndroidWeb()) {
+        return androidWebCapabilities();
+      }
+      // Fallback: use old capability builder (backward compat)
+      return androidCapabilities();
+    }
+
+    if (normalizedPlatform === TEST_PLATFORMS.IOS) {
+      return iosCapabilities();
+    }
 
     throw new Error(`Unsupported mobile platform: ${platform}`);
   }
 
+  /**
+   * Create a driver session via WebDriverIO remote.
+   *
+   * @param {object} config - Test configuration
+   * @returns {Promise<object>} WebDriverIO driver
+   */
   static async createDriver(config) {
     let remote;
     try {
@@ -21,99 +73,45 @@ class MobileDriverFactory {
     }
 
     var caps = this.getCapabilities(config.testPlatform);
+    var executionMode = ExecutionMode.getExecutionMode();
 
-    // ══════════════════════════════════════════════════════════════════
-    // DIAGNOSTIC: Print complete capabilities JSON before session creation
-    // ══════════════════════════════════════════════════════════════════
-    const relevantCaps = [
-      'platformName',
-      'appium:automationName',
-      'appium:deviceName',
-      'appium:platformVersion',
-      'appium:appPackage',
-      'appium:appActivity',
-      'appium:appWaitActivity',
-      'appium:appWaitPackage',
-      'appium:appWaitDuration',
-      'appium:noReset',
-      'appium:fullReset',
-      'appium:dontStopAppOnReset',
-      'appium:autoLaunch',
-      'appium:newCommandTimeout',
-      'appium:adbExecTimeout',
-      'appium:uiautomator2ServerLaunchTimeout',
-      'appium:skipDeviceInitialization',
-      'appium:skipServerInstallation',
-      'appium:autoGrantPermissions',
-      'appium:ensureWebviewsHavePages',
-      'appium:recreateChromeDriverSessions',
-      'appium:nativeWebScreenshot',
-      'appium:chromedriverPort',
-      'appium:udid',
-      'appium:app',
-      // Lock screen unlock capabilities
-      'appium:unlockStrategy',
-      'appium:unlockKey',
-      'appium:unlockType',
-    ];
-
+    // Log capabilities
     console.log('');
     console.log('╔══════════════════════════════════════════════╗');
-    console.log('║   APPIUM SESSION CAPABILITIES DIAGNOSTIC    ║');
+    console.log('║   APPIUM SESSION CAPABILITIES              ║');
     console.log('╚══════════════════════════════════════════════╝');
-    console.log('  Timestamp: ' + new Date().toISOString());
+    console.log('  Execution mode: ' + executionMode);
     console.log('  Platform:  ' + config.testPlatform);
     console.log('  Appium:    ' + config.appium.protocol + '://' + config.appium.hostname + ':' + config.appium.port + config.appium.path);
     console.log('');
 
-    for (var i = 0; i < relevantCaps.length; i++) {
-      var key = relevantCaps[i];
-      var found = false;
-      // Check both with and without appium: prefix
-      if (caps[key] !== undefined) {
-        console.log('  ' + padRight(key, 40) + ' = ' + JSON.stringify(caps[key]));
-        found = true;
-      }
-      // Also check as non-prefixed
-      var strippedKey = key.replace('appium:', '');
-      if (strippedKey !== key && caps[strippedKey] !== undefined) {
-        console.log('  ' + padRight(strippedKey, 40) + ' = ' + JSON.stringify(caps[strippedKey]));
-        found = true;
-      }
-      if (!found) {
-        console.log('  ' + padRight(key, 40) + ' = NOT SET');
+    // Log relevant capabilities
+    for (var key in caps) {
+      if (caps.hasOwnProperty(key) && caps[key] !== undefined) {
+        console.log('  ' + key + ' = ' + JSON.stringify(caps[key]));
       }
     }
     console.log('');
 
-    // Also show env var origin trace
-    console.log('  ENVIRONMENT VARIABLE TRACE:');
-    var envVars = [
-      ['APP_ACTIVITY', process.env.APP_ACTIVITY],
-      ['APP_PACKAGE',  process.env.APP_PACKAGE],
-      ['APPIUM_AUTO_LAUNCH', process.env.APPIUM_AUTO_LAUNCH],
-      ['NO_RESET',     process.env.NO_RESET],
-      ['FULL_RESET',   process.env.FULL_RESET],
-      ['DEVICE_NAME',  process.env.DEVICE_NAME],
-      ['UDID',         process.env.UDID],
-      ['NEW_COMMAND_TIMEOUT', process.env.NEW_COMMAND_TIMEOUT],
-      // Lock screen env vars
-      ['APPIUM_UNLOCK_STRATEGY', process.env.APPIUM_UNLOCK_STRATEGY],
-      ['APPIUM_UNLOCK_KEY',     process.env.APPIUM_UNLOCK_KEY],
-      ['APPIUM_SKIP_UNLOCK',    process.env.APPIUM_SKIP_UNLOCK],
-    ];
-    for (var j = 0; j < envVars.length; j++) {
-      var val = envVars[j][1] !== undefined ? envVars[j][1] : '(undefined)';
-      console.log('    ' + padRight(envVars[j][0], 25) + ' = ' + val);
+    // Validate capability separation
+    if (ExecutionMode.isAndroidNative()) {
+      if (caps['appium:browserName']) {
+        console.warn('[MobileDriverFactory] WARNING: Native capabilities should not include browserName');
+        delete caps['appium:browserName'];
+        delete caps.browserName;
+      }
     }
-    console.log('');
-
-    // Print full capabilities JSON
-    console.log('  FULL CAPABILITIES JSON (sent to Appium):');
-    console.log('  ' + JSON.stringify(caps, null, 4).split('\n').join('\n  '));
-    console.log('');
-    console.log('══════════════════════════════════════════════');
-    console.log('');
+    if (ExecutionMode.isAndroidWeb()) {
+      if (caps['appium:appPackage']) {
+        console.warn('[MobileDriverFactory] WARNING: Web capabilities should not include appPackage');
+        delete caps['appium:appPackage'];
+        delete caps['appium:appActivity'];
+        delete caps['appium:appWaitActivity'];
+        delete caps['appium:appWaitPackage'];
+        delete caps['appium:appWaitDuration'];
+        delete caps['appium:app'];
+      }
+    }
 
     return remote({
       protocol: config.appium.protocol,
@@ -126,11 +124,6 @@ class MobileDriverFactory {
       capabilities: caps,
     });
   }
-}
-
-function padRight(str, len) {
-  while (str.length < len) str += ' ';
-  return str;
 }
 
 module.exports = MobileDriverFactory;

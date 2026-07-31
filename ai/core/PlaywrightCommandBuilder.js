@@ -5,8 +5,30 @@
  * Generates structured Playwright CLI commands that can be passed to
  * PlaywrightExecutionEngine for execution or logged/inspected.
  *
- * The DecisionAgent uses this builder to dynamically construct commands
- * based on context analysis, risk assessment, and execution strategy.
+ * IMPORTANT: Only valid Playwright CLI flags are emitted:
+ *   --headed            ✓ (valid)
+ *   --config            ✓ (valid)
+ *   --project           ✓ (valid)
+ *   --grep              ✓ (valid)
+ *   --workers           ✓ (valid)
+ *   --retries           ✓ (valid)
+ *   --shard             ✓ (valid)
+ *   --timeout           ✓ (valid)
+ *   --reporter          ✓ (valid)
+ *   --output            ✓ (valid)
+ *   --forbid-only       ✓ (valid)
+ *   --fully-parallel    ✓ (valid)
+ *   --repeat-each       ✓ (valid)
+ *   --max-failures      ✓ (valid)
+ *   --browser           ✓ (valid)
+ *
+ * INVALID (config-only, never emit as CLI args):
+ *   --trace             ✗ (config-only in playwright.config.js)
+ *   --video             ✗ (config-only in playwright.config.js)
+ *   --screenshot        ✗ (config-only in playwright.config.js)
+ *
+ * Trace, video, and screenshot are controlled via playwright.config.js
+ * and playwright.config.cli.js — never via CLI arguments.
  *
  * Architecture:
  *   DecisionAgent ──► PlaywrightCommandBuilder ──► { command, args, commandString }
@@ -30,6 +52,7 @@
  */
 
 const path = require('path');
+const executionConfig = require('../../config/executionConfig');
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -51,6 +74,8 @@ class CanonicalCommand {
     this.shard = options.shard || null;
     this.headed = options.headed || false;
     this.browser = options.browser || null;
+    // trace, video, screenshot are stored for metadata/logging only
+    // NEVER emitted as CLI args — they belong in playwright.config.js
     this.trace = options.trace || null;
     this.video = options.video || null;
     this.screenshot = options.screenshot || null;
@@ -69,7 +94,11 @@ class CanonicalCommand {
     return [this.command, ...this._buildArgs()].join(' ');
   }
 
-  /** Build the full CLI arg array */
+  /**
+   * Build the full CLI arg array.
+   * Only emits VALID Playwright CLI flags.
+   * Invalid flags (--trace, --video, --screenshot) are NEVER emitted.
+   */
   _buildArgs() {
     const args = [];
 
@@ -127,7 +156,10 @@ class CanonicalCommand {
       args.push('--fully-parallel');
     }
 
-    if (this.headed) {
+    // --headed is a valid Playwright CLI flag
+    // Use the executionConfig as the single source of truth
+    const headed = this.headed || executionConfig.isHeaded;
+    if (headed) {
       args.push('--headed');
     }
 
@@ -135,17 +167,9 @@ class CanonicalCommand {
       args.push('--browser', this.browser);
     }
 
-    if (this.trace) {
-      args.push('--trace', this.trace);
-    }
-
-    if (this.video) {
-      args.push('--video', this.video);
-    }
-
-    if (this.screenshot) {
-      args.push('--screenshot', this.screenshot);
-    }
+    // NOTE: --trace, --video, --screenshot are NOT valid Playwright CLI flags.
+    // They are config-only options that belong in playwright.config.js.
+    // We intentionally do NOT emit them here.
 
     if (this.extraArgs.length > 0) {
       args.push(...this.extraArgs);
@@ -200,9 +224,6 @@ class PlaywrightCommandBuilder {
    * @param {string}  [options.shard]       - '2/4' format
    * @param {boolean} [options.headed]      - Run headed
    * @param {string}  [options.browser]     - Browser name
-   * @param {string}  [options.trace]       - Trace mode
-   * @param {string}  [options.video]       - Video mode
-   * @param {string}  [options.screenshot]  - Screenshot mode
    * @param {string}  [options.testFile]    - Test file path
    * @param {number}  [options.timeout]     - Test timeout ms
    * @param {number}  [options.maxFailures] - Stop after N failures
@@ -401,30 +422,6 @@ class PlaywrightCommandBuilder {
   }
 
   /**
-   * Build a command with trace mode.
-   * @param {string} mode - 'on' | 'off' | 'retain-on-failure'
-   */
-  withTrace(mode = 'on', options = {}) {
-    return this.build({ ...options, trace: mode, description: `Trace: ${mode}` });
-  }
-
-  /**
-   * Build a command with video mode.
-   * @param {string} mode - 'on' | 'off' | 'retain-on-failure'
-   */
-  withVideo(mode = 'on', options = {}) {
-    return this.build({ ...options, video: mode, description: `Video: ${mode}` });
-  }
-
-  /**
-   * Build a command with screenshot mode.
-   * @param {string} mode - 'on' | 'off' | 'only-on-failure'
-   */
-  withScreenshot(mode = 'on', options = {}) {
-    return this.build({ ...options, screenshot: mode, description: `Screenshot: ${mode}` });
-  }
-
-  /**
    * Build a command with explicit timeout.
    * @param {number} timeoutMs - Timeout in milliseconds
    */
@@ -485,112 +482,53 @@ class PlaywrightCommandBuilder {
       baseCommand = this.forSanity({ ...overrides, platform });
     } else if (tags.includes('@Regression') || tags.includes('@regression')) {
       baseCommand = this.forRegression({ ...overrides, platform });
-    } else if (isCI) {
-      baseCommand = this.forCI({ ...overrides, platform });
+    } else if (tags) {
+      baseCommand = this.withTags(tags, { ...overrides, platform });
     } else {
-      baseCommand = this.forLocal({ ...overrides, platform });
+      baseCommand = this.build({ ...overrides, platform });
     }
 
+    // Always add the primary command
     commands.push(baseCommand);
 
-    // For critical risk, add a parallel sharded execution as fallback
-    if (riskLevel === 'critical' || priority === 'critical') {
-      commands.push(
-        this.forShard(1, 2, { ...overrides, platform, description: 'Critical retry shard 1/2' })
-      );
-      commands.push(
-        this.forShard(2, 2, { ...overrides, platform, description: 'Critical retry shard 2/2' })
-      );
-    }
-
-    // For CI with failures, add a retry command with trace
-    if (isCI && hasFailures) {
-      commands.push(
-        this.withRetries(3, {
-          ...overrides,
-          platform,
-          trace: 'on',
-          video: 'on',
-          description: 'Failure retry with full artifacts'
-        })
-      );
-    }
-
-    // Add platform-specific follow-up
-    if (platform === 'ANDROID') {
-      commands.push(this.forAndroid({ ...overrides, description: 'Android-specific execution' }));
-    } else if (platform === 'IOS') {
-      commands.push(this.forIOS({ ...overrides, description: 'iOS-specific execution' }));
-    } else if (platform === 'API') {
-      commands.push(this.forAPI({ ...overrides, description: 'API-specific execution' }));
+    // If CI and risk is elevated, add a retry command with full debugging
+    if (isCI && (riskLevel === 'critical' || riskLevel === 'high')) {
+      const retryOverrides = {
+        ...overrides,
+        retries: Math.max(overrides.retries || 2, 1),
+        described: 'Retry pass (full artifacts via config)'
+      };
+      if (tags.includes('@Smoke') || tags.includes('@smoke')) {
+        commands.push(this.forSmoke(retryOverrides));
+      } else if (tags) {
+        commands.push(this.withTags(tags, retryOverrides));
+      } else {
+        commands.push(this.build(retryOverrides));
+      }
     }
 
     return commands;
   }
 
-  // ╔════════════════════════════════════════════════════════════════════╗
-  // ║                      UTILITY METHODS                              ║
-  // ╚════════════════════════════════════════════════════════════════════╝
-
   /**
-   * Parse a command string representation back into a CanonicalCommand.
-   * Useful for logging, debugging, and serialization round-trips.
-   *
-   * @param {string} cmdString - e.g. 'npx playwright test --project Android --grep @Smoke'
-   * @returns {CanonicalCommand}
-   */
-  parse(cmdString) {
-    const parts = cmdString.split(/\s+/);
-    const command = parts[0] + ' ' + parts[1]; // 'npx playwright test'
-    const args = parts.slice(3); // everything after 'npx playwright test'
-    const options = {};
-
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === '--config' && args[i + 1]) options.config = args[++i];
-      else if (arg === '--project' && args[i + 1]) options.project = args[++i];
-      else if (arg === '--grep' && args[i + 1]) options.tags = args[++i];
-      else if (arg === '--workers' && args[i + 1]) options.workers = parseInt(args[++i], 10);
-      else if (arg === '--retries' && args[i + 1]) options.retries = parseInt(args[++i], 10);
-      else if (arg === '--shard' && args[i + 1]) options.shard = args[++i];
-      else if (arg === '--headed') options.headed = true;
-      else if (arg === '--browser' && args[i + 1]) options.browser = args[++i];
-      else if (arg === '--trace' && args[i + 1]) options.trace = args[++i];
-      else if (arg === '--video' && args[i + 1]) options.video = args[++i];
-      else if (arg === '--screenshot' && args[i + 1]) options.screenshot = args[++i];
-      else if (arg === '--timeout' && args[i + 1]) options.timeout = parseInt(args[++i], 10);
-      else if (arg === '--max-failures' && args[i + 1]) options.maxFailures = parseInt(args[++i], 10);
-      else if (arg === '--repeat-each' && args[i + 1]) options.repeatEach = parseInt(args[++i], 10);
-      else if (arg === '--forbid-only') options.forbidOnly = true;
-      else if (arg === '--fully-parallel') options.fullyParallel = true;
-      else if (arg === '--update-snapshots') options.updateSnapshots = true;
-      else if (arg === '--pass-with-no-tests') options.passWithNoTests = true;
-      else if (arg.startsWith('--')) { /* unknown flag, skip */ }
-      else if (!arg.startsWith('-')) options.testFile = arg; // positional
-    }
-
-    return this.build(options);
-  }
-
-  /**
-   * Generate a human-readable description for a set of options.
+   * Describe the command based on options.
+   * @private
    */
   _describe(options) {
     const parts = [];
     if (options.platform) parts.push(options.platform);
     if (options.tags) parts.push(options.tags);
-    if (options.project) parts.push(`project=${options.project}`);
-    if (options.workers) parts.push(`${options.workers} workers`);
-    if (options.retries) parts.push(`${options.retries} retries`);
-    if (options.shard) parts.push(`shard=${options.shard}`);
     if (options.headed) parts.push('headed');
-    return parts.join(' | ') || 'Playwright CLI command';
+    if (options.workers) parts.push(`${options.workers}w`);
+    if (options.retries) parts.push(`${options.retries}r`);
+    return parts.length > 0 ? parts.join(' ') : 'Playwright test';
   }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────────
-const instance = new PlaywrightCommandBuilder();
 
-module.exports = instance;
+const singleton = new PlaywrightCommandBuilder();
+
+module.exports = singleton;
 module.exports.PlaywrightCommandBuilder = PlaywrightCommandBuilder;
 module.exports.CanonicalCommand = CanonicalCommand;

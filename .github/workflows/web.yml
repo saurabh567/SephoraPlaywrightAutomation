@@ -16,6 +16,7 @@ jobs:
       ENV: qa
       BROWSER: chromium
       HEADLESS: true
+      EXECUTION_MODE: headless
       PARALLEL: 1
       RETRIES: 0
 

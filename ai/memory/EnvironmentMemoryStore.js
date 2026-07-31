@@ -36,7 +36,7 @@ class EnvironmentMemoryStore {
       runId: options.runId || `run-${Date.now()}`,
       platform: options.platform || process.env.TEST_PLATFORM || 'WEB',
       browser: options.browser || process.env.BROWSER || 'chromium',
-      headless: process.env.HEADLESS !== 'false',
+      headless: require('../../config/executionConfig').isHeadless,
       nodeVersion: process.version,
       os: {
         platform: os.platform(),

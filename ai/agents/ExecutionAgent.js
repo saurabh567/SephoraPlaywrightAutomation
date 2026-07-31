@@ -24,7 +24,8 @@ module.exports = {
     const platform = (input.platform || process.env.TEST_PLATFORM || 'WEB').toUpperCase();
     const tags = input.tags || process.env.TAGS || '';
     const browser = input.browser || process.env.BROWSER || 'chromium';
-    const headless = input.headless !== false;
+    const executionConfig = require('../../config/executionConfig');
+    const headless = executionConfig.isHeadless; // ONLY from executionConfig - single source of truth
 
     const state = loadState();
 
@@ -52,18 +53,18 @@ module.exports = {
         console.log(`[ExecutionAgent] Attempt ${attempt}/${runInfo.maxRetries + 1} on ${platform}`);
 
         const { spawnSync } = require('child_process');
-        const env = { ...process.env, BROWSER: browser, HEADLESS: headless ? 'true' : 'false' };
+        const env = { ...process.env, ...executionConfig.toEnvOverrides(), BROWSER: browser };
         if (tags) env.TAGS = tags;
 
         let result;
         if (platform === 'WEB') {
-          result = spawnSync('npm', ['run', 'test:web'], { stdio: 'inherit', env, shell: true });
+          result = spawnSync('npm', ['run', 'test:web'], { stdio: 'inherit', env, shell: false });
         } else if (platform === 'ANDROID') {
-          result = spawnSync('npm', ['run', 'test:android'], { stdio: 'inherit', env, shell: true });
+          result = spawnSync('npm', ['run', 'test:android'], { stdio: 'inherit', env, shell: false });
         } else if (platform === 'IOS') {
-          result = spawnSync('npm', ['run', 'test:ios'], { stdio: 'inherit', env, shell: true });
+          result = spawnSync('npm', ['run', 'test:ios'], { stdio: 'inherit', env, shell: false });
         } else {
-          result = spawnSync('npm', ['run', 'test:core'], { stdio: 'inherit', env, shell: true });
+          result = spawnSync('npm', ['run', 'test:core'], { stdio: 'inherit', env, shell: false });
         }
 
         exitCode = result && typeof result.status === 'number' ? result.status : -1;

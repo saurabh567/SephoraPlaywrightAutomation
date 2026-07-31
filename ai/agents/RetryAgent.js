@@ -92,11 +92,12 @@ module.exports = {
         .join(' or ');
 
       const env = { ...process.env };
-      const result = spawnSync('npx', [
-        'cucumber-js',
+      // SAFE: Use direct path to node_modules/.bin/cucumber-js, no shell
+      const cucumberBin = require('path').join(process.cwd(), 'node_modules', '.bin', 'cucumber-js');
+      const result = spawnSync(cucumberBin, [
         '--config', 'cucumber.js',
         '--name', tagExpressions
-      ], { stdio: 'pipe', encoding: 'utf8', env, shell: true });
+      ], { stdio: 'pipe', encoding: 'utf8', env, shell: false });
 
       const attemptInfo = {
         attempt,

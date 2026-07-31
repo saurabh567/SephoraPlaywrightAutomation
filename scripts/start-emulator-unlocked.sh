@@ -5,7 +5,7 @@
 # Starts the Android emulator with lock screen bypass options.
 # Usage: ./scripts/start-emulator-unlocked.sh [avd_name]
 #
-# Default AVD name: from $ANDROID_AVD_NAME env var or "Pixel_9_Pro"
+# AVD name: arg > ANDROID_AVD_NAME/ANDROID_AVD env var > auto-detected via emulator -list-avds
 #
 # Key flags:
 #   -no-snapshot       Force cold boot (avoids snapshot issues)
@@ -23,7 +23,32 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AVD_NAME="${1:-${ANDROID_AVD_NAME:-Pixel_9_Pro}}"
+# Resolve AVD: arg > env var > auto-detect via emulator -list-avds
+if [ -n "${1:-}" ]; then
+  AVD_NAME="$1"
+elif [ -n "${ANDROID_AVD_NAME:-}" ]; then
+  AVD_NAME="$ANDROID_AVD_NAME"
+elif [ -n "${ANDROID_AVD:-}" ]; then
+  AVD_NAME="$ANDROID_AVD"
+elif [ -n "${AVD_NAME:-}" ]; then
+  AVD_NAME="$AVD_NAME"
+else
+  EMULATOR_BIN="emulator"
+  if command -v "$EMULATOR_BIN" &>/dev/null; then
+    AVDS=$("$EMULATOR_BIN" -list-avds 2>/dev/null | grep -v '^$' | head -5)
+    if [ -n "$AVDS" ]; then
+      AVD_NAME=$(echo "$AVDS" | grep 'Pixel_9_Pro' | head -1 || echo "$AVDS" | head -1)
+      echo "  Auto-detected AVD: $AVD_NAME"
+    fi
+  fi
+  if [ -z "${AVD_NAME:-}" ]; then
+    echo "ERROR: No AVD specified and auto-detection failed."
+    echo "Set ANDROID_AVD_NAME environment variable or pass AVD name as argument."
+    echo "Available AVDs:"
+    "$EMULATOR_BIN" -list-avds 2>/dev/null || true
+    exit 1
+  fi
+fi
 
 echo "═══ Emulator Starter (Lock Screen Bypass) ═══"
 echo ""

@@ -210,6 +210,9 @@ class WdaLifecycleManager {
       ];
 
       this._log('Running: ' + args.join(' '));
+      console.log('[WDA] Building WDA with: xcrun ' + args.join(' '));
+      console.log('[WDA] This may take 5-30 minutes on first run...');
+      console.log('[WDA] Build logs: ' + this.wdaLogPath);
 
       var child = spawn('xcrun', args, {
         stdio: ['ignore', logFd, logFd],
@@ -255,6 +258,7 @@ class WdaLifecycleManager {
     return new Promise(function(resolve) {
       // Try /health first, then /status
       var urls = [this.wdaHealthUrl, this.wdaStatusUrl];
+      console.log('[WDA] Checking health at: ' + urls.join(', '));
 
       var tryUrl = function(urlIndex) {
         if (urlIndex >= urls.length) {
@@ -375,12 +379,20 @@ class WdaLifecycleManager {
       '-destination', destination,
       '-derivedDataPath', this.derivedDataPath,
       'test-without-building',
-      'CODE_SIGNING_ALLOWED=NO',
+      // Xcode 16+ requires signing for test execution even on simulator.
+      // CODE_SIGNING_ALLOWED=NO is REMOVED from the test command because it
+      // causes xcodebuild 16+ to fail with "No signing certificate found".
+      // The build step still uses CODE_SIGNING_ALLOWED=NO (it works for build).
+      // For test-without-building, we allow automatic provisioning.
+      '-allowProvisioningUpdates',
       'COMPILER_INDEX_STORE_ENABLE=NO',
       'WDA_PORT=' + this.wdaPort
     ];
 
     this._log('Launching: ' + args.join(' '));
+    console.log('[WDA] Launching WDA with: xcrun ' + args.join(' '));
+    console.log('[WDA] WDA logs: ' + this.wdaLogPath);
+    console.log('[WDA] Waiting for health endpoint at ' + this.wdaHealthUrl + ' (timeout: ' + this.startTimeout + 'ms)');
 
     this._child = spawn('xcrun', args, {
       stdio: ['ignore', logFd, logFd],

@@ -2,20 +2,11 @@
  * playwright.config.cli.js
  *
  * Extended Playwright configuration for CLI-driven execution.
- * Used when tests are executed via `npx playwright test` through
- * the PlaywrightCLIAgent / PlaywrightCLILauncher.
- *
- * This config integrates with the existing framework:
- *   - Uses existing page objects, hooks, and utilities
- *   - Retains Cucumber BDD compatibility via test runner spec
- *   - Supports all platforms: WEB, ANDROID, IOS, API
- *   - Works alongside the existing playwright.config.js (not replacing it)
- *
- * The AI DecisionEngine selects this config when routing through
- * the Playwright CLI execution path.
+ * Uses config/executionConfig.js as single source of truth for headless/headed mode.
  *
  * Usage:
  *   npx playwright test --config playwright.config.cli.js
+ *   HEADLESS=false npx playwright test --config playwright.config.cli.js
  *
  * Or via AI orchestrator:
  *   node ai/orchestrator/unifiedOrchestrator.js --playwright-cli
@@ -27,7 +18,10 @@ require('dotenv').config();
 const ROOT = __dirname;
 const PLATFORM = (process.env.TEST_PLATFORM || 'WEB').toUpperCase();
 const IS_CI = process.env.CI === 'true';
-const IS_HEADED = process.env.HEADLESS !== 'false' ? false : true;
+
+// Single source of truth for execution mode
+const executionConfig = require('./config/executionConfig');
+const IS_HEADED = executionConfig.isHeaded;
 
 // ─── Web Projects ──────────────────────────────────────────────────────────
 
@@ -40,7 +34,8 @@ const webProjects = [
       viewport: { width: Number(process.env.VIEWPORT_WIDTH || 1440), height: Number(process.env.VIEWPORT_HEIGHT || 900) },
       acceptDownloads: true,
       bypassCSP: true,
-      ignoreHTTPSErrors: true
+      ignoreHTTPSErrors: true,
+      headless: executionConfig.isHeadless
     },
     grep: /@web/
   },
@@ -51,7 +46,8 @@ const webProjects = [
       baseURL: process.env.BASE_URL || 'https://www.amazon.in',
       viewport: { width: Number(process.env.VIEWPORT_WIDTH || 1440), height: Number(process.env.VIEWPORT_HEIGHT || 900) },
       acceptDownloads: true,
-      ignoreHTTPSErrors: true
+      ignoreHTTPSErrors: true,
+      headless: executionConfig.isHeadless
     },
     grep: /@web/
   },
@@ -61,7 +57,8 @@ const webProjects = [
       browserName: 'webkit',
       baseURL: process.env.BASE_URL || 'https://www.amazon.in',
       viewport: { width: Number(process.env.VIEWPORT_WIDTH || 1440), height: Number(process.env.VIEWPORT_HEIGHT || 900) },
-      acceptDownloads: true
+      acceptDownloads: true,
+      headless: executionConfig.isHeadless
     },
     grep: /@web/
   }
@@ -75,11 +72,12 @@ const androidProjects = [
     use: {
       browserName: 'chromium',
       baseURL: process.env.BASE_URL || 'https://www.amazon.in',
-      viewport: { width: 412, height: 915 },  // Pixel 5
+      viewport: { width: 412, height: 915 },
       userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36',
       acceptDownloads: false,
       hasTouch: true,
-      isMobile: true
+      isMobile: true,
+      headless: false // Mobile always runs headed
     },
     grep: /@android/
   }
@@ -93,11 +91,12 @@ const iosProjects = [
     use: {
       browserName: 'webkit',
       baseURL: process.env.BASE_URL || 'https://www.amazon.in',
-      viewport: { width: 390, height: 844 },  // iPhone 14
+      viewport: { width: 390, height: 844 },
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       acceptDownloads: false,
       hasTouch: true,
-      isMobile: true
+      isMobile: true,
+      headless: false // Mobile always runs headed
     },
     grep: /@ios/
   }
@@ -111,7 +110,7 @@ const apiProjects = [
     use: {
       browserName: 'chromium',
       baseURL: process.env.BASE_URL || 'https://www.amazon.in',
-      launchOptions: { headless: true }
+      launchOptions: { headless: executionConfig.isHeadless }
     },
     grep: /@api/
   }
@@ -129,42 +128,35 @@ function selectProjects() {
       return apiProjects;
     case 'WEB':
     default:
-      // In CI, run all web browsers; locally just chromium
       if (IS_CI) return webProjects;
-      return [webProjects[0]]; // Chromium only for local
+      return [webProjects[0]];
   }
 }
 
 // ─── Config Export ─────────────────────────────────────────────────────────
 
 module.exports = {
-  // Test directory — points to the CLI runner spec that bridges to Cucumber
   testDir: path.join(ROOT, 'test-runners'),
   testMatch: '**/playwright-cli-runner.spec.js',
 
-  // Fully parallel in CI
   fullyParallel: IS_CI,
   forbidOnly: IS_CI,
 
-  // Retries from environment or CI default
   retries: IS_CI ? Number(process.env.RETRIES || 2) : Number(process.env.RETRIES || 0),
 
-  // Workers
   workers: IS_CI ? Number(process.env.PARALLEL || 4) : Number(process.env.PARALLEL || 1),
 
-  // Timeout
   timeout: Number(process.env.TIMEOUT || 60000),
 
-  // Reporter
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'reports/playwright-cli/results.json' }]
   ],
 
-  // Use defaults
+  // Use defaults — trace, video, screenshot are config-only (NOT CLI args)
   use: {
-    headless: !IS_HEADED,
+    headless: executionConfig.isHeadless,
     trace: process.env.TRACE || 'retain-on-failure',
     video: process.env.VIDEO || 'retain-on-failure',
     screenshot: process.env.SCREENSHOT || 'only-on-failure',
@@ -172,18 +164,13 @@ module.exports = {
     navigationTimeout: Number(process.env.NAVIGATION_TIMEOUT || 30000)
   },
 
-  // Projects based on platform
   projects: selectProjects(),
 
-  // Global setup
   globalSetup: path.join(ROOT, 'ai', 'playwright-cli', 'globalSetup.js'),
 
-  // Global teardown
   globalTeardown: path.join(ROOT, 'ai', 'playwright-cli', 'globalTeardown.js'),
 
-  // Output folder for test artifacts
   outputDir: 'test-results',
 
-  // Preserve existing playwright.config.js settings
   ...(require('./playwright.config'))
 };

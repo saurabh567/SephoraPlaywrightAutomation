@@ -536,12 +536,48 @@ async function phaseStartEmulator() {
   setFailedStage('start-emulator');
 
   const existingDevice = getAdbDeviceId();
+
+  // FIX: Even if adb detects a device, verify it is NOT headless.
+  // A headless emulator (qemu-system-aarch64-headless) shows up in adb
+  // but must NOT satisfy the "device exists" condition for HEADLESS=false.
   if (existingDevice) {
     log(`adb device detected: ${existingDevice}`);
-    executionState.adbDeviceId = existingDevice;
-    executionState.bootCompleted = bootCompleted();
-    emulatorOwned = false;
-    return true;
+
+    if (!HEADLESS_EMULATOR) {
+      // HEADLESS=false: verify emulator is NOT headless via ps aux
+      try {
+        const psCheck = runCmdOptional(
+          "ps aux | grep -E .qemu.*-headless.|.qemu.*headless. | grep -v grep || true"
+        );
+        const noWindowCheck = runCmdOptional(
+          "ps aux | grep -E .emulator.*-no-window.|.qemu.*-no-window. | grep -v grep || true"
+        );
+        const isHeadless = (psCheck && psCheck.length > 0) || (noWindowCheck && noWindowCheck.length > 0);
+        if (isHeadless) {
+          log("WARNING: Existing emulator is HEADLESS but HEADLESS=false requested");
+          log("Will stop headless emulator and start fresh headed emulator");
+          try { runCmd("adb emu kill 2>/dev/null || true", { timeout: 3000 }); } catch (_) {}
+          await sleep(3000);
+          try { runCmd("pkill -f .qemu-system. 2>/dev/null || true", { timeout: 5000 }); } catch (_) {}
+          try { runCmd("pkill -f .emulator.*avd. 2>/dev/null || true", { timeout: 5000 }); } catch (_) {}
+          await sleep(3000);
+        } else {
+          log("Existing emulator is HEADED - reusing");
+          executionState.adbDeviceId = existingDevice;
+          executionState.bootCompleted = bootCompleted();
+          emulatorOwned = false;
+          return true;
+        }
+      } catch (_) {
+        log("Could not verify emulator mode - will start fresh");
+      }
+    } else {
+      // HEADLESS=true: reuse existing device
+      executionState.adbDeviceId = existingDevice;
+      executionState.bootCompleted = bootCompleted();
+      emulatorOwned = false;
+      return true;
+    }
   }
 
   const maxAttempts = 2;
@@ -552,6 +588,7 @@ async function phaseStartEmulator() {
 
     try {
       runCmdOptional("pkill -f 'emulator.*avd' 2>/dev/null || true");
+      runCmdOptional("pkill -f .qemu-system. 2>/dev/null || true");
     } catch (_) {}
     await sleep(3000);
 

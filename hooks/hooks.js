@@ -1,74 +1,75 @@
 // Cucumber hooks that manage browser, context, page, screenshots, videos, and traces.
 // Also performs automatic browser cache cleanup before/after test scenarios.
 //
-// IMPORTANT: API-only execution (via cucumber.api.js) does NOT load this file.
-// However, if this file IS loaded alongside API tests (e.g., via cucumber.js with @api tags),
-// the guards below prevent any browser launch or browser-related operations.
-//
-// Mobile BrowserContext Isolation:
-//   Each test case gets a brand-new Appium driver session via MobileSessionManager.
-//   Sessions are always disposed in After hook — even on failure.
-//   No browser state is ever shared between test cases.
-//
-// Mobile Language Popup Handling:
-//   The Amazon app shows a language selection popup IMMEDIATELY after launch on mobile.
-//   This popup appears BEFORE any Cucumber step can execute.
-//   Therefore, popup handling is done DIRECTLY in this Before hook — NOT in step definitions.
-//   After createSession() returns, Android-specific popup handling runs immediately.
-//   This ensures the app is ready for interaction when the first step executes.
-//
 // ══════════════════════════════════════════════════════════════════════════════
-// PLATFORM ISOLATION — CRITICAL
+// PERFORMANCE OPTIMIZATION — LAZY LOADING
 // ══════════════════════════════════════════════════════════════════════════════
-//   Web execution:  this.page   = Playwright page object (has .locator(), .screenshot())
-//   iOS execution:  this.driver = Appium/WebDriverIO driver (has .$(), .saveScreenshot())
-//   Android exec.:  this.driver = Appium/WebDriverIO driver (has .$(), .saveScreenshot())
+//   Web-related modules (WebDriverFactory, ScreenshotUtility, BrowserCacheCleanup)
+//   are NOT loaded at module scope. They are dynamically required only when the
+//   corresponding hook branch is executed (BeforeAll, Before, After).
 //
-//   For backward compatibility with step definitions that reference this.page,
-//   this.page is also set to the driver for mobile execution.  However, the
-//   page objects in pages/ (AmazonHomePage, etc.) detect non-Playwright objects
-//   and delegate to MobileAmazon* implementations automatically.
+//   For ANDROID_NATIVE execution, only the following are loaded eagerly:
+//     - @cucumber/cucumber (framework hooks API)
+//     - path, fs-extra (basic Node utilities)
+//     - config/env.config (shared configuration)
+//     - utils/logger (logging)
+//     - mobile/lifecycle/DriverManager (shared driver access)
+//     - framework/common/ExecutionMode (platform detection)
+//     - framework/common/platforms (platform constants)
+//     - hooks/startup-timer (performance instrumentation)
 //
-//   Screenshots: The After hook ALWAYS passes driver to ScreenshotUtility first
-//   for mobile, avoiding "page.screenshot is not a function".
+//   Everything else is deferred until actually needed.
+//
+//   Startup timer prints per-phase timing on first BeforeAll execution,
+//   enabling precise measurement of each loading phase.
 // ══════════════════════════════════════════════════════════════════════════════
 //
-// ============================================================================
 // API ISOLATION GUARD — Do NOT remove.
 // Three independent defense layers:
 //   1. Config detection (cucumber.api.js in argv)
 //   2. Env var detection (TEST_PLATFORM=API or API_ONLY=true)
 //   3. Scenario tag detection (@api tag on feature/scenario)
-// ============================================================================
+
+'use strict';
+
+// ── STARTUP TIMER (always first to measure all subsequent loads) ─────
+const startupTimer = require('./startup-timer');
+startupTimer.mark('hooks.js module scope start');
+
+// ── EAGER IMPORTS (essential for all execution modes) ────────────────
 const { Before, After, BeforeAll, AfterAll, Status, setDefaultTimeout } = require('@cucumber/cucumber');
 const fs = require('fs-extra');
 const path = require('path');
+
+// ── Shared framework modules (lightweight) ───────────────────────────
 const config = require('../config/env.config');
 const logger = require('../utils/logger');
-const WebDriverFactory = require('../framework/web/WebDriverFactory');
-const ScreenshotUtility = require('../framework/common/ScreenshotUtility');
-const BrowserCacheCleanup = require('../framework/common/BrowserCacheCleanup');
-const MobileSessionManager = require('../framework/mobile/MobileSessionManager');
-const { handleFirstLaunchIfNeeded } = require('../framework/mobile/AmazonFirstLaunchHandler');
+const DriverManager = require('../mobile/lifecycle/DriverManager');
+const {
+  EXECUTION_MODES,
+  getExecutionMode,
+  isAndroid,
+  isAndroidNative,
+  isAndroidWeb,
+  isIOS,
+  isMobile,
+  isWeb,
+  isApi
+} = require('../framework/common/ExecutionMode');
 const { TEST_PLATFORMS } = require('../framework/common/platforms');
-const MobileDebugUtility = require('../utils/mobileDebugUtility');
-const AppiumAgent = require('../ai/agents/AppiumAgent');
+
+startupTimer.mark('Core imports complete');
 
 let browser;
 const workerId = process.env.CUCUMBER_WORKER_ID || 'main';
 
-// ---------------------------------------------------------------------------
-// Layer 1 & 2: Detect API-only execution via config path or env var
-// ---------------------------------------------------------------------------
+// ── API detection (lightweight string check) ─────────────────────────
 const cucumberConfigPath = process.argv.find(a => a.includes('cucumber.api.js'))
   || process.env.CUCUMBER_CONFIG || '';
 const isApiOnlyExecution = cucumberConfigPath.includes('cucumber.api.js')
   || String(process.env.TEST_PLATFORM || '').toUpperCase() === 'API'
   || process.env.API_ONLY === 'true';
 
-// ---------------------------------------------------------------------------
-// Layer 3: Per-scenario tag detection (checked in Before hook)
-// ---------------------------------------------------------------------------
 function isApiScenario(scenario) {
   if (!scenario || !scenario.pickle || !scenario.pickle.tags) return false;
   return scenario.pickle.tags.some(t => {
@@ -77,10 +78,14 @@ function isApiScenario(scenario) {
   });
 }
 
-const isWebExecution = !isApiOnlyExecution && config.testPlatform === TEST_PLATFORMS.WEB;
-const isAndroidExecution = !isApiOnlyExecution && config.testPlatform === TEST_PLATFORMS.ANDROID;
-const isIOSExecution = !isApiOnlyExecution && config.testPlatform === TEST_PLATFORMS.IOS;
-const isMobileExecution = !isApiOnlyExecution && (isAndroidExecution || isIOSExecution);
+// ── Platform detection (single source: ExecutionMode) ────────────────
+const executionMode = getExecutionMode();
+const isAndroidExecution = isAndroid();
+const isIOSExecution = isIOS();
+const isMobileExecution = isMobile();
+const isWebExecution = isWeb();
+
+startupTimer.mark('Platform detection complete');
 
 if (isApiOnlyExecution) {
   logger.info('[Hooks] API-only execution detected — all browser/mobile hooks are permanently skipped');
@@ -90,6 +95,8 @@ setDefaultTimeout(180000);
 
 function getMobileAppId() {
   if (isApiOnlyExecution) return '';
+  // Lazy require MobileSessionManager only when needed
+  const MobileSessionManager = require('../framework/mobile/MobileSessionManager');
   return MobileSessionManager.getAppId(config);
 }
 
@@ -97,11 +104,6 @@ function getMobileAppId() {
 // PRE-FLIGHT TOOL VALIDATION
 // ══════════════════════════════════════════════════════════════════════════
 
-/**
- * Validate that required tools are available before starting mobile tests.
- * Runs once per worker in BeforeAll. Provides clear error messages if a
- * required tool is missing.
- */
 async function validateMobilePrerequisites() {
   const { execSync } = require('child_process');
 
@@ -171,9 +173,14 @@ async function validateMobilePrerequisites() {
   }
 }
 
+startupTimer.mark('Hooks helpers loaded');
+
 // ── BeforeAll: runs once per worker ────────────────────────────────────────
 
 BeforeAll(async function () {
+  // Mark scenario start time
+  startupTimer.mark('BeforeAll started');
+
   if (isApiOnlyExecution) {
     fs.ensureDirSync(path.join(config.reportDir, 'screenshots'));
     fs.ensureDirSync(path.join(config.reportDir, 'videos', `worker-${workerId}`));
@@ -194,33 +201,28 @@ BeforeAll(async function () {
     await validateMobilePrerequisites();
   }
 
+  // ── LAZY LOAD: WebDriverFactory only for web execution ──
   if (isWebExecution) {
+    const WebDriverFactory = require('../framework/web/WebDriverFactory');
     browser = await WebDriverFactory.launch(config);
-    logger.info(`Browser launched: ${config.browser}, headless: ${config.headless}, worker: ${workerId}`);
+    logger.info(`[Hooks] Browser launched: ${config.browser}, headless: ${config.headless}, worker: ${workerId}`);
   } else if (isMobileExecution) {
-    await AppiumAgent.startServerIfNeeded();
-    logger.info(`Mobile platform: ${config.testPlatform}. Driver created per-scenario.`);
-
-    if (isAndroidExecution) {
-      if (process.env.APPIUM_AUTO_LAUNCH !== 'false') {
-        try {
-          const { execSync } = require('child_process');
-          logger.info('[Hooks] Skipping Amazon pm clear - would cause app crash');
-          execSync(`adb shell pm clear ${BrowserCacheCleanup.ANDROID_CHROME_PACKAGE} 2>/dev/null || true`, { timeout: 10000 });
-          logger.info('[Hooks] Android pre-session app data cleared via ADB');
-        } catch (err) {
-          logger.warn(`[Hooks] Android pre-session ADB cleanup failed: ${err.message}`);
-        }
-      } else {
-        logger.info('[Hooks] Skipping ADB pm clear — lifecycle already launched the app');
-      }
+    if (DriverManager.hasDriver()) {
+      logger.info('[Hooks] Driver already created by StartupOrchestrator — reusing.');
+    } else {
+      logger.info('[Hooks] No shared driver found — will create per-scenario in Before hook.');
     }
   }
+
+  startupTimer.mark("BeforeAll complete");
+  startupTimer.report();
 });
 
 // ── Before: runs before each scenario ──────────────────────────────────────
 
 Before(async function (scenario) {
+  startupTimer.mark('Before hook start');
+
   if (isApiOnlyExecution) {
     this.scenarioName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '_');
     this.artifactName = `${this.scenarioName}_worker_${workerId}`;
@@ -248,95 +250,80 @@ Before(async function (scenario) {
   logger.info(`Scenario started: ${scenario.pickle.name}`);
   this.platform = config.testPlatform;
 
-  // WEB
+  // ── WEB: Lazy load Playwright context + page ──
   if (isWebExecution) {
+    const WebDriverFactory = require('../framework/web/WebDriverFactory');
     this.context = await WebDriverFactory.newContext(browser, config);
     await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     this.page = await this.context.newPage();
     this.page.setDefaultTimeout(config.timeout);
     this.page.setDefaultNavigationTimeout(config.timeout);
+
+    // Lazy require BrowserCacheCleanup only for web
+    const BrowserCacheCleanup = require('../framework/common/BrowserCacheCleanup');
     await BrowserCacheCleanup.clearWeb({ page: this.page }).catch(function(err) {
       logger.warn('Pre-scenario web cache cleanup failed (non-fatal): ' + err.message);
     });
     return;
   }
 
-  // MOBILE
-  logger.info(`[Hooks] Creating new mobile session for scenario: ${scenario.pickle.name}`);
+  // ── MOBILE: Reuse existing driver from orchestrator ──
+  logger.info(`[Hooks] Setting up mobile for scenario: ${scenario.pickle.name}`);
 
-  let driver;
-  try {
-    if (isIOSExecution && String(config.mobile.browserName || '').toLowerCase() === 'safari') {
-      driver = await MobileSessionManager.createSafariSession(config);
-    } else {
-      driver = await MobileSessionManager.createSession(config);
-    }
-  } catch (err) {
-    logger.error(`[Hooks] Failed to create mobile session: ${err.message}`);
-    throw err;
-  }
+  let driver = null;
 
-  this.driver = driver;
-  this.page = driver;
-
-  // Android: language popup handling + home page verification
-  if (isAndroidExecution) {
+  if (DriverManager.hasDriver()) {
+    driver = DriverManager.getSharedDriver();
+    logger.info('[Hooks] Reusing existing driver from StartupOrchestrator');
+  } else {
+    // FALLBACK: Lazy require MobileSessionManager only for standalone mode
+    logger.info('[Hooks] No shared driver — creating new mobile session (standalone mode)');
     try {
-      await handleFirstLaunchIfNeeded(driver);
-      logger.info('[MobileSessionManager] Android ready.');
-      try {
-        const url = await driver.getUrl().catch(() => '');
-        const source = await driver.getPageSource().catch(() => '');
-        if (!url.includes('amazon.in') && !/search|amazon|cart|nav/i.test(source)) {
-          logger.warn('[Hooks] Android did not land on Amazon Home Page. URL: ' + url);
-        } else {
-          logger.info('[Hooks] Android verified on Amazon Home Page');
-        }
-      } catch (verifyErr) {
-        logger.warn('[Hooks] Android Home Page verification failed: ' + verifyErr.message);
+      const MobileSessionManager = require('../framework/mobile/MobileSessionManager');
+      if (isIOSExecution) {
+        driver = await MobileSessionManager.createSafariSession(config);
+      } else {
+        driver = await MobileSessionManager.createSession(config);
       }
     } catch (err) {
-      logger.error(`[Hooks] Android first-launch popup handling failed: ${err.message}`);
+      logger.error(`[Hooks] Failed to create mobile session: ${err.message}`);
       throw err;
     }
   }
 
-  // iOS: auth overlay dismissal + home page verification
-  // NOTE: Cache cleanup is now handled INSIDE createSafariSession, BEFORE navigation.
-  if (isIOSExecution) {
-    try {
-      const AmazonIOSSafariPage = require('../mobile/ios/AmazonIOSSafariPage');
-      const dismissHelper = new AmazonIOSSafariPage(driver);
-      const dismissed = await dismissHelper.dismissAuthOverlay();
-      if (dismissed) {
-        logger.info('[Hooks] Auth overlay dismissed after iOS session creation');
-      } else {
-        logger.info('[Hooks] No auth overlay present after iOS session creation');
-      }
-    } catch (authErr) {
-      logger.warn('[Hooks] Auth overlay dismissal failed (non-fatal): ' + authErr.message);
-    }
+  this.driver = driver;
 
-    try {
-      const url = await driver.getUrl().catch(() => '');
-      const isHomePage = url.includes('amazon.in') && (
-        url === 'https://www.amazon.in/' ||
-        url === 'https://www.amazon.in' ||
-        url === 'https://amazon.in/'
-      );
-      if (!isHomePage) {
-        logger.warn('[Hooks] iOS Safari URL is not Home Page: ' + url);
-      } else {
-        logger.info('[Hooks] iOS Safari verified on Amazon Home Page');
+  // ── MOBILE: Verify application initialization ──
+  // ApplicationInitializer.initialize() is called by the startup pipeline
+  // (AndroidStartupPipeline / IosStartupPipeline) after driver creation.
+  // In standalone mode (no pipeline), it is called here as fallback.
+  if (isMobileExecution) {
+    if (DriverManager.isStartupCompleted()) {
+      logger.info("[Hooks] Application already initialized by startup pipeline — dashboard verified");
+    } else {
+      // Standalone mode: run initializer now
+      logger.info("[Hooks] No startup pipeline detected — running ApplicationInitializer");
+      try {
+        var ApplicationInitializer = require("../framework/mobile/ApplicationInitializer");
+        var initResult = await ApplicationInitializer.initialize(driver, { platform: isAndroidExecution ? "android" : "ios" });
+        if (initResult.success && initResult.dashboardVerified) {
+          logger.info("[Hooks] Application initialized and dashboard verified");
+        } else {
+          logger.error("[Hooks] Application initialization FAILED — aborting");
+          throw new Error("Application initialization failed: dashboard not verified");
+        }
+      } catch (err) {
+        logger.error("[Hooks] Application initialization error: " + err.message);
+        throw err;
       }
-    } catch (verifyErr) {
-      logger.warn('[Hooks] iOS Home Page verification failed: ' + verifyErr.message);
     }
-
-    logger.info(`[Hooks] iOS session ready for scenario: ${scenario.pickle.name}`);
   }
 
-  logger.info(`[Hooks] New mobile session created for ${config.testPlatform}, scenario: ${scenario.pickle.name}`);
+  logger.info("[Hooks] Mobile session ready for " + config.testPlatform + ", scenario: " + scenario.pickle.name);
+  startupTimer.mark("Before hook complete");
+
+  logger.info(`[Hooks] Mobile session ready for ${config.testPlatform}, scenario: ${scenario.pickle.name}`);
+  startupTimer.mark('Before hook complete');
 });
 
 // ── After: runs after each scenario ────────────────────────────────────────
@@ -360,87 +347,56 @@ After(async function (scenario) {
 
     if (this.driver) {
       try {
+        // Lazy require ScreenshotUtility only for failure scenarios on mobile
+        const ScreenshotUtility = require('../framework/common/ScreenshotUtility');
         const screenshot = await ScreenshotUtility.capture({ driver: this.driver, filePath: screenshotPath });
         await this.attach(screenshot, 'image/png');
         logger.info(`[Hooks] Mobile screenshot captured (via driver): ${screenshotPath}`);
 
         try {
-          const debugUtil = new MobileDebugUtility(this.driver);
-          await debugUtil.captureFailure('scenario-failure', {
-            scenario: scenario.pickle.name,
-            error: scenario.result.exception
-          });
+          // Lazy require MobileDebugUtility only on failure
+          const MobileDebugUtility = require('../utils/mobileDebugUtility');
+          await MobileDebugUtility.captureMobileDebugInfo(this.driver, config, scenario.pickle.name);
+          logger.info('[Hooks] Mobile debug info captured');
         } catch (debugErr) {
-          logger.warn(`[Hooks] MobileDebug diagnostic capture failed: ${debugErr.message}`);
+          logger.warn('[Hooks] Mobile debug info capture failed (non-fatal): ' + debugErr.message);
         }
-      } catch (err) {
-        logger.warn(`[Hooks] Mobile screenshot via driver failed: ${err.message}`);
-        try {
-          if (this.page && typeof this.page.screenshot === 'function') {
-            const screenshot = await ScreenshotUtility.capture({ page: this.page, filePath: screenshotPath });
-            await this.attach(screenshot, 'image/png');
-            logger.info(`[Hooks] Mobile screenshot captured (via page): ${screenshotPath}`);
-          }
-        } catch (e2) {
-          logger.warn(`[Hooks] All screenshot attempts failed: ${e2.message}`);
-        }
+      } catch (screenshotErr) {
+        logger.warn('[Hooks] Screenshot capture failed: ' + screenshotErr.message);
       }
-    } else if (this.page && typeof this.page.screenshot === 'function') {
+    }
+
+    // Save page source (mobile)
+    if (this.driver) {
       try {
-        const screenshot = await ScreenshotUtility.capture({ page: this.page, filePath: screenshotPath });
-        await this.attach(screenshot, 'image/png');
-        logger.info(`[Hooks] Web screenshot captured: ${screenshotPath}`);
-      } catch (err) {
-        logger.warn(`[Hooks] Web screenshot capture failed: ${err.message}`);
+        const pageSource = await this.driver.getPageSource();
+        if (pageSource) {
+          const sourcePath = path.join(config.reportDir, 'screenshots', `${safeName}_source.html`);
+          await fs.writeFile(sourcePath, pageSource);
+          logger.info(`[Hooks] Page source saved: ${sourcePath}`);
+        }
+      } catch (sourceErr) {
+        logger.warn('[Hooks] Page source capture failed: ' + sourceErr.message);
       }
+    }
+  }
+
+  // Mobile cleanup — nothing to do on per-scenario basis
+  if (isMobileExecution) {
+    return;
+  }
+
+  // Web cleanup
+  if (this.page && !this.page.isClosed()) {
+    await this.page.close();
+  }
+  if (this.context) {
+    if (scenario.result.status === Status.FAILED) {
+      await this.context.tracing.stop({ path: path.join(config.reportDir, 'traces', `${safeName}.zip`) });
     } else {
-      logger.warn(`[Hooks] Screenshot skipped — no usable page/driver available: ${scenario.pickle.name}`);
+      await this.context.tracing.stop();
     }
-  } else {
-    logger.info(`Scenario passed: ${scenario.pickle.name}`);
-  }
-
-  // Post-scenario web cleanup
-  if (isWebExecution && this.page && typeof this.page.locator === 'function') {
-    try {
-      await BrowserCacheCleanup.clearPostScenario({ page: this.page, platform: 'WEB' });
-    } catch (err) {
-      logger.warn(`[Hooks] Post-scenario cleanup warning: ${err.message}`);
-    }
-  }
-
-  // MOBILE: Dispose session
-  if (isMobileExecution && this.driver) {
-    try {
-      await MobileSessionManager.disposeSession(this.driver, {
-        platform: config.testPlatform,
-        appId: getMobileAppId()
-      });
-      logger.info('[Hooks] Mobile session disposed successfully');
-
-      try {
-        await MobileSessionManager.cleanupBetweenScenarios(config.testPlatform);
-        logger.info('[Hooks] Between-scenario cleanup completed');
-      } catch (cleanupErr) {
-        logger.warn('[Hooks] Between-scenario cleanup failed: ' + cleanupErr.message);
-      }
-    } catch (err) {
-      logger.warn(`[Hooks] Mobile session dispose failed: ${err.message}`);
-    }
-    this.driver = null;
-    this.page = null;
-  }
-
-  // WEB: Close context
-  if (isWebExecution && this.context) {
-    try {
-      await this.context.close();
-      logger.info(`[Hooks] Browser context closed for: ${scenario.pickle.name}`);
-    } catch (err) {
-      logger.warn(`[Hooks] Context close failed: ${err.message}`);
-    }
-    this.context = null;
-    this.page = null;
+    await this.context.close();
   }
 });
 
@@ -452,13 +408,26 @@ AfterAll(async function () {
     return;
   }
 
+  // Mobile: orchestrator handles cleanup — do NOT close driver here
+  if (isMobileExecution) {
+    logger.info('[Hooks] Mobile AfterAll: driver cleanup handled by orchestrator');
+    return;
+  }
+
+  // Web: close browser
   if (isWebExecution && browser) {
     try {
       await browser.close();
-      logger.info('[Hooks] Browser closed successfully.');
+      logger.info('[Hooks] Browser closed');
     } catch (err) {
-      logger.warn(`[Hooks] Browser close failed: ${err.message}`);
+      logger.warn('[Hooks] Browser close failed: ' + err.message);
     }
-    browser = null;
   }
+
+  // Print startup timing report at the end of execution
+  startupTimer.report();
 });
+
+// ── BeforeStep / AfterStep ──────────────────────────────────────────────────
+// No BeforeStep or AfterStep hooks are currently required.
+// Platform detection variables are initialized at module scope above.

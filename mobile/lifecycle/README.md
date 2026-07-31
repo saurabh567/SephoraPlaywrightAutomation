@@ -80,7 +80,8 @@ const result = await StartupOrchestrator.startIOS(async (driver) => {
 const orchestrator = new StartupOrchestrator({
   platform: 'android',
   config: {
-    avdName: 'Pixel_6_API_34',
+    // avdName is auto-detected via emulator -list-avds at runtime
+    // Set ANDROID_AVD env var to override auto-detection
     appPackage: 'in.amazon.mShop.android.shopping',
     baseUrl: 'https://www.amazon.in'
   },

@@ -186,7 +186,10 @@ function disableAutoLaunch(baseCapabilities) {
   delete caps['appium:appActivity'];
   delete caps['appium:appWaitActivity'];
   caps['appium:noReset'] = true;
-  logger.info('[androidAppLauncher] AutoLaunch disabled');
+  // fullReset requires an APK (app capability). When using ADB launch,
+  // no APK is provided, so fullReset must be false.
+  caps['appium:fullReset'] = false;
+  logger.info('[androidAppLauncher] AutoLaunch disabled, fullReset disabled');
   return caps;
 }
 

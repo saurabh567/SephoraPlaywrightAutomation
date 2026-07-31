@@ -1,5 +1,5 @@
 {
-  "indexedAt": "2026-07-05T09:56:30.822Z",
+  "indexedAt": "2026-07-22T15:43:15.193Z",
   "categories": {
     "features": [
       {
@@ -94,6 +94,26 @@
       }
     ],
     "aiReports": [
+      {
+        "name": "api-analysis-report.md",
+        "size": "1.0 KB"
+      },
+      {
+        "name": "failure-analysis.md",
+        "size": "0.9 KB"
+      },
+      {
+        "name": "locator-healing-proposals.json",
+        "size": "0.1 KB"
+      },
+      {
+        "name": "locator-healing-report.md",
+        "size": "0.1 KB"
+      },
+      {
+        "name": "root-cause.md",
+        "size": "1.0 KB"
+      },
       {
         "name": "vector-search-results.json",
         "size": "0.1 KB"

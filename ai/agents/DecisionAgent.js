@@ -29,6 +29,7 @@ const agent = new BaseAgent({
 agent.run = async function run(input) {
   if (!input) input = {};
   console.log('[DecisionAgent] Evaluating inputs and making execution decisions');
+  const daExecCfg = require('../../config/executionConfig'); console.log('[DecisionAgent] Execution Mode selected: ' + daExecCfg.mode);
 
   // ─── Build decision object ───────────────────────────────────────────────
   var decision = {
@@ -131,7 +132,7 @@ agent.run = async function run(input) {
   });
 
   // ── 4. HEADLESS / HEADED ─────────────────────────────────────────────────
-  var headless = input.headless !== undefined ? input.headless : process.env.HEADLESS !== 'false';
+  var headless = require('../../config/executionConfig').isHeadless; // ONLY from executionConfig - single source of truth
   var headed = !headless;
   if (platform === 'ANDROID' || platform === 'IOS') { headed = true; headless = false; }
   if (platform === 'ANDROID' || platform === 'IOS') headed = true;
@@ -284,9 +285,9 @@ agent.run = async function run(input) {
     shard: shard || undefined,
     headed: !headless,
     browser: browser,
-    trace: trace,
-    video: video,
-    screenshot: screenshot,
+    trace: trace,     // stored for metadata/logging only (not emitted as CLI arg)
+    video: video,     // stored for metadata/logging only (not emitted as CLI arg)
+    screenshot: screenshot, // stored for metadata/logging only (not emitted as CLI arg)
     timeout: timeout,
     extraArgs: []
   };

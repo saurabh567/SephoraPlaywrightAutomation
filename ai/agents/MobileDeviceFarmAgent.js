@@ -14,7 +14,8 @@ const BUILTIN_DEVICES = {
     type: 'emulator',
     deviceName: 'Android Emulator',
     automationName: 'UiAutomator2',
-    avd: process.env.ANDROID_AVD || 'Pixel_6_API_34',
+    // AVD resolved at runtime — no hardcoded default
+    // Use getAndroidEmulatorConfig() to obtain a full config with dynamic AVD
   },
   'ios-simulator': {
     platform: 'ios',
@@ -26,6 +27,26 @@ const BUILTIN_DEVICES = {
 };
 
 // Cloud device farm configurations
+/**
+ * Return a complete Android emulator device config with dynamically resolved AVD.
+ * Never hardcodes an AVD name — uses getPreferredAVD() from DeviceManager.
+ */
+function getAndroidEmulatorConfig() {
+  try {
+    const DeviceManager = require('../../mobile/lifecycle/DeviceManager');
+    const avd = DeviceManager.getPreferredAVD();
+    console.log('[MobileDeviceFarmAgent] Dynamic AVD resolution: ' + avd);
+    return {
+      ...BUILTIN_DEVICES['android-emulator'],
+      avd: avd,
+    };
+  } catch (err) {
+    console.warn('[MobileDeviceFarmAgent] AVD auto-detection failed: ' + err.message);
+    console.warn('[MobileDeviceFarmAgent] Falling back to raw device config (no AVD specified)');
+    return BUILTIN_DEVICES['android-emulator'];
+  }
+}
+
 const CLOUD_PROVIDERS = {
   browserstack: {
     serverUrl: 'https://hub-cloud.browserstack.com/wd/hub',
@@ -221,7 +242,7 @@ const MobileDeviceFarmAgent = {
       const result = spawnSync('npm', ['run', scriptName], {
         stdio: 'inherit',
         env,
-        shell: true,
+        shell: false,
         timeout: testOptions.timeout || 600000,
       });
 
@@ -333,7 +354,8 @@ const MobileDeviceFarmAgent = {
 
   // Convenience: run on built-in Android emulator
   async runAndroidEmulator(appConfig = {}, testOptions = {}) {
-    return this.runOnDevice(BUILTIN_DEVICES['android-emulator'], appConfig, testOptions);
+    const deviceConfig = getAndroidEmulatorConfig();
+    return this.runOnDevice(deviceConfig, appConfig, testOptions);
   },
 
   // Convenience: run on built-in iOS simulator

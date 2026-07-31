@@ -31,6 +31,15 @@
  */
 
 const path = require('path');
+// Load iOS-specific environment variables (.env.ios)
+// This ensures BROWSER_NAME, DEVICE_NAME, PLATFORM_VERSION, UDID, etc.
+// are available when constructing capabilities for the Appium session.
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env.ios') });
+} catch (_) {
+  // dotenv may not be installed or .env.ios may not exist
+  console.log('[iOS] Note: .env.ios not loaded (dotenv unavailable or file missing)');
+}
 const { StartupOrchestrator } = require('./lifecycle');
 
 async function main() {
@@ -68,13 +77,30 @@ async function main() {
 
   if (pipelineResult.success) {
     console.log('\n  [✓] iOS tests completed successfully');
-    await orchestrator.shutdown();
-    process.exit(0);
   } else {
     console.error('\n  [✗] iOS tests failed');
-    await orchestrator.shutdown(true);
-    process.exit(1);
   }
+
+  // ── Shutdown everything ─────────────────────────────────────────────
+  await orchestrator.shutdown(!pipelineResult.success);
+
+  // ── Shutdown simulator (unless KEEP_IOS_SIMULATOR=true) ────────────
+  if (process.env.KEEP_IOS_SIMULATOR !== 'true') {
+    try {
+      var DeviceManager = require('./lifecycle/DeviceManager');
+      var udid = process.env.UDID || '';
+      if (udid) {
+        console.log('[iOS] Shutting down simulator ' + udid + '...');
+        await DeviceManager.shutdownIOSSimulator(udid);
+      }
+    } catch (e) {
+      console.warn('[iOS] Simulator shutdown warning: ' + e.message);
+    }
+  } else {
+    console.log('[iOS] KEEP_IOS_SIMULATOR=true — simulator left running');
+  }
+
+  process.exit(pipelineResult.success ? 0 : 1);
 }
 
 main().catch(err => {

@@ -127,7 +127,7 @@ function buildCommand(jmeterBin, planPath, jtlPath) {
   const rampup = process.env.JMETER_RAMPUP || getArg('--rampup', config['jmeter.rampup'] || DEFAULT_RAMPUP);
   const duration = process.env.JMETER_DURATION || getArg('--duration', config['jmeter.duration'] || DEFAULT_DURATION);
   const loopCount = process.env.JMETER_LOOP_COUNT || getArg('--loop', config['jmeter.loop'] || DEFAULT_LOOP_COUNT);
-  const baseUrl = process.env.BASE_URL || config['jmeter.base.url'] || 'https://www.amazon.in';
+  const baseUrl = process.env.BASE_URL || config['jmeter.base.url'] || 'www.amazon.in';
   const searchTerm = process.env.JMETER_SEARCH_TERM || config['jmeter.search.term'] || 'laptop';
   const heap = config['jmeter.heap'] || '-Xms1g -Xmx2g';
   const locale = config['jmeter.locale'] || '-Duser.language=en -Duser.region=IN';

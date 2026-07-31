@@ -155,6 +155,7 @@ function findSuiteStatus(statusArr, suiteName) {
 }
 
 function scanAndroidReportPaths() {
+  const found = {};
   found.androidDir = fs.existsSync(path.join(ROOT, 'reports', 'android'));
   found.htmlAndroid = fs.existsSync(path.join(ROOT, 'reports', 'html', 'android'));
   found.jsonAndroid = fs.existsSync(path.join(ROOT, 'reports', 'json', 'android'));
@@ -163,6 +164,7 @@ function scanAndroidReportPaths() {
 }
 
 function scanIOSReportPaths() {
+  const found = {};
   found.iosDir = fs.existsSync(path.join(ROOT, 'reports', 'ios'));
   found.htmlIOS = fs.existsSync(path.join(ROOT, 'reports', 'html', 'ios'));
   found.jsonIOS = fs.existsSync(path.join(ROOT, 'reports', 'json', 'ios'));

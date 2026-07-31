@@ -63,7 +63,7 @@ const SelfHealingPipelineAgent = {
     const result = spawnSync('npm', ['run', scriptName], {
       stdio: 'inherit',
       env,
-      shell: true,
+      shell: false,
       timeout: 600000,
     });
 

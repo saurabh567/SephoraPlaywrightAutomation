@@ -16,7 +16,9 @@
  *   [STEP 11] Create iOS Driver       — WebDriverIO Safari session
  *   [STEP 12] Launch Safari           — Open browser
  *   [STEP 13] Navigate to Target URL  — Go to BASE_URL
- *   [STEP 14] Execute Tests           — Run test function
+   [STEP 14] Initialize Application  — Navigate to Dashboard
+   [STEP 15] Execute Tests           — Run test function
+ *   [STEP 15] Execute Tests           — Run test function
  *
  * Strict ordering ensures no browser/app launches before:
  *   - Environment validation completes
@@ -399,8 +401,45 @@ class IosStartupPipeline {
       return { success: false, driver: driver, metrics: logger.end() };
     }
 
+
     // ════════════════════════════════════════════════════════════════
-    // [STEP 14] Execute Tests
+    // [STEP 14] Initialize Application (navigate to Dashboard)
+    //
+    // ApplicationInitializer handles all startup screens on iOS:
+    //   - Language selection (Safari web redirect)
+    //   - Onboarding skip
+    //   - Sign in skip
+    //   - Permission dialogs
+    //   - Promotional popups
+    //   - Dashboard wait + verification
+    //
+    // IDEMPOTENT — safe for all user states. Retries up to
+    // APP_INIT_MAX_RETRIES times if dashboard verification fails.
+    // ════════════════════════════════════════════════════════════════
+    console.log("[iOS-Pipeline] [STEP 14/16] Initializing application to dashboard...");
+    logger.step("Initialize Application (navigate to Dashboard)");
+    var initStart = Date.now();
+    try {
+      var ApplicationInitializer = require("../../framework/mobile/ApplicationInitializer");
+      var initResult = await ApplicationInitializer.initialize(driver, { platform: "ios" });
+      if (!initResult.success || !initResult.dashboardVerified) {
+        console.log("[iOS-Pipeline] [FAIL] Application initialization failed after retries");
+        logger.fail("Application initialization failed: dashboard not verified");
+        return { success: false, driver: driver, metrics: logger.end() };
+      }
+      console.log("[iOS-Pipeline] [PASS] Application initialized and Dashboard verified (" +
+        initResult.stepsCompleted.length + " steps)");
+      logger.pass("Application initialized to Dashboard");
+    } catch (err) {
+      console.log("[iOS-Pipeline] [FAIL] Application initialization error: " + err.message);
+      logger.fail("Application initialization error: " + err.message);
+      return { success: false, driver: driver, metrics: logger.end() };
+    }
+
+    if (logger.hasFailed()) return { success: false, driver: driver, metrics: logger.end() };
+
+    // ════════════════════════════════════════════════════════════════
+    // [STEP 15] Execute Tests
     // ════════════════════════════════════════════════════════════════
     logger.step('Execute Tests');
     var step14Start = Date.now();

@@ -1,3 +1,10 @@
+/**
+ * platforms.js
+ *
+ * Platform constants and helpers.
+ * For execution mode enum, see ExecutionMode.js.
+ */
+
 const TEST_PLATFORMS = {
   WEB: 'WEB',
   ANDROID: 'ANDROID',

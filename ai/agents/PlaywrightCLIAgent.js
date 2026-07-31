@@ -41,7 +41,7 @@ class PlaywrightCLIAgent {
     this.options = {
       profile: undefined,
       platform: process.env.TEST_PLATFORM || 'WEB',
-      headed: process.env.HEADLESS !== 'false' ? false : true,
+      headed: require('../../config/executionConfig').isHeaded, // DYNAMIC - re-evaluated every time
       browser: process.env.BROWSER || 'chromium',
       project: undefined,
       testFile: undefined,

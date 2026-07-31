@@ -193,7 +193,8 @@ class TestExecutionAgent {
    */
   async _executeViaPlaywrightCLI() {
     const platform = (process.env.TEST_PLATFORM || 'WEB').toUpperCase();
-    const headed = process.env.HEADLESS !== 'false' ? false : true;
+    const executionConfig = require('../../config/executionConfig');
+    const headed = executionConfig.isHeaded;
 
     console.log(`[TestExecutionAgent] Initializing Playwright CLI path for ${platform}`);
 

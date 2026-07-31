@@ -31,6 +31,7 @@
  */
 
 const { spawn } = require('child_process');
+const { resolveNpx, buildNpxPlaywrightArgs } = require('../utils/resolveBinaryPath');
 const fs = require('fs-extra');
 const path = require('path');
 const EventBus = require('./EventBus');
@@ -490,23 +491,9 @@ class PlaywrightExecutionEngine {
       }
     }
 
-    // ── Trace ───────────────────────────────────────────────────────────
-    const trace = options.trace || config.trace;
-    if (trace) {
-      args.push('--trace', trace);
-    }
-
-    // ── Video ───────────────────────────────────────────────────────────
-    const video = options.video || config.video;
-    if (video) {
-      args.push('--video', video);
-    }
-
-    // ── Screenshot ──────────────────────────────────────────────────────
-    const screenshot = options.screenshot || config.screenshot;
-    if (screenshot) {
-      args.push('--screenshot', screenshot);
-    }
+    // NOTE: --trace, --video, --screenshot are NOT valid Playwright CLI flags.
+    // They are config-only options set in playwright.config.js.
+    // Intentionally not emitted here.
 
     // ── Update snapshots ────────────────────────────────────────────────
     if (options.updateSnapshots || config.updateSnapshots) {
@@ -591,10 +578,14 @@ class PlaywrightExecutionEngine {
       let timedOut = false;
       let startSpawn = Date.now();
 
-      const child = spawn(command, args, {
+      // SAFE spawn: resolve binary path, no shell intervention
+      // This prevents macOS XProtect from flagging child processes
+      // as 'Malicious Script Blocked' due to shell + provenance
+      const { cmd, args: safeArgs } = buildNpxPlaywrightArgs(args);
+      const child = spawn(cmd, safeArgs, {
         cwd: ROOT,
         env,
-        shell: true,
+        shell: false,
         stdio: this.options.captureOutput ? 'pipe' : 'inherit',
         timeout: this.options.timeoutMs
       });
@@ -693,9 +684,8 @@ class PlaywrightExecutionEngine {
     if (options.tags) config.tags = options.tags;
     if (options.timeout) config.timeout = options.timeout;
     if (options.maxFailures !== undefined) config.maxFailures = options.maxFailures;
-    if (options.trace) config.trace = options.trace;
-    if (options.video) config.video = options.video;
-    if (options.screenshot) config.screenshot = options.screenshot;
+    // trace, video, screenshot are config-only (set in playwright.config.js)
+
 
     return config;
   }

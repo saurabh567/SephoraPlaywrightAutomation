@@ -1,54 +1,52 @@
 /**
- * StartupOrchestrator.js
+ * StartupOrchestrator.js — ENTERPRISE REFACTOR
  *
- * Enterprise-grade StartupOrchestrator — the single entry point for the
- * mobile automation startup lifecycle.
+ * Single entry point for the mobile automation startup lifecycle.
+ * Delegates to AndroidStartupPipeline for the deterministic 16-step sequence.
  *
- * Responsibilities:
- *   1. Environment validation
- *   2. Device/emulator/simulator lifecycle
- *   3. Appium lifecycle
- *   4. WDA lifecycle (iOS only)
- *   5. Driver creation
- *   6. Browser/app launch
- *   7. Test execution
+ * Lifecycle (Android):
+ *   [01] Validate Environment
+ *   [02] Kill Stale Processes
+ *   [03] Boot Emulator (no snapshots; ANDROID_AVD only)
+ *   [04] Verify Device Connectivity
+ *   [05] Verify App Installed
+ *   [06] Start Appium Server
+ *   [07] Verify Appium Health
+ *   [08] Create Android Driver
+ *   [09] Launch Amazon App
+ *   [10] Initialize Application (first-run screens)
+ *   [11] Verify Dashboard
+ *   [12] Execute Tests (Cucumber)
  *
- * Architecture:
- *   - Uses AndroidStartupPipeline and IosStartupPipeline for platform-specific
- *     deterministic sequences.
- *   - Centralised StepLogger for structured [STEP N] logs with timing metrics.
- *   - Every component is injectable for testability.
- *
- * Usage:
- *   const orchestrator = new StartupOrchestrator();
- *   const result = await orchestrator.startAndroid(myTestFunction);
- *   await orchestrator.shutdown();
+ * Key design:
+ *   - All components injectable for testability
+ *   - StepLogger for structured [STEP N] logs with timing
+ *   - Every failure records root cause and phase
+ *   - Deterministic polling — no arbitrary sleep()
  */
 
 'use strict';
 
-const path = require('path');
-const StepLogger = require('./StepLogger');
-const EnvironmentValidator = require('./EnvironmentValidator');
-const DeviceManager = require('./DeviceManager');
-const AppiumLifecycleManager = require('./AppiumLifecycleManager');
-const DriverManager = require('./DriverManager');
-const AndroidStartupPipeline = require('./AndroidStartupPipeline');
-const IosStartupPipeline = require('./IosStartupPipeline');
+var path = require('path');
+var StepLogger = require('./StepLogger');
+var EnvironmentValidator = require('./EnvironmentValidator');
+var DeviceManager = require('./DeviceManager');
+var AppiumLifecycleManager = require('./AppiumLifecycleManager');
+var DriverManager = require('./DriverManager');
+var AndroidStartupPipeline = require('./AndroidStartupPipeline');
+var IosStartupPipeline = require('./IosStartupPipeline');
 
 class StartupOrchestrator {
   /**
-   * Create a new StartupOrchestrator.
-   *
-   * @param {object} options - Configuration options
+   * @param {object} options
    * @param {string} options.platform - 'android' or 'ios'
-   * @param {object} options.logger - Custom StepLogger (optional)
-   * @param {object} options.envValidator - Custom EnvironmentValidator (optional)
-   * @param {object} options.deviceManager - Custom DeviceManager (optional)
-   * @param {object} options.appiumManager - Custom AppiumLifecycleManager (optional)
-   * @param {object} options.wdaManager - Custom WdaLifecycleManager (optional)
-   * @param {object} options.driverManager - Custom DriverManager (optional)
-   * @param {object} options.config - Custom configuration
+   * @param {object} options.logger - Custom StepLogger
+   * @param {object} options.envValidator - Custom EnvironmentValidator
+   * @param {object} options.deviceManager - Custom DeviceManager
+   * @param {object} options.appiumManager - Custom AppiumLifecycleManager
+   * @param {object} options.wdaManager - Custom WdaLifecycleManager (iOS only)
+   * @param {object} options.driverManager - Custom DriverManager
+   * @param {object} options.config - Configuration (avdName, allowSnapshots, etc.)
    */
   constructor(options) {
     options = options || {};
@@ -56,13 +54,13 @@ class StartupOrchestrator {
     this.platform = (options.platform || process.env.TEST_PLATFORM || 'android').toLowerCase();
     this.config = options.config || {};
 
-    // Core components (injectable for testing)
+    // Core components (injectable)
     this.logger = options.logger || new StepLogger();
     this.envValidator = options.envValidator || EnvironmentValidator;
     this.deviceManager = options.deviceManager || DeviceManager;
     this.driverManager = options.driverManager || DriverManager;
 
-    // Appium lifecycle manager
+    // Appium lifecycle
     this.appiumManager = options.appiumManager || new AppiumLifecycleManager({
       host: options.appiumHost || process.env.APPIUM_HOST,
       port: options.appiumPort || process.env.APPIUM_PORT,
@@ -71,7 +69,7 @@ class StartupOrchestrator {
       retryCount: options.appiumRetryCount || process.env.APPIUM_RETRY_COUNT
     });
 
-    // WDA lifecycle manager (iOS only)
+    // WDA (iOS only)
     this.wdaManager = options.wdaManager || null;
 
     this._driver = null;
@@ -80,10 +78,9 @@ class StartupOrchestrator {
   }
 
   /**
-   * Start the Android startup lifecycle.
-   *
-   * @param {function} testFn - Async test function to execute after startup
-   * @returns {Promise<{success: boolean, driver: object|null, metrics: object}>}
+   * Start Android lifecycle.
+   * @param {function} testFn - Async test function
+   * @returns {Promise<{success:boolean, driver:object|null, metrics:object}>}
    */
   async startAndroid(testFn) {
     this.platform = 'android';
@@ -91,10 +88,9 @@ class StartupOrchestrator {
   }
 
   /**
-   * Start the iOS startup lifecycle.
-   *
-   * @param {function} testFn - Async test function to execute after startup
-   * @returns {Promise<{success: boolean, driver: object|null, metrics: object}>}
+   * Start iOS lifecycle.
+   * @param {function} testFn - Async test function
+   * @returns {Promise<{success:boolean, driver:object|null, metrics:object}>}
    */
   async startIOS(testFn) {
     this.platform = 'ios';
@@ -102,10 +98,7 @@ class StartupOrchestrator {
   }
 
   /**
-   * Start the platform-specific startup pipeline.
-   *
-   * @param {function} testFn - Async test function
-   * @returns {Promise<{success: boolean, driver: object|null, metrics: object}>}
+   * Internal start — delegates to platform pipeline.
    */
   async _start(testFn) {
     this.logger.begin();
@@ -124,7 +117,6 @@ class StartupOrchestrator {
       if (this.platform === 'android') {
         this._pipelineResult = await AndroidStartupPipeline.run(pipelineContext);
       } else if (this.platform === 'ios') {
-        // Create WDA manager if not provided
         if (!this.wdaManager) {
           var WdaLifecycleManager = require('./WdaLifecycleManager');
           this.wdaManager = new WdaLifecycleManager({
@@ -147,86 +139,62 @@ class StartupOrchestrator {
     }
 
     this._started = true;
-    this._driver = this._pipelineResult.driver;
+    this._driver = this._pipelineResult ? this._pipelineResult.driver : null;
 
-    // Print the final summary
+    // Print final summary
     this.logger.end();
 
     return this._pipelineResult;
   }
 
-  /**
-   * Get the created driver instance.
-   * @returns {object|null}
-   */
+  /** @returns {object|null} */
   getDriver() {
     return this._driver;
   }
 
-  /**
-   * Get pipeline execution result.
-   * @returns {object|null}
-   */
+  /** @returns {object|null} */
   getResult() {
     return this._pipelineResult;
   }
 
-  /**
-   * Check if startup was successful.
-   * @returns {boolean}
-   */
+  /** @returns {boolean} */
   isSuccessful() {
     return this._pipelineResult ? this._pipelineResult.success : false;
   }
 
   /**
-   * Shutdown everything — stop Appium, WDA, and clean up driver.
-   * @param {boolean} force - Force stop even if autoStop is disabled
+   * Shutdown everything.
+   * @param {boolean} force
    */
   async shutdown(force) {
-    // Delete driver session first
     if (this._driver) {
       try {
-        await this.driverManager.deleteSession(this._driver);
+        await this._driver.deleteSession();
       } catch (_) {}
       this._driver = null;
     }
 
-    // Stop WDA (iOS only)
     if (this.wdaManager) {
       try {
         await this.wdaManager.stop();
       } catch (_) {}
     }
 
-    // Stop Appium
     try {
       await this.appiumManager.stop(force);
     } catch (_) {}
   }
 
-  /**
-   * Static convenience method — start Android in one call.
-   * @param {function} testFn
-   * @param {object} options
-   * @returns {Promise<object>}
-   */
+  /** Static convenience. */
   static async startAndroid(testFn, options) {
-    var orchestrator = new StartupOrchestrator(Object.assign({ platform: 'android' }, options));
-    var result = await orchestrator.startAndroid(testFn);
-    return result;
+    var orch = new StartupOrchestrator(Object.assign({ platform: 'android' }, options));
+    return orch.startAndroid(testFn);
   }
 
-  /**
-   * Static convenience method — start iOS in one call.
-   * @param {function} testFn
-   * @param {object} options
-   * @returns {Promise<object>}
-   */
+  /** Static convenience. */
   static async startIOS(testFn, options) {
-    var orchestrator = new StartupOrchestrator(Object.assign({ platform: 'ios' }, options));
-    var result = await orchestrator.startIOS(testFn);
-    return result;
+    var orch = new StartupOrchestrator(Object.assign({ platform: 'ios' }, options));
+    return orch.startIOS(testFn);
   }
 }
 

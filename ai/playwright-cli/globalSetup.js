@@ -33,7 +33,7 @@ async function globalSetup(config) {
   // ─── 2. Environment validation ────────────────────────────────────────
   console.log(`  Platform: ${platform}`);
   console.log(`  CI Mode: ${process.env.CI === 'true'}`);
-  console.log(`  Headless: ${process.env.HEADLESS !== 'false'}`);
+  const execCfg = require('../../config/executionConfig'); console.log(`  Headless: ${execCfg.isHeadless}`);
 
   // ─── 3. AI service health checks (non-fatal) ──────────────────────────
   try {

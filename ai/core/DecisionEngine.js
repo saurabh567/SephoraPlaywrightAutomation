@@ -59,7 +59,7 @@ class DecisionEngine {
       // Environment
       environment: process.env.ENV || 'dev',
       browser: process.env.BROWSER || 'chromium',
-      headless: process.env.HEADLESS !== 'false',
+      headless: require('../../config/executionConfig').isHeadless,
       parallel: Number(process.env.PARALLEL || 1),
 
       // Failure history from memory

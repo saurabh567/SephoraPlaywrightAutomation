@@ -12,6 +12,9 @@
  *   Execution:   workerCount, retryCount, tags, projects
  *   Statistics:  scenarioCount, featureCount
  *
+ * IMPORTANT: headless/headed mode is ALWAYS resolved dynamically from
+ * config/executionConfig.js — the single source of truth. Never cached.
+ *
  * Architecture:
  *   ┌─────────────────────────────────────────────────────┐
  *   │  ExecutionContext.getInstance()  ← singleton         │
@@ -76,7 +79,10 @@ class ExecutionContext {
     this.retryCount = 0;
     this.tags = '';
     this.projects = [];
-    this.headed = false;
+    // headed/headless: ALWAYS resolved dynamically from executionConfig.
+    // The _headed property stores an override if explicitly set via initialize().
+    // If not set, every access to this.headed re-reads executionConfig.
+    this._headed = null; // null = use executionConfig dynamically
     this.shard = null;
     this.trace = 'retain-on-failure';
     this.video = 'retain-on-failure';
@@ -110,6 +116,19 @@ class ExecutionContext {
   }
 
   /**
+   * Dynamic headed getter — always reads from executionConfig singleton
+   * unless explicitly overridden via initialize({ headed: ... }).
+   */
+  get headed() {
+    if (this._headed !== null) return this._headed;
+    return require('../../config/executionConfig').isHeaded;
+  }
+
+  set headed(val) {
+    this._headed = val;
+  }
+
+  /**
    * Initialize the execution context with environment data.
    * Call this once at the start of every orchestration.
    *
@@ -124,7 +143,7 @@ class ExecutionContext {
    * @param {number} [options.retryCount]   - Retry count
    * @param {string} [options.tags]         - Tag filter
    * @param {string[]}[options.projects]    - Project list
-   * @param {boolean}[options.headed]       - Headed mode
+   * @param {boolean}[options.headed]       - Headed mode (override)
    * @param {string} [options.shard]        - Shard spec
    * @param {string} [options.trace]        - Trace mode
    * @param {string} [options.video]        - Video mode
@@ -161,7 +180,8 @@ class ExecutionContext {
     if (options.retryCount !== undefined) this.retryCount = options.retryCount;
     if (options.tags) this.tags = options.tags;
     if (options.projects) this.projects = Array.isArray(options.projects) ? options.projects : [options.projects];
-    if (options.headed !== undefined) this.headed = options.headed;
+    // Headed: store explicit override only; otherwise use dynamic evaluation
+    if (options.headed !== undefined) this._headed = options.headed;
     if (options.shard) this.shard = options.shard;
     if (options.trace) this.trace = options.trace;
     if (options.video) this.video = options.video;
@@ -178,7 +198,7 @@ class ExecutionContext {
     // Source
     this.source = options.source || process.env.SOURCE || 'cli';
 
-    console.log(`[ExecutionContext] Initialized: id=${this.executionId} platform=${this.platform} ci=${this.isCI} env=${this.environment}`);
+    console.log(`[ExecutionContext] Initialized: id=${this.executionId} platform=${this.platform} ci=${this.isCI} env=${this.environment} headed=${this.headed}`);
 
     return this;
   }
@@ -267,7 +287,7 @@ class ExecutionContext {
       hasFailures: this.hasFailures,
       exitCode: this.exitCode,
       orchestratorPhase: this.orchestratorPhase,
-      headed: this.headed,
+      headed: this.headed,  // dynamically evaluated
       shard: this.shard,
       trace: this.trace,
       video: this.video,
@@ -317,7 +337,7 @@ class ExecutionContext {
     this.retryCount = 0;
     this.tags = '';
     this.projects = [];
-    this.headed = false;
+    this._headed = null;  // Reset to dynamic evaluation mode
     this.shard = null;
     this.trace = 'retain-on-failure';
     this.video = 'retain-on-failure';

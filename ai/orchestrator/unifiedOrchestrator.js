@@ -123,7 +123,7 @@ async function phase0Preflight(contextOptions) {
   results.environment = {
     platform: (process.env.TEST_PLATFORM || 'WEB').toUpperCase(),
     browser: process.env.BROWSER || 'chromium',
-    headless: process.env.HEADLESS !== 'false'
+    headless: require('../../config/executionConfig').isHeadless
   };
 
   // Router-based preflight agents (mcpHealthCheck, EcosystemReadiness, Planner, SmartSelector)

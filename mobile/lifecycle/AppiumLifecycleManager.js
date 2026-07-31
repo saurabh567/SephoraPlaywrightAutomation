@@ -211,7 +211,8 @@ class AppiumLifecycleManager {
       'appium',
       '--address', this.host,
       '--port', String(this.port),
-      '--base-path', this.basePath
+      '--base-path', this.basePath,
+      '--allow-insecure', 'chromedriver_autodownload'
     ];
 
     // Use --use-plugins if set

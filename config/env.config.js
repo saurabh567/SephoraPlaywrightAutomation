@@ -1,6 +1,10 @@
 // Central environment configuration read by hooks, page objects, and utility helpers.
+// Uses config/executionConfig.js as single source of truth for headless/headed mode.
+// IMPORTANT: headless mode is NEVER cached — it's always resolved dynamically
+// via a getter that re-reads executionConfig on every access.
 require('dotenv').config({ path: process.env.ENV_FILE || '.env' });
 const { normalizePlatform, TEST_PLATFORMS } = require('../framework/common/platforms');
+const executionConfig = require('./executionConfig');
 
 const environments = {
   dev: { baseUrl: process.env.BASE_URL || 'https://www.amazon.in' },
@@ -12,26 +16,13 @@ const environments = {
 const activeEnv = process.env.ENV || 'dev';
 const testPlatform = normalizePlatform(process.env.TEST_PLATFORM || TEST_PLATFORMS.WEB);
 
-// Headless mode: default TRUE (no visible browser windows).
-// Only explicit HEADLESS=false from the shell overrides this.
-// Values like '0', '', 'FALSE', 'false' are all treated as headed=false → headless=true.
-const rawHeadless = process.env.HEADLESS;
-let isHeadless = true;
-if (rawHeadless !== undefined && rawHeadless !== null) {
-  const lower = String(rawHeadless).toLowerCase().trim();
-  // Only explicit 'false' or '0' disables headless
-  if (lower === 'false' || lower === '0') {
-    isHeadless = false;
-  }
-}
-
-module.exports = {
+// Build the module exports object
+const config = {
   env: activeEnv,
   testPlatform,
   appName: process.env.APP_NAME || 'Amazon India',
   baseUrl: (environments[activeEnv] || environments.dev).baseUrl,
   browser: process.env.BROWSER || 'chromium',
-  headless: isHeadless,
   timeout: Number(process.env.TIMEOUT || 60000),
   reportDir: process.env.REPORT_DIR || 'reports',
   retries: Number(process.env.RETRIES || 1),
@@ -68,10 +59,18 @@ module.exports = {
     udid: process.env.UDID || '',
     noReset: process.env.NO_RESET === 'true',
     fullReset: process.env.FULL_RESET === 'true'
+  },
+  // Headless mode: ALWAYS resolve dynamically from executionConfig.
+  // Do NOT cache this value — use the getter to ensure every consumer
+  // gets the live headless/headed state.
+  get headless() {
+    return executionConfig.isHeadless;
   }
 };
 
 // Log headless state at startup for debugging
 if (typeof console !== 'undefined' && console.log) {
-  console.log(`[config] HEADLESS=${rawHeadless === undefined ? '(unset)' : rawHeadless} → headless=${isHeadless}, parallel=${module.exports.parallel}, browser=${module.exports.browser}`);
+  console.log(`[config] HEADLESS=${process.env.HEADLESS === undefined ? '(unset)' : process.env.HEADLESS} → headless=${config.headless}, parallel=${config.parallel}, browser=${config.browser}`);
 }
+
+module.exports = config;
